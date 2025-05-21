@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Lint frontend
+      run: |
+        cd frontend
+        npm run lint
+    
+    - name: Type check frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npm test
+      env:
+        CI: true
+
+  backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm ci
+    
+    - name: Lint backend
+      run: |
+        cd backend
+        npm run lint
+      continue-on-error: true
+    
+    - name: Type check and build backend
+      run: |
+        cd backend
+        npm run build
+    
+    - name: Run backend tests
+      run: |
+        cd backend
+        npm test
+      env:
+        MONGODB_URI: mongodb://localhost:27017/github-for-writers-test
+        NODE_ENV: test
