@@ -7,7 +7,14 @@
       "Bash(mkdir:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(gh repo create:*)"
+      "Bash(gh repo create:*)",
+      "Bash(cp:*)",
+      "Bash(timeout:*)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
