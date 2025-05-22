@@ -119,7 +119,9 @@ export const RegisterForm = () => {
           
           {registerError && (
             <div className="text-sm text-red-600 text-center p-3 bg-red-50 rounded-md">
-              {(registerError as any).response?.data?.error || 'Registration failed. Please try again.'}
+              {(registerError as any).response?.data?.error || 
+               (registerError as any).message || 
+               'Registration failed. Please check your connection and try again.'}
             </div>
           )}
           
