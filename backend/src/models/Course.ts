@@ -59,7 +59,6 @@ const courseSchema = new Schema<ICourse>({
 });
 
 courseSchema.index({ instructor: 1 });
-courseSchema.index({ enrollmentCode: 1 });
 courseSchema.index({ isActive: 1 });
 courseSchema.index({ tags: 1 });
 
