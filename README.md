@@ -31,7 +31,6 @@ github-for-ed/
 
 ### Prerequisites
 - Node.js (v18 or higher)
-- MongoDB (local or cloud instance)
 - Git
 
 ### Installation
@@ -54,28 +53,45 @@ cd ../backend
 npm install
 ```
 
-4. Set up environment variables:
+4. Set up MongoDB and environment:
 ```bash
-cd backend
-cp .env.example .env
-# Edit .env with your MongoDB connection string
+# MongoDB is included in the project - no separate installation needed!
+# Environment is already configured in backend/.env
 ```
 
 ### Development
 
-1. Start the backend server:
+1. Start MongoDB (Terminal 1):
+```bash
+./start-mongodb.sh
+```
+
+2. Start the backend server (Terminal 2):
 ```bash
 cd backend
 npm run dev
 ```
 
-2. Start the frontend development server:
+3. Start the frontend development server (Terminal 3):
 ```bash
 cd frontend
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173` and the backend at `http://localhost:5000`.
+The frontend will be available at `http://localhost:5173` and the backend at `http://localhost:5001`.
+
+### MongoDB Management
+
+```bash
+# Start MongoDB
+./start-mongodb.sh
+
+# Stop MongoDB  
+./stop-mongodb.sh
+
+# Check if MongoDB is running
+ps aux | grep mongod
+```
 
 ## Features (Planned)
 

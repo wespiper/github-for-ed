@@ -68,3 +68,8 @@ yarn-error.log
 
 # DynamoDB Local files
 .dynamodb/
+
+# Local MongoDB installation and data
+mongodb-macos-*/
+mongodb-data/
+mongodb.log
