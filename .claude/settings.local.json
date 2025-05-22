@@ -16,7 +16,8 @@
       "WebFetch(domain:github.com)",
       "Bash(rm:*)",
       "Bash(git push:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node test-backend.js)"
     ],
     "deny": []
   }
