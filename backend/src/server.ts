@@ -30,10 +30,23 @@ app.use('/api/courses', courseRoutes);
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/github-for-writers';
+    console.log('Connecting to MongoDB...');
+    
+    if (mongoURI.includes('<username>') || mongoURI.includes('<password>')) {
+      console.error('❌ Please update MONGODB_URI in .env file with your actual MongoDB connection string');
+      console.log('For local MongoDB: mongodb://localhost:27017/github-for-writers');
+      console.log('For MongoDB Atlas: Get your connection string from Atlas dashboard');
+      process.exit(1);
+    }
+    
     await mongoose.connect(mongoURI);
-    console.log('MongoDB connected successfully');
+    console.log('✅ MongoDB connected successfully');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', error.message);
+    console.log('\n💡 Solutions:');
+    console.log('1. Start local MongoDB: brew services start mongodb-community');
+    console.log('2. Or use MongoDB Atlas cloud database');
+    console.log('3. Update MONGODB_URI in backend/.env file');
     process.exit(1);
   }
 };
