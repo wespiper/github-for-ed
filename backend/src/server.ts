@@ -42,7 +42,7 @@ const connectDB = async () => {
     await mongoose.connect(mongoURI);
     console.log('✅ MongoDB connected successfully');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
+    console.error('❌ MongoDB connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');
     console.log('1. Start local MongoDB: brew services start mongodb-community');
     console.log('2. Or use MongoDB Atlas cloud database');
