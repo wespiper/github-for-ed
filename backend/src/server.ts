@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
+import adminRoutes from './routes/admin';
+import documentRoutes from './routes/documents';
+import assignmentRoutes from './routes/assignments';
+import submissionRoutes from './routes/submissions';
+import notificationRoutes from './routes/notifications';
 
 dotenv.config();
 
@@ -26,6 +31,11 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/submissions', submissionRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 const connectDB = async () => {
   try {
