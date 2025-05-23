@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 interface Version {
     id: string;
@@ -64,23 +64,13 @@ export const VersionTimeline = ({
         }
     };
 
-    const getVersionIcon = (type: string) => {
-        switch (type) {
-            case "auto":
-                return "🤖";
-            case "manual":
-                return "💾";
-            case "collaboration":
-                return "👥";
-            default:
-                return "📝";
-        }
-    };
-
-    const getChangeColor = (addedWords: number, deletedWords: number) => {
-        if (addedWords > deletedWords) return "text-branch-600";
-        if (deletedWords > addedWords) return "text-ember-600";
-        return "text-ink-600";
+    const getVersionIcon = (type: string, changes: { addedWords: number; deletedWords: number }) => {
+        // More intuitive, writer-friendly icons based on activity
+        if (type === "collaboration") return "👥";
+        if (changes.addedWords > changes.deletedWords * 2) return "✍️"; // Major writing
+        if (changes.deletedWords > changes.addedWords) return "✂️"; // Heavy editing
+        if (type === "auto") return "💫"; // Auto-save sparkle
+        return "📝"; // General writing
     };
 
     if (loading) {
@@ -95,12 +85,52 @@ export const VersionTimeline = ({
         );
     }
 
+    // Calculate writing journey progress
+    const totalWords = versions.length > 0 ? versions[0].metadata.wordCount : 0;
+    const initialWords = versions.length > 0 ? versions[versions.length - 1].metadata.wordCount : 0;
+    const journeyProgress = initialWords > 0 ? ((totalWords - initialWords) / Math.max(totalWords, 1000)) * 100 : 0;
+
+    const getActivityDescription = (type: string, changes: { addedWords: number; deletedWords: number }) => {
+        if (type === "collaboration") return "Collaborated";
+        if (changes.addedWords > changes.deletedWords * 2) return "Major writing session";
+        if (changes.deletedWords > changes.addedWords) return "Editing & refining";
+        if (changes.addedWords > 50) return "Productive writing";
+        if (type === "auto") return "Quick thoughts";
+        return "Writing session";
+    };
+
     return (
         <div className="space-y-4">
+            {/* Writing Journey Progress */}
+            {versions.length > 1 && (
+                <div className="bg-gradient-to-r from-scribe-50 to-branch-50 rounded-lg p-4 border border-scribe-200">
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-scribe-900">Writing Journey</h4>
+                        <span className="text-xs text-scribe-600">
+                            {totalWords - initialWords > 0 ? '+' : ''}{totalWords - initialWords} words
+                        </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <span className="text-xs text-scribe-600">📖 Draft</span>
+                        <div className="flex-1 bg-scribe-200 rounded-full h-2">
+                            <div 
+                                className="bg-gradient-to-r from-scribe-500 to-branch-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, Math.max(10, journeyProgress))}%` }}
+                            />
+                        </div>
+                        <span className="text-xs text-scribe-600">🎯 Goal</span>
+                    </div>
+                    <div className="mt-2 text-xs text-scribe-600">
+                        {versions.length} version{versions.length !== 1 ? 's' : ''} • 
+                        Started {formatDistanceToNow(new Date(versions[versions.length - 1]?.createdAt || Date.now()))} ago
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-ink-900">
-                    Version History
+                    Your Writing Story
                 </h3>
                 <div className="flex items-center space-x-2">
                     {compareMode ? (
@@ -110,7 +140,7 @@ export const VersionTimeline = ({
                                 disabled={selectedVersions.length !== 2}
                                 className="px-3 py-1 bg-scribe-600 text-white text-sm rounded-md hover:bg-scribe-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Compare ({selectedVersions.length}/2)
+                                See Changes ({selectedVersions.length}/2)
                             </button>
                             <button
                                 onClick={() => {
@@ -127,19 +157,18 @@ export const VersionTimeline = ({
                             onClick={() => setCompareMode(true)}
                             className="px-3 py-1 bg-ink-100 text-ink-700 text-sm rounded-md hover:bg-ink-200"
                         >
-                            Compare Versions
+                            🔍 Compare Drafts
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Timeline */}
-            <div className="space-y-3">
+            <div className="space-y-2">
                 {versions.map((version, index) => (
                     <div
                         key={version.id}
-                        onClick={() => handleVersionClick(version.version)}
-                        className={`relative p-4 border rounded-lg cursor-pointer transition-all ${
+                        className={`relative border rounded-lg transition-all ${
                             version.version === currentVersion
                                 ? "border-scribe-500 bg-scribe-50"
                                 : compareMode &&
@@ -153,128 +182,102 @@ export const VersionTimeline = ({
                             <div className="absolute left-6 top-16 w-0.5 h-6 bg-ink-200"></div>
                         )}
 
-                        <div className="flex items-start space-x-3">
-                            {/* Version indicator */}
-                            <div
-                                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                                    version.version === currentVersion
-                                        ? "bg-scribe-500 text-white"
-                                        : "bg-ink-100 text-ink-600"
-                                }`}
-                            >
-                                v{version.version}
-                            </div>
+                        {/* Compact version row */}
+                        <div 
+                            className="p-3 cursor-pointer hover:bg-ink-25 transition-colors"
+                            onClick={() => handleVersionClick(version.version)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleVersionClick(version.version);
+                                }
+                            }}
+                            aria-label={`Version ${version.version}: ${getActivityDescription(version.changes.type, version.changes)}`}
+                        >
+                            <div className="flex items-center space-x-3">
+                                {/* Version indicator - more subtle */}
+                                <div
+                                    className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                                        version.version === currentVersion
+                                            ? "bg-scribe-500 text-white"
+                                            : "bg-ink-200 text-ink-500"
+                                    }`}
+                                >
+                                    {version.version === currentVersion ? "●" : "○"}
+                                </div>
 
-                            {/* Version details */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-lg">
-                                            {getVersionIcon(
-                                                version.changes.type
+                                {/* Version details */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-lg">
+                                                {getVersionIcon(
+                                                    version.changes.type,
+                                                    version.changes
+                                                )}
+                                            </span>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-ink-900">
+                                                    {getActivityDescription(version.changes.type, version.changes)}
+                                                </h4>
+                                                <div className="flex items-center space-x-2 text-xs text-ink-500">
+                                                    <span>{formatDistanceToNow(new Date(version.createdAt))} ago</span>
+                                                    <span>•</span>
+                                                    <span>{version.metadata.wordCount} words</span>
+                                                </div>
+                                            </div>
+                                            {version.version === currentVersion && (
+                                                <span className="px-2 py-1 bg-scribe-100 text-scribe-800 text-xs font-medium rounded-full">
+                                                    Current
+                                                </span>
                                             )}
+                                        </div>
+                                        
+                                        {/* Simple activity indicator */}
+                                        <span className="text-xs text-ink-400 italic">
+                                            {version.changes.addedWords > version.changes.deletedWords * 2 
+                                                ? "✍️ Writing flow" 
+                                                : version.changes.deletedWords > version.changes.addedWords 
+                                                ? "✂️ Refining ideas"
+                                                : version.changes.type === "collaboration"
+                                                ? "👥 Collaborative"
+                                                : "📝 Progress"
+                                            }
                                         </span>
-                                        <h4 className="text-sm font-medium text-ink-900 truncate">
-                                            {version.title}
-                                        </h4>
-                                        {version.version === currentVersion && (
-                                            <span className="px-2 py-1 bg-scribe-100 text-scribe-800 text-xs font-medium rounded-full">
-                                                Current
-                                            </span>
-                                        )}
                                     </div>
-                                    <time className="text-xs text-ink-500">
-                                        {format(
-                                            new Date(version.createdAt),
-                                            "MMM d, h:mm a"
-                                        )}
-                                    </time>
                                 </div>
 
-                                <div className="mt-1 flex items-center space-x-4 text-xs text-ink-500">
-                                    <span>
-                                        {version.author.firstName}{" "}
-                                        {version.author.lastName}
-                                    </span>
-                                    <span>
-                                        {version.metadata.wordCount} words
-                                    </span>
-                                    <span>
-                                        {version.metadata.readingTime} min read
-                                    </span>
-                                    <span
-                                        className={getChangeColor(
-                                            version.changes.addedWords,
-                                            version.changes.deletedWords
-                                        )}
+                                {/* Selection indicator for compare mode */}
+                                {compareMode && (
+                                    <div
+                                        className={`flex-shrink-0 w-4 h-4 rounded border-2 ${
+                                            selectedVersions.includes(
+                                                version.version
+                                            )
+                                                ? "bg-branch-500 border-branch-500"
+                                                : "border-ink-300"
+                                        }`}
                                     >
-                                        {version.changeSummary}
-                                    </span>
-                                </div>
-
-                                {/* Change details */}
-                                {(version.changes.addedWords > 0 ||
-                                    version.changes.deletedWords > 0) && (
-                                    <div className="mt-2 flex items-center space-x-3 text-xs">
-                                        {version.changes.addedWords > 0 && (
-                                            <span className="flex items-center space-x-1 text-branch-600">
-                                                <span>
-                                                    +
-                                                    {version.changes.addedWords}{" "}
-                                                    words
-                                                </span>
-                                            </span>
-                                        )}
-                                        {version.changes.deletedWords > 0 && (
-                                            <span className="flex items-center space-x-1 text-ember-600">
-                                                <span>
-                                                    -
-                                                    {
-                                                        version.changes
-                                                            .deletedWords
-                                                    }{" "}
-                                                    words
-                                                </span>
-                                            </span>
-                                        )}
-                                        {version.changes.type ===
-                                            "collaboration" && (
-                                            <span className="flex items-center space-x-1 text-highlight-600">
-                                                <span>Collaborative edit</span>
-                                            </span>
+                                        {selectedVersions.includes(
+                                            version.version
+                                        ) && (
+                                            <svg
+                                                className="w-3 h-3 text-white"
+                                                fill="currentColor"
+                                                viewBox="0 0 20 20"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
                                         )}
                                     </div>
                                 )}
                             </div>
-
-                            {/* Selection indicator for compare mode */}
-                            {compareMode && (
-                                <div
-                                    className={`flex-shrink-0 w-4 h-4 rounded border-2 ${
-                                        selectedVersions.includes(
-                                            version.version
-                                        )
-                                            ? "bg-branch-500 border-branch-500"
-                                            : "border-ink-300"
-                                    }`}
-                                >
-                                    {selectedVersions.includes(
-                                        version.version
-                                    ) && (
-                                        <svg
-                                            className="w-3 h-3 text-white"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                        >
-                                            <path
-                                                fillRule="evenodd"
-                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                                clipRule="evenodd"
-                                            />
-                                        </svg>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
                 ))}
@@ -282,12 +285,27 @@ export const VersionTimeline = ({
 
             {/* Empty state */}
             {versions.length === 0 && (
-                <div className="text-center py-8 text-ink-500">
-                    <div className="text-4xl mb-2">📝</div>
-                    <p>No versions available yet.</p>
-                    <p className="text-sm">
-                        Start writing to create your first version!
+                <div className="text-center py-12 px-6">
+                    <div className="text-6xl mb-4">✨</div>
+                    <h3 className="text-lg font-semibold text-ink-900 mb-2">Your Writing Journey Starts Here</h3>
+                    <p className="text-ink-600 mb-1">Every great story begins with a single word.</p>
+                    <p className="text-sm text-ink-500">
+                        Start writing and watch your ideas grow—we'll track every step of your creative process.
                     </p>
+                    <div className="mt-6 flex justify-center space-x-6 text-xs text-ink-400">
+                        <div className="flex items-center space-x-1">
+                            <span>💫</span>
+                            <span>Auto-saves</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                            <span>📊</span>
+                            <span>Progress tracking</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                            <span>🔄</span>
+                            <span>Version history</span>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

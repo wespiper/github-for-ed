@@ -385,36 +385,136 @@ export const WritingAnalytics = ({
                 </div>
             </div>
 
-            {/* Writing Tips */}
-            <div className="bg-scribe-50 border border-scribe-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-scribe-900 mb-2">
-                    💡 Writing Tips
+            {/* Writing Journey Insights */}
+            <div className="bg-gradient-to-r from-scribe-50 to-highlight-50 border border-scribe-200 rounded-lg p-6">
+                <h4 className="text-lg font-semibold text-scribe-900 mb-4 flex items-center">
+                    <span className="mr-2">🚀</span>
+                    Your Writing Journey
                 </h4>
-                <div className="text-sm text-scribe-800 space-y-1">
-                    {consistencyScore < 40 && (
-                        <p>
-                            • Try to write a little bit every day to build a
-                            consistent habit.
-                        </p>
+                
+                {/* Achievement badges */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    {totalWordsAdded >= 1000 && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-branch-200">
+                            <div className="text-2xl mb-1">🏆</div>
+                            <div className="text-xs font-medium text-branch-700">Milestone Writer</div>
+                            <div className="text-xs text-branch-600">1,000+ words</div>
+                        </div>
                     )}
-                    {averageSessionDuration < 15 && (
-                        <p>
-                            • Consider longer writing sessions (15+ minutes) for
-                            better flow.
-                        </p>
+                    {consistencyScore >= 70 && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-scribe-200">
+                            <div className="text-2xl mb-1">🔥</div>
+                            <div className="text-xs font-medium text-scribe-700">Consistent Writer</div>
+                            <div className="text-xs text-scribe-600">{consistencyScore}% consistency</div>
+                        </div>
                     )}
-                    {totalWordsDeleted > totalWordsAdded * 0.3 && (
-                        <p>
-                            • You're doing a lot of editing! That's great for
-                            refining your work.
-                        </p>
+                    {averageSessionDuration >= 30 && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-highlight-200">
+                            <div className="text-2xl mb-1">⏰</div>
+                            <div className="text-xs font-medium text-highlight-700">Deep Writer</div>
+                            <div className="text-xs text-highlight-600">{Math.round(averageSessionDuration)}min sessions</div>
+                        </div>
                     )}
-                    {totalWordsAdded === 0 && (
-                        <p>
-                            • Start writing to see your progress and analytics!
-                        </p>
+                    {totalWordsDeleted > totalWordsAdded * 0.2 && (
+                        <div className="bg-white rounded-lg p-3 text-center border border-ember-200">
+                            <div className="text-2xl mb-1">✂️</div>
+                            <div className="text-xs font-medium text-ember-700">Thoughtful Editor</div>
+                            <div className="text-xs text-ember-600">Careful revision</div>
+                        </div>
                     )}
                 </div>
+
+                {/* Personalized writing tips */}
+                <div className="bg-white rounded-lg p-4 border border-scribe-200">
+                    <h5 className="text-sm font-semibold text-scribe-900 mb-2">
+                        💡 Personalized Writing Insights
+                    </h5>
+                    <div className="text-sm text-scribe-800 space-y-2">
+                        {consistencyScore < 40 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-highlight-500 mt-0.5">📅</span>
+                                <div>
+                                    <strong>Build a routine:</strong> Try writing for just 10 minutes each day. 
+                                    Small, consistent efforts lead to big improvements over time.
+                                </div>
+                            </div>
+                        )}
+                        {averageSessionDuration < 15 && totalWordsAdded > 100 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-branch-500 mt-0.5">⏱️</span>
+                                <div>
+                                    <strong>Try longer sessions:</strong> You're making good progress! 
+                                    Consider 20-30 minute writing sessions to get into a deeper flow state.
+                                </div>
+                            </div>
+                        )}
+                        {totalWordsDeleted > totalWordsAdded * 0.3 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-scribe-500 mt-0.5">✨</span>
+                                <div>
+                                    <strong>Great revision skills:</strong> You're thoughtfully editing your work. 
+                                    This shows you're developing as a writer!
+                                </div>
+                            </div>
+                        )}
+                        {mostProductiveDay.wordsAdded > 200 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-branch-500 mt-0.5">🎯</span>
+                                <div>
+                                    <strong>Peak performance:</strong> Your best day was {new Date(mostProductiveDay.date).toLocaleDateString()} 
+                                    with {mostProductiveDay.wordsAdded} words. What made that day special?
+                                </div>
+                            </div>
+                        )}
+                        {totalWordsAdded === 0 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-highlight-500 mt-0.5">🌟</span>
+                                <div>
+                                    <strong>Ready to begin:</strong> Every great writer started with a blank page. 
+                                    Start writing and watch your ideas come to life!
+                                </div>
+                            </div>
+                        )}
+                        {totalWordsAdded >= 500 && consistencyScore >= 50 && (
+                            <div className="flex items-start space-x-2">
+                                <span className="text-branch-500 mt-0.5">🚀</span>
+                                <div>
+                                    <strong>You're on fire:</strong> Great consistency and word count! 
+                                    You're developing strong writing habits that will serve you well.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Writing growth visualization */}
+                {writingPatterns.length > 2 && (
+                    <div className="mt-4 bg-white rounded-lg p-4 border border-scribe-200">
+                        <h5 className="text-sm font-semibold text-scribe-900 mb-3">
+                            📈 Your Writing Growth
+                        </h5>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div className="text-2xl font-bold text-branch-600">
+                                    {Math.round((totalWordsAdded / writingPatterns.length) * 10) / 10}
+                                </div>
+                                <div className="text-xs text-ink-600">Avg words/day</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-highlight-600">
+                                    {Math.round(averageSessionDuration)}m
+                                </div>
+                                <div className="text-xs text-ink-600">Avg session</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-scribe-600">
+                                    {activeDays}
+                                </div>
+                                <div className="text-xs text-ink-600">Active days</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -73,3 +73,7 @@ yarn-error.log
 mongodb-macos-*/
 mongodb-data/
 mongodb.log
+
+# Claude Code reflections and insights
+.claude/reflections/
+.claude/insights/

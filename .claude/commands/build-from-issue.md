@@ -1,28 +1,58 @@
 # Build from Issue
 
-**Usage:** `@build-from-issue <issue-url-or-number> [--check-comment <comment-url>]`
+**Usage:** 
+- `@build-from-issue <issue-url-or-number>` - Build feature from issue
+- `@build-from-issue --check-comment <comment-url>` - Analyze and respond to specific comment
 
-**Description:** Analyzes a GitHub issue and implements the requested feature or fix following the project's development standards. Can also check and respond to specific issue comments for iterative development.
+**Description:** Analyzes a GitHub issue and implements the requested feature or fix following the project's development standards. When using `--check-comment`, focuses specifically on analyzing and responding to the comment content rather than the original issue.
+
+## ⚠️ CRITICAL: Two Different Modes
+
+### Mode 1: Issue Implementation
+`@build-from-issue <issue-number>` → Builds the entire feature from the issue description
+
+### Mode 2: Comment Analysis 
+`@build-from-issue --check-comment <comment-url>` → Analyzes ONLY the comment and implements its specific requests
+
+**When `--check-comment` is used:**
+- ❌ Do NOT rebuild the entire feature from the issue
+- ✅ DO analyze the specific comment content as the primary directive
+- ✅ DO implement the exact changes/fixes requested in the comment
+- ✅ DO treat the comment as incremental feedback on existing implementation
 
 ## Process
 
+### For Regular Issue Implementation
 1. **Issue Analysis**
    - Fetch and parse the GitHub issue content
    - Extract requirements, acceptance criteria, and technical specifications
    - Identify if it's a feature, bug fix, enhancement, or documentation update
 
-2. **Comment Analysis** (when `--check-comment` flag is used)
-   - Fetch and parse the specific comment content
-   - Analyze the comment in context of the original issue
-   - Determine if it's feedback, a new request, or modification to existing implementation
-   - Implement requested changes or respond to feedback
+### For Comment Analysis (--check-comment flag)
+**IMPORTANT: When `--check-comment` is used, focus EXCLUSIVELY on the comment content, not the original issue.**
 
-3. **Planning Phase**
+1. **Comment-First Analysis**
+   - Fetch and parse the specific comment content as the PRIMARY source
+   - Analyze what the comment is requesting, reporting, or discussing
+   - Identify the type of comment: feedback, bug report, feature request, clarification, etc.
+
+2. **Context Understanding**
+   - Understand the comment in relation to existing implementation
+   - Determine what specific changes, fixes, or improvements are being requested
+   - Identify if this requires code changes, bug fixes, or clarifications
+
+3. **Direct Implementation**
+   - Implement the specific requests made in the comment
+   - Fix any issues reported in the comment
+   - Make the exact changes requested rather than rebuilding the entire feature
+
+### Common Planning Phase
+4. **Planning Phase** (applies to both issue and comment modes)
    - Create a todo list breaking down the implementation into manageable tasks
    - Determine if backend models, API routes, or frontend components need to be created/modified
    - Identify dependencies and prerequisites
 
-4. **Implementation Strategy**
+5. **Implementation Strategy**
    
    **For Backend Features:**
    - Create or modify Mongoose models in `backend/src/models/`
@@ -55,7 +85,14 @@
 
 ## Comment Analysis Features
 
+**CRITICAL: When `--check-comment` flag is used, this is a COMMENT-FOCUSED operation, not an issue implementation. The comment content is the primary directive.**
+
 When using `--check-comment`, the system will:
+
+### Primary Directive
+- **ANALYZE THE COMMENT FIRST**: The comment content is the main instruction, not the original issue
+- **IMPLEMENT COMMENT REQUESTS**: Focus on what the comment specifically asks for
+- **INCREMENTAL CHANGES**: Make targeted changes based on comment feedback rather than rebuilding
 
 ### Feedback Recognition
 - **Approval**: "This looks good", "Works perfectly", "Great implementation"
@@ -84,12 +121,21 @@ When using `--check-comment`, the system will:
 # Build from issue number (if repo context is available)
 @build-from-issue 15
 
-# Check and respond to a specific comment
+# COMMENT ANALYSIS MODE - Analyze and respond to specific comment
 @build-from-issue --check-comment https://github.com/username/github-for-ed/issues/15#issuecomment-123456789
-
-# Combine issue implementation with comment analysis
-@build-from-issue 15 --check-comment https://github.com/username/github-for-ed/issues/15#issuecomment-123456789
 ```
+
+### Comment Analysis Example
+When you run:
+```bash
+@build-from-issue --check-comment https://github.com/wespiper/github-for-ed/issues/3#issuecomment-2905483881
+```
+
+The system should:
+1. Fetch and analyze ONLY the comment content at that URL
+2. Determine what changes/fixes/improvements the comment requests
+3. Implement those specific requests
+4. NOT rebuild the entire feature from the original issue
 
 ## Comment URL Format
 
@@ -129,6 +175,26 @@ The command automatically determines which files need to be:
 - **Created**: New models, routes, components, tests
 - **Modified**: Existing files requiring updates
 - **Updated**: Documentation and configuration files
+
+## Troubleshooting
+
+### If `--check-comment` isn't working as expected:
+
+**Problem**: Command treats comment analysis like a full issue rebuild
+**Solution**: Ensure the flag is used correctly: `@build-from-issue --check-comment <url>` (not combined with issue number)
+
+**Problem**: Claude Code ignores the comment content  
+**Solution**: Verify the comment URL format is correct and the comment is publicly accessible
+
+**Problem**: Response is too generic and doesn't address specific comment requests
+**Solution**: Check that the comment contains specific, actionable feedback rather than general discussion
+
+### Expected Behavior
+When working correctly, `--check-comment` should:
+1. Start by quoting or referencing the specific comment content
+2. Identify the exact requests/issues raised in the comment  
+3. Implement targeted fixes rather than rebuilding features
+4. Respond directly to the comment's concerns
 
 ## Notes
 
