@@ -7,7 +7,7 @@ export const RegisterForm = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState<'student' | 'educator' | ''>('');
+  const [role, setRole] = useState<'student' | 'educator' | 'admin' | ''>('');
   const { register, isLoading, registerError } = useAuth();
   const navigate = useNavigate();
 
@@ -21,7 +21,7 @@ export const RegisterForm = () => {
         password, 
         firstName, 
         lastName, 
-        role: role as 'student' | 'educator'
+        role: role as 'student' | 'educator' | 'admin'
       });
       navigate('/dashboard');
     } catch (error) {
@@ -107,13 +107,14 @@ export const RegisterForm = () => {
             <select
               id="role"
               value={role}
-              onChange={(e) => setRole(e.target.value as 'student' | 'educator')}
+              onChange={(e) => setRole(e.target.value as 'student' | 'educator' | 'admin')}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select your role</option>
               <option value="student">Student</option>
               <option value="educator">Educator</option>
+              <option value="admin">Admin (Development)</option>
             </select>
           </div>
           

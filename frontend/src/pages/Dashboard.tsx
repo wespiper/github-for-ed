@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { CreateCourseModal } from '@/components/courses/CreateCourseModal';
+import { CreateAssignmentModal } from '@/components/assignments/CreateAssignmentModal';
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const [showCreateCourse, setShowCreateCourse] = useState(false);
+  const [showCreateAssignment, setShowCreateAssignment] = useState(false);
 
   if (!user) return null;
 
@@ -103,11 +108,17 @@ export const Dashboard = () => {
           <div className="flex gap-4">
             {user.role === 'educator' ? (
               <>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
+                <button 
+                  onClick={() => setShowCreateCourse(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                >
                   <span>+</span>
                   Create Course
                 </button>
-                <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center gap-2">
+                <button 
+                  onClick={() => setShowCreateAssignment(true)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                >
                   <span>📝</span>
                   Create Assignment
                 </button>
@@ -127,6 +138,16 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <CreateCourseModal 
+        isOpen={showCreateCourse} 
+        onClose={() => setShowCreateCourse(false)} 
+      />
+      <CreateAssignmentModal 
+        isOpen={showCreateAssignment} 
+        onClose={() => setShowCreateAssignment(false)} 
+      />
     </div>
   );
 };

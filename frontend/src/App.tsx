@@ -7,6 +7,7 @@ import { Landing } from '@/pages/Landing';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Dashboard } from '@/pages/Dashboard';
+import { EditorTestPage } from '@/components/editor/EditorTestPage';
 import { useAuthStore } from '@/stores/authStore';
 
 function App() {
@@ -36,6 +37,10 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/editor-test"
+              element={<EditorTestPage />}
             />
             <Route path="/unauthorized" element={<div className="container mx-auto py-8"><h1 className="text-2xl font-bold">Unauthorized Access</h1><p>You don't have permission to access this page.</p></div>} />
             <Route path="*" element={<div className="container mx-auto py-8"><h1 className="text-2xl font-bold">Page Not Found</h1><p>The page you're looking for doesn't exist.</p></div>} />

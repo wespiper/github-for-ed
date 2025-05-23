@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { RoleToggle } from '@/components/admin/RoleToggle';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -44,7 +46,21 @@ export const Header = () => {
                     My Courses
                   </Link>
                 )}
+                {user.role === 'admin' && (
+                  <Link
+                    to="/admin"
+                    className="text-sm font-medium transition-colors hover:text-blue-600"
+                  >
+                    Admin
+                  </Link>
+                )}
               </nav>
+              
+              {/* Notifications */}
+              <NotificationBell />
+              
+              {/* Admin Role Toggle */}
+              <RoleToggle />
               
               <div className="relative">
                 <button

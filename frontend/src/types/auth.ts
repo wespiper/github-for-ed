@@ -3,7 +3,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'student' | 'educator';
+  role: 'student' | 'educator' | 'admin';
   profilePicture?: string;
   bio?: string;
   isVerified: boolean;
@@ -21,7 +21,7 @@ export interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
-  role: 'student' | 'educator';
+  role: 'student' | 'educator' | 'admin';
 }
 
 export interface LoginData {
