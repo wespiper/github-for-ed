@@ -10,8 +10,8 @@ export interface AssignmentSubmission {
     _id: string;
     title: string;
     dueDate?: string;
-    requirements: any;
-    collaboration: any;
+    requirements: Record<string, unknown>;
+    collaboration: Record<string, unknown>;
     instructor: string;
     course: string;
   };
@@ -46,7 +46,7 @@ export interface AssignmentSubmission {
     timestamp: string;
     description: string;
     wordCount: number;
-    author: any;
+    author: { _id: string; firstName: string; lastName: string; email: string };
   }>;
   comments: Array<{
     id: string;
@@ -64,7 +64,7 @@ export interface AssignmentSubmission {
     resolved: boolean;
     createdAt: string;
     replies?: Array<{
-      author: any;
+      author: { _id: string; firstName: string; lastName: string; email: string };
       content: string;
       createdAt: string;
     }>;
@@ -81,7 +81,7 @@ export interface AssignmentSubmission {
     }>;
     collaborationMetrics: {
       contributorStats: Array<{
-        user: any;
+        user: { _id: string; firstName: string; lastName: string; email: string };
         wordsContributed: number;
         editsCount: number;
         commentsCount: number;
@@ -100,7 +100,7 @@ export interface AssignmentSubmission {
       feedback: string;
     }>;
     overallFeedback: string;
-    gradedBy: any;
+    gradedBy: { _id: string; firstName: string; lastName: string; email: string } | null;
     gradedAt: string;
   };
   aiInteractions: Array<{
@@ -155,7 +155,7 @@ const submissionsAPI = {
     submission: AssignmentSubmission;
     versionCreated: boolean;
     currentVersion: number;
-    diff: any;
+    diff: Record<string, unknown>;
   }> => {
     const response = await axios.put(`${API_BASE}/${submissionId}/content`, data);
     return response.data.data;

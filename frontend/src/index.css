@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Branch & Word Brand Colors */
+    --background: 0 0% 100%;
+    --foreground: 220 13% 9%; /* ink-900 */
+    
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%; /* ink-900 */
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%; /* ink-900 */
+    
+    --primary: 88 67% 14%; /* forest-600 */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 210 40% 96%; /* ink-100 */
+    --secondary-foreground: 220 13% 9%; /* ink-900 */
+    
+    --muted: 210 40% 96%; /* ink-100 */
+    --muted-foreground: 215 16% 47%; /* ink-500 */
+    
+    --accent: 210 40% 96%; /* ink-100 */
+    --accent-foreground: 220 13% 9%; /* ink-900 */
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 13% 91%; /* ink-200 */
+    --input: 220 13% 91%; /* ink-200 */
+    --ring: 88 67% 14%; /* forest-600 */
+    
+    --radius: 0.5rem;
+  }
+  
+  .dark {
+    --background: 224 71% 4%; /* ink-950 */
+    --foreground: 213 31% 91%; /* ink-100 */
+    
+    --card: 224 71% 4%; /* ink-950 */
+    --card-foreground: 213 31% 91%; /* ink-100 */
+    
+    --popover: 224 71% 4%; /* ink-950 */
+    --popover-foreground: 213 31% 91%; /* ink-100 */
+    
+    --primary: 88 67% 14%; /* forest-600 */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 215 28% 17%; /* ink-800 */
+    --secondary-foreground: 213 31% 91%; /* ink-100 */
+    
+    --muted: 215 28% 17%; /* ink-800 */
+    --muted-foreground: 217 11% 65%; /* ink-400 */
+    
+    --accent: 215 28% 17%; /* ink-800 */
+    --accent-foreground: 213 31% 91%; /* ink-100 */
+    
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 213 31% 91%; /* ink-100 */
+    
+    --border: 215 28% 17%; /* ink-800 */
+    --input: 215 28% 17%; /* ink-800 */
+    --ring: 88 67% 14%; /* forest-600 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

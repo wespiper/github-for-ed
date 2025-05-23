@@ -31,7 +31,11 @@
       "Bash(npm start)",
       "WebFetch(domain:api.github.com)",
       "Bash(grep:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(gh issue view:*)",
+      "Bash(gh api:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

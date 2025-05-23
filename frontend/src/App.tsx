@@ -7,6 +7,8 @@ import { Landing } from '@/pages/Landing';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Dashboard } from '@/pages/Dashboard';
+import { CreateCourse } from '@/pages/CreateCourse';
+import { CreateAssignment } from '@/pages/CreateAssignment';
 import { EditorTestPage } from '@/components/editor/EditorTestPage';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -35,6 +37,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses/create"
+              element={
+                <ProtectedRoute>
+                  <CreateCourse />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/assignments/create"
+              element={
+                <ProtectedRoute>
+                  <CreateAssignment />
                 </ProtectedRoute>
               }
             />

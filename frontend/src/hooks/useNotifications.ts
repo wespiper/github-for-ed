@@ -1,6 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 
+type ApiError = {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+};
+
+const getErrorMessage = (error: unknown, defaultMessage: string): string => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const apiError = error as ApiError;
+    return apiError.response?.data?.error || defaultMessage;
+  }
+  return defaultMessage;
+};
+
 export interface AppNotification {
   _id: string;
   recipient: string;
@@ -88,8 +104,8 @@ export const useNotifications = () => {
       setNotifications(notifs);
       setPagination(pag);
       setUnreadCount(count);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch notifications');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to fetch notifications'));
     } finally {
       setLoading(false);
     }
@@ -108,8 +124,8 @@ export const useNotifications = () => {
       );
       
       setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to mark notification as read');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to mark notification as read'));
     }
   }, []);
 
@@ -122,8 +138,8 @@ export const useNotifications = () => {
       );
       
       setUnreadCount(0);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to mark all notifications as read');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to mark all notifications as read'));
     }
   }, []);
 
@@ -138,8 +154,8 @@ export const useNotifications = () => {
       if (deletedNotif && deletedNotif.status === 'unread') {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to delete notification');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete notification'));
     }
   }, [notifications]);
 
@@ -166,8 +182,8 @@ export const useNotifications = () => {
             : notif
         )
       );
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to resolve intervention');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to resolve intervention'));
     }
   }, []);
 
@@ -175,8 +191,8 @@ export const useNotifications = () => {
     try {
       const response = await api.get('/notifications/stats', { params: { days } });
       return response.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch notification stats');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to fetch notification stats'));
       return null;
     }
   }, []);
@@ -187,8 +203,8 @@ export const useNotifications = () => {
         params: courseId ? { courseId } : undefined 
       });
       return response.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch intervention summary');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to fetch intervention summary'));
       return null;
     }
   }, []);
@@ -204,8 +220,8 @@ export const useNotifications = () => {
       await fetchNotifications();
       
       return response.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to analyze student');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to analyze student'));
       return null;
     }
   }, [fetchNotifications]);
@@ -218,8 +234,8 @@ export const useNotifications = () => {
       await fetchNotifications();
       
       return response.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to analyze course');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to analyze course'));
       return null;
     }
   }, [fetchNotifications]);
@@ -237,8 +253,8 @@ export const useNotifications = () => {
     try {
       const response = await api.post('/notifications', notificationData);
       return response.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create notification');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create notification'));
       return null;
     }
   }, []);
