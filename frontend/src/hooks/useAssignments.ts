@@ -43,11 +43,38 @@ export interface Assignment {
     allowVersionRevert: boolean;
     trackAllChanges: boolean;
   };
+  learningObjectives: {
+    id: string;
+    description: string;
+    category: 'knowledge' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
+    bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
+    assessmentCriteria: string[];
+    weight: number;
+  }[];
+  writingStages: {
+    id: string;
+    name: string;
+    description: string;
+    order: number;
+    required: boolean;
+    minWords?: number;
+    maxWords?: number;
+    durationDays?: number;
+    allowAI: boolean;
+    aiAssistanceLevel: 'none' | 'minimal' | 'moderate' | 'comprehensive';
+  }[];
   aiSettings: {
     enabled: boolean;
-    allowedAssistanceTypes: ('grammar' | 'style' | 'structure' | 'research' | 'citations')[];
+    globalBoundary: 'strict' | 'moderate' | 'permissive';
+    allowedAssistanceTypes: ('grammar' | 'style' | 'structure' | 'research' | 'citations' | 'brainstorming' | 'outlining')[];
     requireReflection: boolean;
-    boundaryLevel: 'strict' | 'moderate' | 'permissive';
+    reflectionPrompts: string[];
+    stageSpecificSettings: {
+      stageId: string;
+      allowedTypes: string[];
+      boundaryLevel: 'strict' | 'moderate' | 'permissive';
+      customPrompts: string[];
+    }[];
   };
   status: 'draft' | 'published' | 'in_progress' | 'completed' | 'archived';
   publishedAt?: string;
@@ -95,11 +122,38 @@ export interface CreateAssignmentData {
     allowVersionRevert?: boolean;
     trackAllChanges?: boolean;
   };
+  learningObjectives?: {
+    id: string;
+    description: string;
+    category: 'knowledge' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
+    bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
+    assessmentCriteria: string[];
+    weight: number;
+  }[];
+  writingStages?: {
+    id: string;
+    name: string;
+    description: string;
+    order: number;
+    required: boolean;
+    minWords?: number;
+    maxWords?: number;
+    durationDays?: number;
+    allowAI: boolean;
+    aiAssistanceLevel: 'none' | 'minimal' | 'moderate' | 'comprehensive';
+  }[];
   aiSettings?: {
     enabled?: boolean;
-    allowedAssistanceTypes?: ('grammar' | 'style' | 'structure' | 'research' | 'citations')[];
+    globalBoundary?: 'strict' | 'moderate' | 'permissive';
+    allowedAssistanceTypes?: ('grammar' | 'style' | 'structure' | 'research' | 'citations' | 'brainstorming' | 'outlining')[];
     requireReflection?: boolean;
-    boundaryLevel?: 'strict' | 'moderate' | 'permissive';
+    reflectionPrompts?: string[];
+    stageSpecificSettings?: {
+      stageId: string;
+      allowedTypes: string[];
+      boundaryLevel: 'strict' | 'moderate' | 'permissive';
+      customPrompts: string[];
+    }[];
   };
   grading?: {
     enabled?: boolean;

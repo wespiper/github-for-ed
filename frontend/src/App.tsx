@@ -3,12 +3,16 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import SimpleErrorBoundary from '@/components/SimpleErrorBoundary';
 import { Landing } from '@/pages/Landing';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Dashboard } from '@/pages/Dashboard';
 import { CreateCourse } from '@/pages/CreateCourse';
-import { CreateAssignment } from '@/pages/CreateAssignment';
+import { CreateAssignmentPage } from '@/pages/CreateAssignmentPage';
+import { CreateTemplatePage } from '@/pages/CreateTemplatePage';
+import { TemplateLibraryPage } from '@/pages/TemplateLibraryPage';
+import { DeployTemplatePage } from '@/pages/DeployTemplatePage';
 import { EditorTestPage } from '@/components/editor/EditorTestPage';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -16,9 +20,10 @@ function App() {
   const { isAuthenticated } = useAuthStore();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <Layout>
+    <SimpleErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <Layout>
           <Routes>
             <Route 
               path="/" 
@@ -52,7 +57,31 @@ function App() {
               path="/assignments/create"
               element={
                 <ProtectedRoute>
-                  <CreateAssignment />
+                  <CreateAssignmentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <ProtectedRoute>
+                  <TemplateLibraryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/create"
+              element={
+                <ProtectedRoute>
+                  <CreateTemplatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/:templateId/deploy"
+              element={
+                <ProtectedRoute>
+                  <DeployTemplatePage />
                 </ProtectedRoute>
               }
             />
@@ -66,6 +95,7 @@ function App() {
         </Layout>
       </Router>
     </QueryClientProvider>
+    </SimpleErrorBoundary>
   );
 }
 

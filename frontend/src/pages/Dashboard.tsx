@@ -1,17 +1,26 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useMyTemplates } from "@/hooks/useAssignmentTemplates";
+import { useMyCourseAssignments, useAssignmentsDueSoon } from "@/hooks/useCourseAssignments";
 import {
     BookOpen,
     FileText,
     Users,
-    AlertCircle,
     TrendingUp,
     Clock,
+    FileCode,
+    Layers,
+    CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Dashboard = () => {
     const { user } = useAuth();
+    
+    // Fetch template and assignment data for educators
+    const { data: myTemplates } = useMyTemplates({ status: 'published' });
+    const { data: myCourseAssignments } = useMyCourseAssignments({ status: 'published' });
+    const { data: assignmentsDueSoon } = useAssignmentsDueSoon(7);
 
     if (!user) return null;
 
@@ -58,44 +67,44 @@ export const Dashboard = () => {
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-branch-50 rounded-lg">
-                                        <TrendingUp className="h-5 w-5 text-branch-600" />
+                                    <div className="p-2 bg-scribe-50 rounded-lg">
+                                        <FileCode className="h-5 w-5 text-scribe-600" />
                                     </div>
                                     <h3 className="text-sm font-medium text-ink-900">
-                                        Student Progress
+                                        My Templates
                                     </h3>
                                 </div>
                             </div>
                             <div className="text-3xl font-bold text-ink-900 mb-1">
-                                42
+                                {myTemplates?.length || 0}
                             </div>
                             <p className="text-sm text-ink-600">
-                                <span className="text-branch-600 font-medium">
-                                    78%
+                                <span className="text-scribe-600 font-medium">
+                                    Reusable
                                 </span>{" "}
-                                branching beautifully
+                                assignment templates
                             </p>
                         </div>
 
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-highlight-50 rounded-lg">
-                                        <AlertCircle className="h-5 w-5 text-highlight-600" />
+                                    <div className="p-2 bg-branch-50 rounded-lg">
+                                        <Layers className="h-5 w-5 text-branch-600" />
                                     </div>
                                     <h3 className="text-sm font-medium text-ink-900">
-                                        Need Support
+                                        Course Assignments
                                     </h3>
                                 </div>
                             </div>
                             <div className="text-3xl font-bold text-ink-900 mb-1">
-                                3
+                                {myCourseAssignments?.length || 0}
                             </div>
                             <p className="text-sm text-ink-600">
-                                Writers ready for{" "}
-                                <span className="text-highlight-600 font-medium">
-                                    gentle guidance
-                                </span>
+                                <span className="text-branch-600 font-medium">
+                                    Active
+                                </span>{" "}
+                                deployed assignments
                             </p>
                         </div>
                     </>
@@ -191,14 +200,14 @@ export const Dashboard = () => {
                                     className="w-full h-auto p-6 justify-start bg-forest-600 hover:bg-forest-700"
                                     size="lg"
                                 >
-                                    <Link to="/courses/create">
-                                        <BookOpen size={20} />
+                                    <Link to="/templates/create">
+                                        <FileCode size={20} />
                                         <div className="text-left ml-3">
                                             <div className="font-medium">
-                                                Create Course
+                                                Create Assignment Template
                                             </div>
                                             <div className="text-sm opacity-90">
-                                                Cultivate a learning community
+                                                Reusable template with learning objectives
                                             </div>
                                         </div>
                                     </Link>
@@ -209,14 +218,32 @@ export const Dashboard = () => {
                                     className="w-full h-auto p-6 justify-start border-forest-200 text-forest-700 hover:bg-forest-50"
                                     size="lg"
                                 >
-                                    <Link to="/assignments/create">
-                                        <FileText size={20} />
+                                    <Link to="/templates">
+                                        <Layers size={20} />
                                         <div className="text-left ml-3">
                                             <div className="font-medium">
-                                                Create Assignment
+                                                Manage Templates
                                             </div>
                                             <div className="text-sm text-forest-600">
-                                                Help words find their purpose
+                                                Browse, deploy, and share templates
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="w-full h-auto p-6 justify-start border-gray-200 text-gray-700 hover:bg-gray-50"
+                                    size="lg"
+                                >
+                                    <Link to="/courses/create">
+                                        <BookOpen size={20} />
+                                        <div className="text-left ml-3">
+                                            <div className="font-medium">
+                                                Create Course
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                Traditional course creation
                                             </div>
                                         </div>
                                     </Link>
@@ -280,46 +307,60 @@ export const Dashboard = () => {
                         {user.role === "educator" ? (
                             <>
                                 <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-branch-50 rounded-lg">
-                                        <TrendingUp className="h-4 w-4 text-branch-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            3 writers found their thesis voice
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            arguments branching beautifully in
-                                            Workshop
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
                                     <div className="p-2 bg-scribe-50 rounded-lg">
-                                        <Users className="h-4 w-4 text-scribe-600" />
+                                        <FileCode className="h-4 w-4 text-scribe-600" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-ink-900">
-                                            Words shared in community
+                                            {myTemplates?.length || 0} assignment templates created
                                         </p>
                                         <p className="text-xs text-ink-500">
-                                            peer feedback helping papers grow
+                                            ready to deploy across courses
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-highlight-50 rounded-lg">
-                                        <AlertCircle className="h-4 w-4 text-highlight-600" />
+                                    <div className="p-2 bg-branch-50 rounded-lg">
+                                        <Layers className="h-4 w-4 text-branch-600" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-ink-900">
-                                            2 writers ready for gentle guidance
+                                            {myCourseAssignments?.length || 0} deployed assignments active
                                         </p>
                                         <p className="text-xs text-ink-500">
-                                            perfect time for nurturing
-                                            conversation
+                                            templates working across courses
                                         </p>
                                     </div>
                                 </div>
+                                {assignmentsDueSoon && assignmentsDueSoon.length > 0 ? (
+                                    <div className="flex items-start space-x-3">
+                                        <div className="p-2 bg-highlight-50 rounded-lg">
+                                            <Clock className="h-4 w-4 text-highlight-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-ink-900">
+                                                {assignmentsDueSoon.length} assignments due this week
+                                            </p>
+                                            <p className="text-xs text-ink-500">
+                                                students approaching deadlines
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-start space-x-3">
+                                        <div className="p-2 bg-green-50 rounded-lg">
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-ink-900">
+                                                No urgent deadlines this week
+                                            </p>
+                                            <p className="text-xs text-ink-500">
+                                                perfect time for template creation
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         ) : (
                             <>
@@ -367,6 +408,7 @@ export const Dashboard = () => {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 };

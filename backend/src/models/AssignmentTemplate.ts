@@ -1,22 +1,17 @@
 import mongoose, { Document as MongooseDocument, Schema, Types } from 'mongoose';
 import { IUser } from './User';
-import { ICourse } from './Course';
 
-export interface IAssignment extends MongooseDocument {
+export interface IAssignmentTemplate extends MongooseDocument {
   _id: Types.ObjectId;
   title: string;
   description: string;
   instructions: string;
-  course: Types.ObjectId | ICourse;
   instructor: Types.ObjectId | IUser;
   
   // Assignment Configuration
   type: 'individual' | 'collaborative' | 'peer-review';
-  dueDate?: Date;
-  allowLateSubmissions: boolean;
-  maxCollaborators?: number;
   
-  // Writing Requirements
+  // Writing Requirements (Template Defaults)
   requirements: {
     minWords?: number;
     maxWords?: number;
@@ -81,11 +76,7 @@ export interface IAssignment extends MongooseDocument {
     }[];
   };
   
-  // Assignment Status
-  status: 'draft' | 'published' | 'in_progress' | 'completed' | 'archived';
-  publishedAt?: Date;
-  
-  // Grading and Feedback
+  // Grading and Feedback Template
   grading: {
     enabled: boolean;
     totalPoints?: number;
@@ -97,34 +88,34 @@ export interface IAssignment extends MongooseDocument {
     allowPeerReview: boolean;
   };
   
+  // Template Metadata
+  status: 'draft' | 'published' | 'archived';
+  tags: string[];
+  isPublic: boolean; // Allow other educators to use this template
+  usageCount: number; // Track how many times template has been deployed
+  
   // Metadata
   createdAt: Date;
   updatedAt: Date;
 }
 
-const assignmentSchema = new Schema<IAssignment>({
+const assignmentTemplateSchema = new Schema<IAssignmentTemplate>({
   title: {
     type: String,
-    required: [true, 'Assignment title is required'],
+    required: [true, 'Template title is required'],
     trim: true,
     maxlength: [200, 'Title cannot exceed 200 characters']
   },
   description: {
     type: String,
-    required: [true, 'Assignment description is required'],
+    required: [true, 'Template description is required'],
     trim: true,
     maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
   instructions: {
     type: String,
-    required: [true, 'Assignment instructions are required'],
+    required: [true, 'Template instructions are required'],
     maxlength: [10000, 'Instructions cannot exceed 10000 characters']
-  },
-  course: {
-    type: Schema.Types.ObjectId,
-    ref: 'Course',
-    required: [true, 'Course reference is required'],
-    index: true
   },
   instructor: {
     type: Schema.Types.ObjectId,
@@ -137,19 +128,6 @@ const assignmentSchema = new Schema<IAssignment>({
     enum: ['individual', 'collaborative', 'peer-review'],
     default: 'individual',
     index: true
-  },
-  dueDate: {
-    type: Date,
-    index: true
-  },
-  allowLateSubmissions: {
-    type: Boolean,
-    default: true
-  },
-  maxCollaborators: {
-    type: Number,
-    min: [2, 'Must allow at least 2 collaborators'],
-    max: [10, 'Cannot exceed 10 collaborators']
   },
   requirements: {
     minWords: {
@@ -343,16 +321,6 @@ const assignmentSchema = new Schema<IAssignment>({
       }]
     }]
   },
-  status: {
-    type: String,
-    enum: ['draft', 'published', 'in_progress', 'completed', 'archived'],
-    default: 'draft',
-    index: true
-  },
-  publishedAt: {
-    type: Date,
-    index: true
-  },
   grading: {
     enabled: {
       type: Boolean,
@@ -382,6 +350,28 @@ const assignmentSchema = new Schema<IAssignment>({
       type: Boolean,
       default: false
     }
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'published', 'archived'],
+    default: 'draft',
+    index: true
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+    maxlength: [50, 'Tag cannot exceed 50 characters']
+  }],
+  isPublic: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  usageCount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true,
@@ -390,58 +380,34 @@ const assignmentSchema = new Schema<IAssignment>({
 });
 
 // Indexes for better query performance
-assignmentSchema.index({ course: 1, status: 1 });
-assignmentSchema.index({ instructor: 1, status: 1 });
-assignmentSchema.index({ dueDate: 1, status: 1 });
-assignmentSchema.index({ type: 1, status: 1 });
+assignmentTemplateSchema.index({ instructor: 1, status: 1 });
+assignmentTemplateSchema.index({ status: 1, isPublic: 1 });
+assignmentTemplateSchema.index({ tags: 1, status: 1 });
+assignmentTemplateSchema.index({ type: 1, status: 1 });
+assignmentTemplateSchema.index({ usageCount: -1, status: 1 }); // For popularity sorting
+assignmentTemplateSchema.index({ 'learningObjectives.category': 1 });
+assignmentTemplateSchema.index({ 'learningObjectives.bloomsLevel': 1 });
 
-// Virtual for submission count
-assignmentSchema.virtual('submissionCount', {
-  ref: 'AssignmentSubmission',
+// Text search index
+assignmentTemplateSchema.index({
+  title: 'text',
+  description: 'text',
+  tags: 'text'
+});
+
+// Virtual for deployments count
+assignmentTemplateSchema.virtual('deploymentCount', {
+  ref: 'CourseAssignment',
   localField: '_id',
-  foreignField: 'assignment',
+  foreignField: 'template',
   count: true
 });
 
-// Virtual for active submissions
-assignmentSchema.virtual('activeSubmissions', {
-  ref: 'AssignmentSubmission',
-  localField: '_id',
-  foreignField: 'assignment',
-  match: { status: { $in: ['draft', 'in_progress'] } }
-});
-
-// Virtual to check if assignment is overdue
-assignmentSchema.virtual('isOverdue').get(function() {
-  if (!this.dueDate) return false;
-  return new Date() > this.dueDate && this.status !== 'completed';
-});
-
-// Virtual to calculate days remaining
-assignmentSchema.virtual('daysRemaining').get(function() {
-  if (!this.dueDate) return null;
-  const now = new Date();
-  const due = new Date(this.dueDate);
-  const diffTime = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
-});
-
 // Pre-save middleware
-assignmentSchema.pre('save', function(next) {
-  // Set publishedAt when status changes to published
-  if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-    this.publishedAt = new Date();
-  }
-  
+assignmentTemplateSchema.pre('save', function(next) {
   // Validate collaboration settings
   if (this.type === 'collaborative' && !this.collaboration.enabled) {
     this.collaboration.enabled = true;
-  }
-  
-  // Set default max collaborators for collaborative assignments
-  if (this.type === 'collaborative' && !this.maxCollaborators) {
-    this.maxCollaborators = 5;
   }
 
   // Validate learning objectives weights sum to 100%
@@ -475,105 +441,95 @@ assignmentSchema.pre('save', function(next) {
 });
 
 // Static methods
-assignmentSchema.statics.findByCourse = function(courseId: string, filters: any = {}) {
-  return this.find({ 
-    course: courseId,
-    status: { $ne: 'archived' },
-    ...filters 
-  }).populate('instructor', 'firstName lastName email')
-    .populate('submissionCount')
-    .sort({ createdAt: -1 });
-};
-
-assignmentSchema.statics.findByInstructor = function(instructorId: string, filters: any = {}) {
+assignmentTemplateSchema.statics.findByInstructor = function(instructorId: string, filters: any = {}) {
   return this.find({ 
     instructor: instructorId,
     status: { $ne: 'archived' },
     ...filters 
-  }).populate('course', 'title')
-    .populate('submissionCount')
-    .sort({ createdAt: -1 });
+  }).populate('deploymentCount')
+    .sort({ updatedAt: -1 });
 };
 
-assignmentSchema.statics.findUpcoming = function(courseId?: string) {
-  const filter: any = {
+assignmentTemplateSchema.statics.findPublicTemplates = function(filters: any = {}) {
+  return this.find({ 
     status: 'published',
-    dueDate: { $gte: new Date() }
+    isPublic: true,
+    ...filters 
+  }).populate('instructor', 'firstName lastName')
+    .populate('deploymentCount')
+    .sort({ usageCount: -1, updatedAt: -1 });
+};
+
+assignmentTemplateSchema.statics.findByTag = function(tag: string, instructorId?: string) {
+  const filter: any = {
+    tags: tag,
+    status: { $ne: 'archived' }
   };
   
-  if (courseId) {
-    filter.course = courseId;
+  if (instructorId) {
+    filter.$or = [
+      { instructor: instructorId },
+      { isPublic: true, status: 'published' }
+    ];
+  } else {
+    filter.isPublic = true;
+    filter.status = 'published';
   }
   
   return this.find(filter)
-    .populate('course', 'title')
     .populate('instructor', 'firstName lastName')
-    .sort({ dueDate: 1 });
+    .populate('deploymentCount')
+    .sort({ usageCount: -1, updatedAt: -1 });
 };
 
-// Educational workflow methods
-assignmentSchema.statics.findByLearningObjectiveCategory = function(category: string, courseId?: string) {
+assignmentTemplateSchema.statics.findByLearningObjectiveCategory = function(category: string, instructorId?: string) {
   const filter: any = {
     'learningObjectives.category': category,
     status: { $ne: 'archived' }
   };
   
-  if (courseId) {
-    filter.course = courseId;
+  if (instructorId) {
+    filter.$or = [
+      { instructor: instructorId },
+      { isPublic: true, status: 'published' }
+    ];
+  } else {
+    filter.isPublic = true;
+    filter.status = 'published';
   }
   
   return this.find(filter)
-    .populate('course', 'title')
     .populate('instructor', 'firstName lastName')
-    .sort({ createdAt: -1 });
+    .populate('deploymentCount')
+    .sort({ usageCount: -1, updatedAt: -1 });
 };
 
-assignmentSchema.statics.findByBloomsLevel = function(bloomsLevel: number, courseId?: string) {
+assignmentTemplateSchema.statics.searchTemplates = function(searchTerm: string, instructorId?: string) {
   const filter: any = {
-    'learningObjectives.bloomsLevel': bloomsLevel,
+    $text: { $search: searchTerm },
     status: { $ne: 'archived' }
   };
   
-  if (courseId) {
-    filter.course = courseId;
+  if (instructorId) {
+    filter.$or = [
+      { instructor: instructorId },
+      { isPublic: true, status: 'published' }
+    ];
+  } else {
+    filter.isPublic = true;
+    filter.status = 'published';
   }
   
-  return this.find(filter)
-    .populate('course', 'title')
+  return this.find(filter, { score: { $meta: 'textScore' } })
     .populate('instructor', 'firstName lastName')
-    .sort({ createdAt: -1 });
+    .populate('deploymentCount')
+    .sort({ score: { $meta: 'textScore' }, usageCount: -1 });
 };
 
-assignmentSchema.statics.findWithAIEnabled = function(courseId?: string) {
-  const filter: any = {
-    'aiSettings.enabled': true,
-    status: { $ne: 'archived' }
-  };
-  
-  if (courseId) {
-    filter.course = courseId;
-  }
-  
-  return this.find(filter)
-    .populate('course', 'title')
-    .populate('instructor', 'firstName lastName')
-    .sort({ createdAt: -1 });
+// Method to increment usage count
+assignmentTemplateSchema.methods.incrementUsage = function() {
+  this.usageCount += 1;
+  return this.save();
 };
 
-assignmentSchema.statics.findMultiStageAssignments = function(courseId?: string) {
-  const filter: any = {
-    $expr: { $gt: [{ $size: '$writingStages' }, 1] },
-    status: { $ne: 'archived' }
-  };
-  
-  if (courseId) {
-    filter.course = courseId;
-  }
-  
-  return this.find(filter)
-    .populate('course', 'title')
-    .populate('instructor', 'firstName lastName')
-    .sort({ createdAt: -1 });
-};
-
-export const Assignment = mongoose.model<IAssignment>('Assignment', assignmentSchema);
+export const AssignmentTemplate = mongoose.model<IAssignmentTemplate>('AssignmentTemplate', assignmentTemplateSchema);

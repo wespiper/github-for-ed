@@ -20,6 +20,8 @@ router.post('/', authenticate, requireRole(['educator', 'admin']), async (req: A
       requirements,
       collaboration,
       versionControl,
+      learningObjectives,
+      writingStages,
       aiSettings,
       grading
     } = req.body;
@@ -67,11 +69,15 @@ router.post('/', authenticate, requireRole(['educator', 'admin']), async (req: A
         trackAllChanges: true,
         ...versionControl
       },
+      learningObjectives: learningObjectives || [],
+      writingStages: writingStages || [],
       aiSettings: {
         enabled: false,
+        globalBoundary: 'moderate',
         allowedAssistanceTypes: [],
         requireReflection: true,
-        boundaryLevel: 'moderate',
+        reflectionPrompts: [],
+        stageSpecificSettings: [],
         ...aiSettings
       },
       grading: {
@@ -237,8 +243,8 @@ router.put('/:assignmentId', authenticate, requireRole(['educator', 'admin']), a
     // Update fields
     const allowedUpdates = [
       'title', 'description', 'instructions', 'type', 'dueDate', 'allowLateSubmissions',
-      'maxCollaborators', 'requirements', 'collaboration', 'versionControl', 'aiSettings',
-      'status', 'grading'
+      'maxCollaborators', 'requirements', 'collaboration', 'versionControl', 
+      'learningObjectives', 'writingStages', 'aiSettings', 'status', 'grading'
     ];
 
     allowedUpdates.forEach(field => {
@@ -453,6 +459,299 @@ router.delete('/:assignmentId', authenticate, requireRole(['educator', 'admin'])
   } catch (error) {
     console.error('Error archiving assignment:', error);
     res.status(500).json({ error: 'Failed to archive assignment' });
+  }
+});
+
+// Educational workflow endpoints
+
+// Get assignments by learning objective category
+router.get('/by-objective/:category', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { category } = req.params;
+    const { courseId } = req.query;
+    const userId = req.userId!;
+
+    // If courseId provided, verify access
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        res.status(404).json({ error: 'Course not found' });
+        return;
+      }
+
+      const isInstructor = course.instructor.toString() === userId;
+      const isAdmin = req.user!.role === 'admin';
+
+      if (!isInstructor && !isAdmin) {
+        res.status(403).json({ error: 'Access denied to this course' });
+        return;
+      }
+    }
+
+    const assignments = await (Assignment as any).findByLearningObjectiveCategory(
+      category, 
+      courseId as string
+    );
+
+    res.json({
+      message: `Assignments with ${category} learning objectives retrieved successfully`,
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching assignments by objective category:', error);
+    res.status(500).json({ error: 'Failed to fetch assignments' });
+  }
+});
+
+// Get assignments by Bloom's taxonomy level
+router.get('/by-blooms/:level', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { level } = req.params;
+    const { courseId } = req.query;
+    const userId = req.userId!;
+    const bloomsLevel = parseInt(level);
+
+    if (isNaN(bloomsLevel) || bloomsLevel < 1 || bloomsLevel > 6) {
+      res.status(400).json({ error: 'Bloom\'s level must be between 1 and 6' });
+      return;
+    }
+
+    // If courseId provided, verify access
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        res.status(404).json({ error: 'Course not found' });
+        return;
+      }
+
+      const isInstructor = course.instructor.toString() === userId;
+      const isAdmin = req.user!.role === 'admin';
+
+      if (!isInstructor && !isAdmin) {
+        res.status(403).json({ error: 'Access denied to this course' });
+        return;
+      }
+    }
+
+    const assignments = await (Assignment as any).findByBloomsLevel(
+      bloomsLevel, 
+      courseId as string
+    );
+
+    res.json({
+      message: `Assignments with Bloom's level ${bloomsLevel} retrieved successfully`,
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching assignments by Bloom\'s level:', error);
+    res.status(500).json({ error: 'Failed to fetch assignments' });
+  }
+});
+
+// Get multi-stage assignments
+router.get('/multi-stage', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { courseId } = req.query;
+    const userId = req.userId!;
+
+    // If courseId provided, verify access
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        res.status(404).json({ error: 'Course not found' });
+        return;
+      }
+
+      const isInstructor = course.instructor.toString() === userId;
+      const isAdmin = req.user!.role === 'admin';
+
+      if (!isInstructor && !isAdmin) {
+        res.status(403).json({ error: 'Access denied to this course' });
+        return;
+      }
+    }
+
+    const assignments = await (Assignment as any).findMultiStageAssignments(courseId as string);
+
+    res.json({
+      message: 'Multi-stage assignments retrieved successfully',
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching multi-stage assignments:', error);
+    res.status(500).json({ error: 'Failed to fetch assignments' });
+  }
+});
+
+// Get assignments with AI enabled
+router.get('/with-ai', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { courseId } = req.query;
+    const userId = req.userId!;
+
+    // If courseId provided, verify access
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        res.status(404).json({ error: 'Course not found' });
+        return;
+      }
+
+      const isInstructor = course.instructor.toString() === userId;
+      const isAdmin = req.user!.role === 'admin';
+
+      if (!isInstructor && !isAdmin) {
+        res.status(403).json({ error: 'Access denied to this course' });
+        return;
+      }
+    }
+
+    const assignments = await (Assignment as any).findWithAIEnabled(courseId as string);
+
+    res.json({
+      message: 'AI-enabled assignments retrieved successfully',
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching AI-enabled assignments:', error);
+    res.status(500).json({ error: 'Failed to fetch assignments' });
+  }
+});
+
+// Clone assignment template
+router.post('/:assignmentId/clone', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { assignmentId } = req.params;
+    const { title, courseId, adjustments } = req.body;
+    const userId = req.userId!;
+
+    const originalAssignment = await Assignment.findById(assignmentId);
+    if (!originalAssignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    // Verify course access for target course
+    const targetCourse = await Course.findById(courseId);
+    if (!targetCourse) {
+      res.status(404).json({ error: 'Target course not found' });
+      return;
+    }
+
+    const isInstructor = targetCourse.instructor.toString() === userId;
+    const isAdmin = req.user!.role === 'admin';
+
+    if (!isInstructor && !isAdmin) {
+      res.status(403).json({ error: 'Only course instructors can create assignments' });
+      return;
+    }
+
+    // Clone assignment
+    const clonedData = originalAssignment.toObject();
+    const { _id, createdAt, updatedAt, publishedAt, ...dataToClone } = clonedData;
+    
+    dataToClone.title = title || `${originalAssignment.title} (Copy)`;
+    dataToClone.course = new Types.ObjectId(courseId);
+    dataToClone.instructor = new Types.ObjectId(userId);
+    dataToClone.status = 'draft';
+
+    // Apply any adjustments
+    if (adjustments) {
+      Object.assign(dataToClone, adjustments);
+    }
+
+    const clonedAssignment = new Assignment(dataToClone);
+    await clonedAssignment.save();
+
+    const populatedClone = await Assignment.findById(clonedAssignment._id)
+      .populate('instructor', 'firstName lastName email')
+      .populate('course', 'title');
+
+    res.status(201).json({
+      message: 'Assignment cloned successfully',
+      data: populatedClone
+    });
+  } catch (error) {
+    console.error('Error cloning assignment:', error);
+    res.status(500).json({ error: 'Failed to clone assignment' });
+  }
+});
+
+// Validate assignment before publishing
+router.post('/:assignmentId/validate', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.userId!;
+
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isInstructor = assignment.instructor.toString() === userId;
+    const isAdmin = req.user!.role === 'admin';
+
+    if (!isInstructor && !isAdmin) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const validationResults = {
+      isValid: true,
+      errors: [] as string[],
+      warnings: [] as string[]
+    };
+
+    // Check required fields
+    if (!assignment.title?.trim()) {
+      validationResults.errors.push('Title is required');
+    }
+    if (!assignment.description?.trim()) {
+      validationResults.errors.push('Description is required');
+    }
+    if (!assignment.instructions?.trim()) {
+      validationResults.errors.push('Instructions are required');
+    }
+
+    // Validate learning objectives
+    if (!assignment.learningObjectives || assignment.learningObjectives.length === 0) {
+      validationResults.warnings.push('No learning objectives defined');
+    } else {
+      const totalWeight = assignment.learningObjectives.reduce((sum, obj) => sum + obj.weight, 0);
+      if (totalWeight !== 100) {
+        validationResults.errors.push('Learning objectives weights must sum to 100%');
+      }
+    }
+
+    // Validate writing stages
+    if (assignment.writingStages && assignment.writingStages.length > 0) {
+      const orders = assignment.writingStages.map(stage => stage.order);
+      const uniqueOrders = new Set(orders);
+      if (orders.length !== uniqueOrders.size) {
+        validationResults.errors.push('Writing stages must have unique order values');
+      }
+    }
+
+    // Validate AI settings
+    if (assignment.aiSettings.enabled && assignment.aiSettings.stageSpecificSettings) {
+      const stageIds = new Set(assignment.writingStages?.map(stage => stage.id) || []);
+      for (const setting of assignment.aiSettings.stageSpecificSettings) {
+        if (!stageIds.has(setting.stageId)) {
+          validationResults.errors.push(`AI setting references invalid stage ID: ${setting.stageId}`);
+        }
+      }
+    }
+
+    validationResults.isValid = validationResults.errors.length === 0;
+
+    res.json({
+      message: 'Assignment validation completed',
+      data: validationResults
+    });
+  } catch (error) {
+    console.error('Error validating assignment:', error);
+    res.status(500).json({ error: 'Failed to validate assignment' });
   }
 });
 

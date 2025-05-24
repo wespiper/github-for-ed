@@ -1,6 +1,7 @@
 import express, { Response } from 'express';
 import { Course, ICourse } from '../models/Course';
 import { User } from '../models/User';
+import { Assignment } from '../models/Assignment';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
@@ -11,6 +12,48 @@ interface CreateCourseRequest {
   maxStudents?: number;
   tags?: string[];
 }
+
+// Get courses based on user role
+router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const userRole = req.user!.role;
+    
+    let courses: ICourse[];
+    
+    if (userRole === 'educator') {
+      // Educators see their own courses
+      courses = await Course.find({ instructor: userId })
+        .populate('students', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else if (userRole === 'student') {
+      // Students see courses they're enrolled in
+      courses = await Course.find({ 
+        students: userId,
+        isActive: true 
+      })
+        .populate('instructor', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else if (userRole === 'admin') {
+      // Admins see all courses
+      courses = await Course.find()
+        .populate('instructor', 'firstName lastName email')
+        .populate('students', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else {
+      courses = [];
+    }
+
+    res.json({ 
+      success: true,
+      data: courses,
+      totalCount: courses.length 
+    });
+  } catch (error) {
+    console.error('Get courses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Get all courses for instructor
 router.get('/my-courses', authenticate, requireRole(['educator']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -96,7 +139,6 @@ router.get('/:courseId', authenticate, async (req: AuthenticatedRequest, res: Re
   try {
     const { courseId } = req.params;
     const userId = req.userId!;
-    const userRole = req.user!.role;
 
     const course = await Course.findById(courseId)
       .populate('instructor', 'firstName lastName email')
@@ -246,6 +288,67 @@ router.post('/:courseId/unenroll', authenticate, requireRole(['student']), async
   } catch (error) {
     console.error('Unenroll course error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get assignments for a specific course
+router.get('/:courseId/assignments', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { courseId } = req.params;
+    const { status, type } = req.query;
+    const userId = req.userId!;
+
+    // Verify course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      res.status(404).json({ error: 'Course not found' });
+      return;
+    }
+
+    // Check access permissions
+    const isInstructor = course.instructor.toString() === userId;
+    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
+    const isAdmin = req.user!.role === 'admin';
+
+    if (!isInstructor && !isStudent && !isAdmin) {
+      res.status(403).json({ error: 'Access denied to this course' });
+      return;
+    }
+
+    // Build filter for assignments
+    const filter: any = { course: courseId };
+    if (status && typeof status === 'string') filter.status = status;
+    if (type && typeof type === 'string') filter.type = type;
+
+    // Students can only see published assignments
+    if (!isInstructor && !isAdmin) {
+      filter.status = 'published';
+    }
+
+    const assignments = await Assignment.find(filter)
+      .populate('instructor', 'firstName lastName email')
+      .populate('submissionCount')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      message: 'Course assignments retrieved successfully',
+      data: {
+        course: {
+          _id: course._id,
+          title: course.title,
+          description: course.description
+        },
+        assignments,
+        totalCount: assignments.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching course assignments:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch course assignments' 
+    });
   }
 });
 

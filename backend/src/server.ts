@@ -7,8 +7,11 @@ import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import assignmentRoutes from './routes/assignments';
+import assignmentTemplateRoutes from './routes/assignmentTemplates';
+import courseAssignmentRoutes from './routes/courseAssignments';
 import submissionRoutes from './routes/submissions';
 import notificationRoutes from './routes/notifications';
+import learningObjectivesRoutes from './routes/learningObjectives';
 
 dotenv.config();
 
@@ -34,8 +37,11 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api/assignment-templates', assignmentTemplateRoutes);
+app.use('/api/course-assignments', courseAssignmentRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/learning-objectives', learningObjectivesRoutes);
 
 const connectDB = async () => {
   try {

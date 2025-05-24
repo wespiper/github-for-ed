@@ -31,13 +31,8 @@ export const useCourses = () => {
   return useQuery({
     queryKey: ['courses'],
     queryFn: async (): Promise<Course[]> => {
-      try {
-        const response = await api.get('/courses');
-        return response.data.data || [];
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-        return [];
-      }
+      const response = await api.get('/courses');
+      return response.data.data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

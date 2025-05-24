@@ -5,7 +5,7 @@ interface SidebarPanel {
     id: string;
     title: string;
     icon: React.ComponentType<{ className?: string }>;
-    component: React.ComponentType<any>;
+    component: React.ComponentType<Record<string, unknown>>;
 }
 
 interface EducationalSidebarProps {
