@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import type { ReflectionAssessment } from '@/components/ai/ReflectionQualityInterface';
+import type { AIContribution } from '@/components/ai/AIContributionTracker';
 
 // Types for analytics data
 export interface WritingProgress {
@@ -353,6 +355,143 @@ export const useUpdateAnalyticsPreferences = () => {
   });
 };
 
+// Hook for tracking AI interactions
+export const useTrackAIInteraction = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (interaction: {
+      studentId: string;
+      assignmentId: string;
+      documentId: string;
+      aiContribution: Omit<AIContribution, 'id' | 'timestamp'>;
+      reflectionAssessment: ReflectionAssessment;
+    }) => {
+      const response = await api.post('/analytics/ai-interactions', {
+        ...interaction,
+        timestamp: new Date().toISOString(),
+      });
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate related queries to refresh data
+      queryClient.invalidateQueries({
+        queryKey: ['writingProgress', variables.studentId, variables.assignmentId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['writingJourney', variables.studentId, variables.assignmentId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['aiInteractionHistory', variables.documentId]
+      });
+    },
+  });
+};
+
+// Hook for fetching AI interaction history
+export const useAIInteractionHistory = (documentId: string) => {
+  return useQuery({
+    queryKey: ['aiInteractionHistory', documentId],
+    queryFn: async () => {
+      if (!documentId) return [];
+      const response = await api.get<AIContribution[]>(
+        `/analytics/ai-interactions/${documentId}`
+      );
+      return response.data;
+    },
+    enabled: !!documentId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Hook for AI usage analytics
+export const useAIUsageAnalytics = (studentId: string, assignmentId?: string) => {
+  return useQuery({
+    queryKey: ['aiUsageAnalytics', studentId, assignmentId],
+    queryFn: async () => {
+      const endpoint = assignmentId 
+        ? `/analytics/ai-usage/${studentId}/${assignmentId}`
+        : `/analytics/ai-usage/${studentId}`;
+      const response = await api.get(endpoint);
+      return response.data;
+    },
+    enabled: !!studentId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+// Hook for reflection quality tracking
+export const useReflectionQualityAnalytics = (studentId: string, timeRange: 'week' | 'month' | 'semester' = 'month') => {
+  return useQuery({
+    queryKey: ['reflectionQualityAnalytics', studentId, timeRange],
+    queryFn: async () => {
+      const response = await api.get(
+        `/analytics/reflection-quality/${studentId}?range=${timeRange}`
+      );
+      return response.data;
+    },
+    enabled: !!studentId,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+  });
+};
+
+// Hook for AI contribution impact analysis
+export const useAIContributionImpact = (documentId: string) => {
+  return useQuery({
+    queryKey: ['aiContributionImpact', documentId],
+    queryFn: async () => {
+      if (!documentId) return null;
+      const response = await api.get(`/analytics/ai-contribution-impact/${documentId}`);
+      return response.data;
+    },
+    enabled: !!documentId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+// Hook for educational AI compliance checking
+export const useAIComplianceCheck = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (request: {
+      studentId: string;
+      assignmentId: string;
+      writingStage: 'brainstorming' | 'drafting' | 'revising' | 'editing';
+      requestedAction: string;
+      studentLevel: 'novice' | 'developing' | 'proficient' | 'advanced';
+      boundaryLevel: 'strict' | 'guided' | 'flexible';
+      reflectionQuality?: 'surface' | 'developing' | 'deep' | 'transformative';
+    }) => {
+      const response = await api.post('/analytics/ai-compliance-check', request);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      // Track compliance checks for analytics
+      queryClient.invalidateQueries({
+        queryKey: ['aiUsageAnalytics', variables.studentId, variables.assignmentId]
+      });
+    },
+  });
+};
+
+// Hook for exporting AI contribution data
+export const useExportAIContributions = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      documentId: string;
+      format: 'json' | 'csv' | 'pdf';
+      includeReflections: boolean;
+      timeRange?: { start: string; end: string };
+    }) => {
+      const response = await api.post('/analytics/export-ai-contributions', params, {
+        responseType: 'blob',
+      });
+      return response.data;
+    },
+  });
+};
+
 // Utility hook for common analytics operations
 export const useAnalyticsHelpers = () => {
   const formatDuration = (minutes: number): string => {
@@ -389,10 +528,68 @@ export const useAnalyticsHelpers = () => {
     }
   };
 
+  const getReflectionQualityScore = (quality: 'surface' | 'developing' | 'deep' | 'transformative'): number => {
+    switch (quality) {
+      case 'surface': return 25;
+      case 'developing': return 50;
+      case 'deep': return 75;
+      case 'transformative': return 100;
+    }
+  };
+
+  const getAIAccessLevelFromReflection = (quality: 'surface' | 'developing' | 'deep' | 'transformative'): 'minimal' | 'guided' | 'full' => {
+    switch (quality) {
+      case 'surface': return 'minimal';
+      case 'developing': return 'guided';
+      case 'deep': 
+      case 'transformative': return 'full';
+    }
+  };
+
+  const calculateAIContributionValue = (contributions: AIContribution[]): {
+    educationalValue: 'high' | 'medium' | 'low';
+    incorporationRate: number;
+    averageReflectionQuality: number;
+    totalInteractions: number;
+  } => {
+    if (contributions.length === 0) {
+      return {
+        educationalValue: 'low',
+        incorporationRate: 0,
+        averageReflectionQuality: 0,
+        totalInteractions: 0,
+      };
+    }
+
+    const incorporationRate = (contributions.filter(c => c.isIncorporated).length / contributions.length) * 100;
+    
+    const reflectionQualityScores = contributions.map(c => getReflectionQualityScore(c.reflectionQuality));
+    const averageReflectionQuality = reflectionQualityScores.reduce((sum, score) => sum + score, 0) / reflectionQualityScores.length;
+
+    let educationalValue: 'high' | 'medium' | 'low';
+    if (averageReflectionQuality >= 75 && incorporationRate >= 70) {
+      educationalValue = 'high';
+    } else if (averageReflectionQuality >= 50 && incorporationRate >= 50) {
+      educationalValue = 'medium';
+    } else {
+      educationalValue = 'low';
+    }
+
+    return {
+      educationalValue,
+      incorporationRate,
+      averageReflectionQuality,
+      totalInteractions: contributions.length,
+    };
+  };
+
   return {
     formatDuration,
     calculateTrend,
     getMasteryLevel,
     getPriorityColor,
+    getReflectionQualityScore,
+    getAIAccessLevelFromReflection,
+    calculateAIContributionValue,
   };
 };

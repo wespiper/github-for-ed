@@ -4,6 +4,37 @@ import { WritingSession } from '../models/WritingSession';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 
+// Educational AI Actions - Focus on questions and prompts, never content generation
+export type AIEducationalAction = 
+  // Brainstorming Stage
+  | 'generate_prompts'          // "Have you considered..." type questions
+  | 'suggest_perspectives'      // Alternative viewpoints to explore
+  | 'ask_clarifying_questions'  // Help focus ideas
+  
+  // Drafting Stage  
+  | 'suggest_organization'      // Structure questions, not content
+  | 'prompt_development'        // "What evidence supports..." questions
+  | 'identify_gaps'             // Point out missing elements
+  
+  // Revising Stage
+  | 'evaluate_arguments'        // Logic and consistency questions
+  | 'suggest_evidence_needs'    // "What would strengthen..." prompts
+  | 'question_logic'            // Critical thinking challenges
+  
+  // Editing Stage
+  | 'suggest_grammar_fixes'     // Mechanical corrections with explanation
+  | 'identify_clarity_issues'   // Questions about unclear passages  
+  | 'recommend_style_improvements' // Reader-focused suggestions
+
+// Prohibited actions - these should NEVER be allowed
+export type ProhibitedAIAction = 
+  | 'generate_content'      // Writing paragraphs or sentences
+  | 'complete_thoughts'     // Finishing student ideas
+  | 'provide_final_answers' // Giving solutions instead of guidance
+
+export type WritingStage = 'brainstorming' | 'drafting' | 'revising' | 'editing';
+
+// Current AI assistance types (educational actions to be implemented in Phase 3B)
 export type AIAssistanceType = 
   | 'grammar' 
   | 'style' 
@@ -15,6 +46,51 @@ export type AIAssistanceType =
 
 export type AIBoundaryLevel = 'strict' | 'moderate' | 'permissive';
 
+/*
+// FUTURE: Educational AI Request Interface (Phase 3B Implementation)
+export interface AIEducationalRequest {
+  studentId: string;
+  assignmentId: string;
+  submissionId?: string;
+  action: AIEducationalAction;
+  context: {
+    currentStage: WritingStage;
+    contentSample: string;
+    specificQuestion: string;      // What student is trying to figure out
+    learningObjective: string;     // What they should learn from this
+  };
+  timestamp: Date;
+}
+*/
+
+/*
+// FUTURE: Educational AI Contribution Interface (Phase 3B Implementation)
+export interface AIContribution {
+  id: string;
+  type: 'question' | 'prompt' | 'perspective' | 'feedback';
+  content: string;
+  timestamp: Date;
+  stage: WritingStage;
+  action: AIEducationalAction;
+  educationalRationale: string;   // Why this helps learning
+  
+  // Student engagement requirement
+  studentResponse: {
+    acknowledged: boolean;
+    reflection: string;           // Required explanation of thinking
+    reasoning: string;            // Why they found it helpful/not helpful
+    applied: boolean;            // Did they use this in their writing
+    modifications: string;       // How they adapted the suggestion
+  } | null;
+  
+  // Attribution and transparency
+  educatorVisible: boolean;
+  attributionRequired: boolean;   // Must be cited in final work
+  learningImpact: 'none' | 'minimal' | 'moderate' | 'significant';
+}
+*/
+
+// Maintain backward compatibility with existing implementation
 export interface AIAssistanceRequest {
   studentId: string;
   assignmentId: string;
@@ -28,6 +104,85 @@ export interface AIAssistanceRequest {
   timestamp: Date;
 }
 
+/*
+// FUTURE: Educational AI Response Interface (Phase 3B Implementation)
+export interface AIEducationalResponse {
+  requestId: string;
+  approved: boolean;
+  
+  // When approved: Educational questions and prompts
+  educationalGuidance?: {
+    type: 'question' | 'prompt' | 'perspective' | 'challenge';
+    action: AIEducationalAction;
+    content: string[];               // Array of questions/prompts, never answers
+    educationalRationale: string;    // Why this helps learning
+    expectedOutcome: string;         // What student should discover
+    reflectionPrompt: string;        // Required reflection after engagement
+  };
+  
+  // When denied: Learning-focused alternatives  
+  denialReason?: string;
+  educationalAlternatives?: {
+    independentActions: string[];    // What student can do alone
+    resourceSuggestions: string[];   // Materials to consult
+    reflectionQuestions: string[];   // Questions to consider
+    learningObjective: string;       // Why independence is valuable here
+  };
+  
+  // Always required
+  contributionTracking: {
+    mustBeAttributed: boolean;
+    visibleToEducator: boolean;
+    impactsAssessment: boolean;
+  };
+  
+  // Required reflection before next AI interaction
+  mandatoryReflection: {
+    required: boolean;
+    minimumLength: number;
+    qualityThreshold: 'basic' | 'detailed' | 'analytical';
+    prompts: string[];
+  };
+}
+*/
+
+/*
+// FUTURE: Reflection Quality Assessment (Phase 3B Implementation)
+export interface ReflectionQualityMetrics {
+  length: number;
+  thoughtfulness: 'surface' | 'developing' | 'deep';
+  specificity: 'vague' | 'specific' | 'detailed';
+  criticalThinking: 'absent' | 'present' | 'sophisticated';
+  selfAwareness: 'low' | 'medium' | 'high';
+  educationalValue: number; // 1-10 scale
+  
+  // Progressive access impact
+  unlocksNextLevel: boolean;
+  allowsMoreAIAccess: boolean;
+}
+
+// FUTURE: Progressive AI Access System (Phase 3B Implementation)
+export interface AIAccessProgression {
+  currentLevel: 'restricted' | 'standard' | 'enhanced';
+  interactionsRemaining: number;
+  reflectionQualityRequired: 'basic' | 'detailed' | 'analytical';
+  
+  unlockCriteria: {
+    reflectionQuality: number;        // Average quality score needed
+    consistentEngagement: boolean;    // Regular reflection participation
+    educatorApproval?: boolean;       // Optional educator override
+    independenceShown: boolean;       // Evidence of working without AI
+  };
+  
+  restrictions: {
+    maxInteractionsPerHour: number;
+    reflectionRequiredAfter: number;  // Every N interactions
+    educatorNotificationTrigger: boolean;
+  };
+}
+*/
+
+// Maintain backward compatibility with existing implementation  
 export interface AIAssistanceResponse {
   requestId: string;
   approved: boolean;
@@ -43,6 +198,69 @@ export interface AIAssistanceResponse {
   learningOpportunity: string;
 }
 
+/*
+// FUTURE: Educational AI Analytics Interface (Phase 3B Implementation)
+export interface AIEducationalAnalytics {
+  studentId: string;
+  assignmentId: string;
+  
+  // Educational Interaction Patterns
+  educationalEngagement: {
+    totalInteractions: number;
+    questionsAsked: number;               // AI asked questions
+    promptsEngaged: number;               // Student engaged with prompts
+    reflectionsCompleted: number;         
+    averageReflectionQuality: number;     // 1-10 scale
+    stageProgression: Record<WritingStage, number>;
+  };
+  
+  // Critical Thinking Development
+  intellectualGrowth: {
+    independentWorkTime: number;          // Minutes working without AI
+    assistedThinkingTime: number;         // Minutes engaging with AI questions
+    questionQualityImprovement: number;   // How student questions evolved
+    criticalThinkingScore: number;        // Evidence of deeper analysis
+    selfAwarenessGrowth: number;          // Metacognitive development
+  };
+  
+  // Learning Process Visibility
+  processAwareness: {
+    writingDecisionExplanations: number;  // Can articulate choices
+    revisionReasoning: number;            // Explains changes made
+    sourceEvaluation: number;             // Critical assessment of sources
+    argumentDevelopment: number;          // Logical thinking progression
+  };
+  
+  // Independence Building
+  autonomyDevelopment: {
+    aiDependencyTrend: 'increasing' | 'stable' | 'decreasing';
+    problemSolvingWithoutAI: number;      // Successfully worked independently
+    questionFormulationSkill: number;     // Asks better questions over time
+    confidenceInOwnThinking: number;      // Self-reported confidence
+    transferToNewContexts: number;        // Applies learning elsewhere
+  };
+  
+  // Educational Recommendations
+  pedagogicalInsights: {
+    readyForReducedAI: boolean;           // Can handle less assistance
+    needsMoreScaffolding: boolean;        // Requires more support
+    excellentReflector: boolean;          // High-quality self-assessment
+    criticalThinkingStrengths: string[];  // Demonstrated capabilities
+    growthOpportunities: string[];        // Areas for development
+    nextLearningChallenges: string[];     // Appropriate next steps
+  };
+  
+  // Attribution and Transparency
+  contributionTracking: {
+    totalAIContributions: number;
+    attributedContributions: number;
+    educatorVisibleInteractions: number;
+    transparencyScore: number;            // How open about AI use
+  };
+}
+*/
+
+// Maintain backward compatibility with existing implementation
 export interface AIUsageAnalytics {
   studentId: string;
   assignmentId: string;

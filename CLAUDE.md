@@ -77,13 +77,14 @@ npm run start   # Production server from compiled JS
 #### Feature Development Process
 
 1. **Understand Requirements**: Review GitHub issue, ask clarifying questions
-2. **Plan Implementation**: Identify components, APIs, and tests needed
-3. **Write Tests First**: Create failing tests that define expected behavior
-4. **Implement Backend**: API routes, database models, business logic
-5. **Implement Frontend**: Components, hooks, integration with backend
-6. **Integration Testing**: Test complete user workflows end-to-end
-7. **Manual Testing**: Verify in browser/interface
-8. **Complete Task Reflection**: Use `/reflect` command to document insights
+2. **AI Compliance Check**: If AI-related, review `.claude/docs/ai-philosophy.md` for educational alignment
+3. **Plan Implementation**: Identify components, APIs, and tests needed
+4. **Write Tests First**: Create failing tests that define expected behavior
+5. **Implement Backend**: API routes, database models, business logic
+6. **Implement Frontend**: Components, hooks, integration with backend
+7. **Integration Testing**: Test complete user workflows end-to-end
+8. **Manual Testing**: Verify in browser/interface
+9. **Complete Task Reflection**: Use `/reflect` command to document insights
 
 #### Code Quality Gates
 
@@ -284,6 +285,29 @@ Ask: "Does this help educators understand student writing development?"
 -   Assignment systems focused on writing skills and learning objectives
 -   Analytics that inform pedagogical decisions about writing instruction
 -   AI assistance that is bounded, transparent, and educational
+
+## AI Development Guidelines
+
+### **IMPORTANT: AI Philosophy Compliance**
+
+**Before implementing ANY AI-related features**, developers MUST review our comprehensive AI philosophy:
+
+📋 **Required Reading**: `.claude/docs/ai-philosophy.md`
+
+**Core AI Principles** (detailed in philosophy document):
+- **Educational Focus**: AI enhances thinking, never replaces it
+- **Questions Only**: AI asks questions and provides prompts, never generates content
+- **Mandatory Reflection**: Every AI interaction requires student thinking explanation
+- **Complete Transparency**: All AI contributions visible to students and educators
+- **Progressive Independence**: AI access decreases as student skills develop
+
+**Decision Framework**: Every AI feature must answer "Does this build student thinking or just make work easier?"
+
+**Implementation Requirements**:
+- Stage-specific educational boundaries (brainstorming ≠ editing)
+- Reflection quality assessment and progressive access
+- Complete attribution and transparency systems
+- Educator pedagogical control over AI boundaries
 
 ## Core User Workflows
 

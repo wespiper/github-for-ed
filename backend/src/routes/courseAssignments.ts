@@ -6,6 +6,13 @@ import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/a
 
 const router = Router();
 
+// Helper function to extract instructor ID from populated or non-populated field
+const getInstructorId = (instructor: any): string => {
+  return typeof instructor === 'object' && instructor._id 
+    ? instructor._id.toString() 
+    : instructor.toString();
+};
+
 // Deploy template to course
 router.post('/deploy', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -30,12 +37,39 @@ router.post('/deploy', authenticate, requireRole(['educator', 'admin']), async (
     }
 
     // Check template access
-    const isTemplateOwner = template.instructor.toString() === userId;
+    const isTemplateOwner = getInstructorId(template.instructor) === userId;
     const isTemplatePublic = template.isPublic && template.status === 'published';
     const isAdmin = req.user!.role === 'admin';
 
-    if (!isTemplateOwner && !isTemplatePublic && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this template' });
+    // Allow deployment of own templates regardless of status
+    const hasTemplateAccess = isTemplateOwner || isTemplatePublic || isAdmin;
+
+    // Debug logging
+    console.log('Template deployment access check:', {
+      templateId,
+      instructorId: getInstructorId(template.instructor),
+      currentUserId: userId,
+      isTemplateOwner,
+      templateIsPublic: template.isPublic,
+      templateStatus: template.status,
+      isTemplatePublic,
+      isAdmin,
+      userRole: req.user!.role,
+      hasTemplateAccess
+    });
+
+    if (!hasTemplateAccess) {
+      res.status(403).json({ 
+        error: 'Access denied to this template',
+        debug: {
+          isTemplateOwner,
+          isTemplatePublic,
+          isAdmin,
+          templateStatus: template.status,
+          templateIsPublic: template.isPublic,
+          note: 'You can only deploy templates you own, public published templates, or if you are an admin'
+        }
+      });
       return;
     }
 

@@ -5,6 +5,13 @@ import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/a
 
 const router = Router();
 
+// Helper function to extract instructor ID from populated or non-populated field
+const getInstructorId = (instructor: any): string => {
+  return typeof instructor === 'object' && instructor._id 
+    ? instructor._id.toString() 
+    : instructor.toString();
+};
+
 // Get all templates for an instructor
 router.get('/my-templates', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -83,12 +90,39 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
     }
     
     // Check access permissions
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isPublic = template.isPublic && template.status === 'published';
     const isAdmin = userRole === 'admin';
     
-    if (!isOwner && !isPublic && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this template' });
+    // Allow access to own templates regardless of status (for editing/deployment)
+    const hasAccess = isOwner || isPublic || isAdmin;
+    
+    // Debug logging
+    console.log('Template access check:', {
+      templateId: id,
+      instructorId: getInstructorId(template.instructor),
+      currentUserId: userId,
+      isOwner,
+      templateIsPublic: template.isPublic,
+      templateStatus: template.status,
+      isPublic,
+      isAdmin,
+      userRole,
+      hasAccess
+    });
+    
+    if (!hasAccess) {
+      res.status(403).json({ 
+        error: 'Access denied to this template',
+        debug: {
+          isOwner,
+          isPublic,
+          isAdmin,
+          templateStatus: template.status,
+          templateIsPublic: template.isPublic,
+          note: 'You can only access templates you own, public published templates, or if you are an admin'
+        }
+      });
       return;
     }
     
@@ -200,7 +234,7 @@ router.put('/:id', authenticate, requireRole(['educator', 'admin']), async (req:
     }
     
     // Check ownership
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isAdmin = userRole === 'admin';
     
     if (!isOwner && !isAdmin) {
@@ -243,7 +277,7 @@ router.patch('/:id/publish', authenticate, requireRole(['educator', 'admin']), a
     }
     
     // Check ownership
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isAdmin = userRole === 'admin';
     
     if (!isOwner && !isAdmin) {
@@ -278,7 +312,7 @@ router.patch('/:id/archive', authenticate, requireRole(['educator', 'admin']), a
     }
     
     // Check ownership
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isAdmin = userRole === 'admin';
     
     if (!isOwner && !isAdmin) {
@@ -362,7 +396,7 @@ router.get('/:id/deployments', authenticate, requireRole(['educator', 'admin']),
     }
     
     // Check ownership
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isAdmin = userRole === 'admin';
     
     if (!isOwner && !isAdmin) {
@@ -396,7 +430,7 @@ router.delete('/:id', authenticate, requireRole(['educator', 'admin']), async (r
     }
     
     // Check ownership
-    const isOwner = template.instructor.toString() === userId;
+    const isOwner = getInstructorId(template.instructor) === userId;
     const isAdmin = userRole === 'admin';
     
     if (!isOwner && !isAdmin) {
