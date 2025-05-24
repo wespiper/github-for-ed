@@ -31,28 +31,35 @@
 ### For Comment Analysis (--check-comment flag)
 **IMPORTANT: When `--check-comment` is used, focus EXCLUSIVELY on the comment content, not the original issue.**
 
-1. **Comment-First Analysis**
-   - Fetch and parse the specific comment content as the PRIMARY source
+1. **Comment Access Attempts** (CRITICAL: Must retry on failure)
+   - **First Attempt**: Try to fetch and parse the specific comment content using WebFetch
+   - **If First Attempt Fails**: Wait 2 seconds and retry with same URL
+   - **If Second Attempt Fails**: Stop implementation and ask user for guidance
+   - **NEVER**: Proceed with issue content or make assumptions about comment content
+   - **NEVER**: Try to interpret or implement based on guesswork
+
+2. **Comment-First Analysis** (Only after successful comment access)
+   - Parse the specific comment content as the PRIMARY source
    - Analyze what the comment is requesting, reporting, or discussing
    - Identify the type of comment: feedback, bug report, feature request, clarification, etc.
 
-2. **Context Understanding**
+3. **Context Understanding**
    - Understand the comment in relation to existing implementation
    - Determine what specific changes, fixes, or improvements are being requested
    - Identify if this requires code changes, bug fixes, or clarifications
 
-3. **Direct Implementation**
+4. **Direct Implementation**
    - Implement the specific requests made in the comment
    - Fix any issues reported in the comment
    - Make the exact changes requested rather than rebuilding the entire feature
 
 ### Common Planning Phase
-4. **Planning Phase** (applies to both issue and comment modes)
+5. **Planning Phase** (applies to both issue and comment modes)
    - Create a todo list breaking down the implementation into manageable tasks
    - Determine if backend models, API routes, or frontend components need to be created/modified
    - Identify dependencies and prerequisites
 
-5. **Implementation Strategy**
+6. **Implementation Strategy**
    
    **For Backend Features:**
    - Create or modify Mongoose models in `backend/src/models/`
@@ -71,13 +78,13 @@
    - Ensure API contracts match frontend expectations
    - Implement proper error handling on both sides
 
-5. **Quality Assurance**
+7. **Quality Assurance**
    - Write tests following TDD principles before implementation
    - Ensure code follows project's readability and scalability standards
    - Run linting and type checking: `npm run lint` and `npm run build`
    - Test the feature manually in development mode
 
-6. **Documentation**
+8. **Documentation**
    - Update API documentation for new endpoints
    - Add component documentation for complex React components
    - Update README.md if the feature affects setup or usage
@@ -180,21 +187,32 @@ The command automatically determines which files need to be:
 
 ### If `--check-comment` isn't working as expected:
 
+**Problem**: Cannot access specific comment content via WebFetch
+**Solution**: 
+1. Retry exactly once with 2-second delay
+2. If second attempt fails, STOP and ask user: "I cannot access the comment at [URL] after two attempts. Would you like me to: (a) Try a different approach, (b) Work from the comment text if you provide it, or (c) Skip this task?"
+3. NEVER proceed with guesswork or issue content
+
 **Problem**: Command treats comment analysis like a full issue rebuild
 **Solution**: Ensure the flag is used correctly: `@build-from-issue --check-comment <url>` (not combined with issue number)
-
-**Problem**: Claude Code ignores the comment content  
-**Solution**: Verify the comment URL format is correct and the comment is publicly accessible
 
 **Problem**: Response is too generic and doesn't address specific comment requests
 **Solution**: Check that the comment contains specific, actionable feedback rather than general discussion
 
 ### Expected Behavior
 When working correctly, `--check-comment` should:
-1. Start by quoting or referencing the specific comment content
-2. Identify the exact requests/issues raised in the comment  
-3. Implement targeted fixes rather than rebuilding features
-4. Respond directly to the comment's concerns
+1. **Access Verification**: Successfully fetch comment content after 1-2 attempts, or ask user for guidance
+2. **Content Quote**: Start by quoting or referencing the specific comment content
+3. **Request Identification**: Identify the exact requests/issues raised in the comment  
+4. **Targeted Implementation**: Implement targeted fixes rather than rebuilding features
+5. **Direct Response**: Respond directly to the comment's concerns
+
+### Failure Protocol
+If comment cannot be accessed after two attempts:
+1. **Stop Implementation**: Do not proceed with any code changes
+2. **Report Issue**: Clearly state the access problem to the user
+3. **Request Guidance**: Ask user how they want to proceed
+4. **Never Guess**: Do not make assumptions about comment content or fall back to issue content
 
 ## Notes
 

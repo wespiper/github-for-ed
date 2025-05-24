@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { type AuthResponse, type LoginData, type RegisterData, type User } from '@/types/auth';
+import { type AuthResponse, type LoginInput, type RegisterInput, type User } from '@shared/types';
 import { useAuthStore } from '@/stores/authStore';
 
 const authApi = {
-  register: async (data: RegisterData): Promise<AuthResponse> => {
+  register: async (data: RegisterInput): Promise<AuthResponse> => {
     const response = await api.post('/auth/register', data);
     return response.data;
   },
   
-  login: async (data: LoginData): Promise<AuthResponse> => {
+  login: async (data: LoginInput): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', data);
     return response.data;
   },

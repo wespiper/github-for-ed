@@ -1,3 +1,10 @@
+// NOTE: This file has been replaced by AssignmentCreationWizard.tsx
+// Keeping for reference but should be removed in production
+export default function CreateAssignment() {
+    return <div>This page has been replaced by the new Assignment Creation Wizard</div>;
+}
+
+/* 
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -1105,3 +1112,4 @@ export const CreateAssignment = () => {
         </div>
     );
 };
+*/

@@ -118,18 +118,32 @@ npm run start   # Production server from compiled JS
 ### Testing Commands
 
 ```bash
-# Frontend testing
+# Frontend testing (Vitest + React Testing Library)
 cd frontend
-npm test              # Run all tests
+npm test              # Run all tests once
 npm run test:watch    # Watch mode for development
 npm run test:coverage # Generate coverage report
 
-# Backend testing
+# Backend testing (Jest + MongoDB Memory Server)
 cd backend
 npm test              # Run all tests with MongoDB memory server
 npm run test:watch    # Watch mode for development
 npm run test:coverage # Generate coverage report
 ```
+
+### Testing Setup
+
+**Frontend Testing Stack**:
+- **Vitest**: Fast test runner with TypeScript support
+- **React Testing Library**: Component testing focused on user behavior
+- **@testing-library/jest-dom**: Additional DOM matchers
+- **@testing-library/user-event**: User interaction simulation
+- **jsdom**: DOM environment for tests
+
+**Test Configuration**:
+- `vitest.config.ts`: Test environment configuration with path aliases
+- `src/test/setup.ts`: Global test setup with DOM mocks
+- Test files: `*.test.tsx` for components, `*.test.ts` for utilities
 
 ### Testing Standards
 

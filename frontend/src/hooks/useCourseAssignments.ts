@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { type AssignmentTemplate } from './useAssignmentTemplates';
+import { type AssignmentTemplate } from '@shared/types';
 
 // Types for Course Assignments
 export interface CourseAssignment {

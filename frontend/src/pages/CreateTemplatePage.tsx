@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2, Target, BookOpen, Brain, Settings, Tag } from "lucide-react";
-import { useCreateTemplate, type CreateTemplateData } from "@/hooks/useAssignmentTemplates";
+import { useCreateTemplate } from "@/hooks/useAssignmentTemplates";
+import { type CreateAssignmentTemplateInput, type WritingStage } from "@shared/types";
 import { LearningObjectiveSelector } from "@/components/assignments/LearningObjectiveSelector";
 import { type LearningObjectivePreset } from "@/hooks/useLearningObjectives";
 import SimpleErrorBoundary from "@/components/SimpleErrorBoundary";
@@ -38,18 +39,6 @@ const Switch = ({ checked, onCheckedChange }: { checked: boolean; onCheckedChang
     </Button>
 );
 
-interface WritingStage {
-    id: string;
-    name: string;
-    description: string;
-    order: number;
-    required: boolean;
-    minWords?: number;
-    maxWords?: number;
-    durationDays?: number;
-    allowAI: boolean;
-    aiAssistanceLevel: 'none' | 'minimal' | 'moderate' | 'comprehensive';
-}
 
 const STEPS = [
     { id: 'basic', title: 'Template Info', icon: BookOpen },
@@ -66,7 +55,7 @@ const AI_ASSISTANCE_TYPES = [
 export const CreateTemplatePage = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(0);
-    const [formData, setFormData] = useState<CreateTemplateData & {
+    const [formData, setFormData] = useState<CreateAssignmentTemplateInput & {
         writingStages: WritingStage[];
         tags: string[];
     }>({

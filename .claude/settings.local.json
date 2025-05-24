@@ -35,7 +35,12 @@
       "Bash(gh issue view:*)",
       "Bash(gh api:*)",
       "Bash(rg:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(gh issue list:*)",
+      "Bash(cat:*)",
+      "Bash(npm test)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm test:*)"
     ],
     "deny": []
   }

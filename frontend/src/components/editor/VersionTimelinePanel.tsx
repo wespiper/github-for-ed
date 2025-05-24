@@ -1,8 +1,34 @@
 import { VersionTimeline } from "./VersionTimeline";
 
-// This is a wrapper component specifically for the sidebar panel
+// Import the correct Version interface from VersionTimeline
+interface Version {
+    id: string;
+    version: number;
+    title: string;
+    author: {
+        firstName: string;
+        lastName: string;
+    };
+    changes: {
+        type: "auto" | "manual" | "collaboration";
+        addedWords: number;
+        deletedWords: number;
+        addedChars: number;
+        deletedChars: number;
+    };
+    metadata: {
+        wordCount: number;
+        characterCount: number;
+        paragraphCount: number;
+        readingTime: number;
+        averageWordsPerSentence: number;
+    };
+    changeSummary: string;
+    createdAt: string;
+}
+
 interface VersionTimelinePanelProps {
-    versions?: any[];
+    versions?: Version[];
     currentVersion?: number;
     onVersionSelect?: (version: number) => void;
     onCompareVersions?: (version1: number, version2: number) => void;

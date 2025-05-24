@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import {
-    useCreateAssignment,
-    type CreateAssignmentData,
-} from "@/hooks/useAssignments";
+import { useCreateAssignment } from "@/hooks/useAssignments";
+import { type CreateAssignmentInput } from "@shared/types";
 import { useCourses } from "@/hooks/useCourses";
 import {
     Select,
@@ -22,7 +20,7 @@ export const CreateAssignmentModal = ({
     isOpen,
     onClose,
 }: CreateAssignmentModalProps) => {
-    const [formData, setFormData] = useState<CreateAssignmentData>({
+    const [formData, setFormData] = useState<CreateAssignmentInput>({
         title: "",
         description: "",
         instructions: "",
@@ -77,7 +75,7 @@ export const CreateAssignmentModal = ({
 
         if (name.startsWith("requirements.")) {
             const requirementField = name.split(".")[1];
-            setFormData((prev) => ({
+            setFormData((prev: CreateAssignmentInput) => ({
                 ...prev,
                 requirements: {
                     ...prev.requirements,
@@ -86,12 +84,12 @@ export const CreateAssignmentModal = ({
                 },
             }));
         } else {
-            setFormData((prev) => ({ ...prev, [name]: value }));
+            setFormData((prev: CreateAssignmentInput) => ({ ...prev, [name]: value }));
         }
     };
 
     const handleSelectChange = (name: string, value: string) => {
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData((prev: CreateAssignmentInput) => ({ ...prev, [name]: value }));
     };
 
     if (!isOpen) return null;

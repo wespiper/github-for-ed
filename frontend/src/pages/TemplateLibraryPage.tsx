@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, BookOpen, Target, Users, Clock, Copy, Eye, Trash2, Archive, Tag, Star } from "lucide-react";
-import { useMyTemplates, useTemplateLibrary, useCloneTemplate, useArchiveTemplate, useDeleteTemplate, type AssignmentTemplate } from "@/hooks/useAssignmentTemplates";
+import { useMyTemplates, useTemplateLibrary, useCloneTemplate, useArchiveTemplate, useDeleteTemplate } from "@/hooks/useAssignmentTemplates";
+import { type AssignmentTemplate } from "@shared/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

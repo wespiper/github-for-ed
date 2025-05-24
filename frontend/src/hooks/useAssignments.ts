@@ -1,175 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { type Assignment, type CreateAssignmentInput } from '@shared/types';
 
 const API_BASE = 'http://localhost:5001/api/assignments';
 
-// Types
-export interface Assignment {
-  _id: string;
-  title: string;
-  description: string;
-  instructions: string;
-  course: {
-    _id: string;
-    title: string;
-  };
-  instructor: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  type: 'individual' | 'collaborative' | 'peer-review';
-  dueDate?: string;
-  allowLateSubmissions: boolean;
-  maxCollaborators?: number;
-  requirements: {
-    minWords?: number;
-    maxWords?: number;
-    requiredSections?: string[];
-    citationStyle?: 'APA' | 'MLA' | 'Chicago' | 'IEEE';
-    allowedResources?: string[];
-  };
-  collaboration: {
-    enabled: boolean;
-    allowRealTimeEditing: boolean;
-    allowComments: boolean;
-    allowSuggestions: boolean;
-    requireApprovalForChanges: boolean;
-  };
-  versionControl: {
-    autoSaveInterval: number;
-    createVersionOnSubmit: boolean;
-    allowVersionRevert: boolean;
-    trackAllChanges: boolean;
-  };
-  learningObjectives: {
-    id: string;
-    description: string;
-    category: 'knowledge' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
-    bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
-    assessmentCriteria: string[];
-    weight: number;
-  }[];
-  writingStages: {
-    id: string;
-    name: string;
-    description: string;
-    order: number;
-    required: boolean;
-    minWords?: number;
-    maxWords?: number;
-    durationDays?: number;
-    allowAI: boolean;
-    aiAssistanceLevel: 'none' | 'minimal' | 'moderate' | 'comprehensive';
-  }[];
-  aiSettings: {
-    enabled: boolean;
-    globalBoundary: 'strict' | 'moderate' | 'permissive';
-    allowedAssistanceTypes: ('grammar' | 'style' | 'structure' | 'research' | 'citations' | 'brainstorming' | 'outlining')[];
-    requireReflection: boolean;
-    reflectionPrompts: string[];
-    stageSpecificSettings: {
-      stageId: string;
-      allowedTypes: string[];
-      boundaryLevel: 'strict' | 'moderate' | 'permissive';
-      customPrompts: string[];
-    }[];
-  };
-  status: 'draft' | 'published' | 'in_progress' | 'completed' | 'archived';
-  publishedAt?: string;
-  grading: {
-    enabled: boolean;
-    totalPoints?: number;
-    rubric?: {
-      criteria: string;
-      points: number;
-      description: string;
-    }[];
-    allowPeerReview: boolean;
-  };
-  submissionCount: number;
-  isOverdue: boolean;
-  daysRemaining: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateAssignmentData {
-  title: string;
-  description: string;
-  instructions: string;
-  courseId: string;
-  type?: 'individual' | 'collaborative' | 'peer-review';
-  dueDate?: string;
-  requirements?: {
-    minWords?: number;
-    maxWords?: number;
-    requiredSections?: string[];
-    citationStyle?: 'APA' | 'MLA' | 'Chicago' | 'IEEE';
-    allowedResources?: string[];
-  };
-  collaboration?: {
-    enabled?: boolean;
-    allowRealTimeEditing?: boolean;
-    allowComments?: boolean;
-    allowSuggestions?: boolean;
-    requireApprovalForChanges?: boolean;
-  };
-  versionControl?: {
-    autoSaveInterval?: number;
-    createVersionOnSubmit?: boolean;
-    allowVersionRevert?: boolean;
-    trackAllChanges?: boolean;
-  };
-  learningObjectives?: {
-    id: string;
-    description: string;
-    category: 'knowledge' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
-    bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
-    assessmentCriteria: string[];
-    weight: number;
-  }[];
-  writingStages?: {
-    id: string;
-    name: string;
-    description: string;
-    order: number;
-    required: boolean;
-    minWords?: number;
-    maxWords?: number;
-    durationDays?: number;
-    allowAI: boolean;
-    aiAssistanceLevel: 'none' | 'minimal' | 'moderate' | 'comprehensive';
-  }[];
-  aiSettings?: {
-    enabled?: boolean;
-    globalBoundary?: 'strict' | 'moderate' | 'permissive';
-    allowedAssistanceTypes?: ('grammar' | 'style' | 'structure' | 'research' | 'citations' | 'brainstorming' | 'outlining')[];
-    requireReflection?: boolean;
-    reflectionPrompts?: string[];
-    stageSpecificSettings?: {
-      stageId: string;
-      allowedTypes: string[];
-      boundaryLevel: 'strict' | 'moderate' | 'permissive';
-      customPrompts: string[];
-    }[];
-  };
-  grading?: {
-    enabled?: boolean;
-    totalPoints?: number;
-    rubric?: {
-      criteria: string;
-      points: number;
-      description: string;
-    }[];
-    allowPeerReview?: boolean;
-  };
-}
-
 // API functions
 const assignmentsAPI = {
-  create: async (data: CreateAssignmentData): Promise<Assignment> => {
+  create: async (data: CreateAssignmentInput): Promise<Assignment> => {
     const response = await axios.post(API_BASE, data);
     return response.data.data;
   },
@@ -196,7 +33,7 @@ const assignmentsAPI = {
     return response.data.data;
   },
 
-  update: async (assignmentId: string, data: Partial<CreateAssignmentData>): Promise<Assignment> => {
+  update: async (assignmentId: string, data: Partial<CreateAssignmentInput>): Promise<Assignment> => {
     const response = await axios.put(`${API_BASE}/${assignmentId}`, data);
     return response.data.data;
   },
@@ -270,7 +107,7 @@ export const useUpdateAssignment = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ assignmentId, data }: { assignmentId: string; data: Partial<CreateAssignmentData> }) =>
+    mutationFn: ({ assignmentId, data }: { assignmentId: string; data: Partial<CreateAssignmentInput> }) =>
       assignmentsAPI.update(assignmentId, data),
     onSuccess: (_, { assignmentId }) => {
       queryClient.invalidateQueries({ queryKey: ['assignment', assignmentId] });
