@@ -4,102 +4,29 @@ import { AssignmentSubmission, IAssignmentSubmission } from '../models/Assignmen
 import { Course } from '../models/Course';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { Types } from 'mongoose';
+import { CreateAssignmentInput, UpdateAssignmentInput, AssignmentFilters } from '@shared/types';
+import { AssignmentService } from '../services';
 
 const router = Router();
 
 // Create a new assignment
 router.post('/', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const {
-      title,
-      description,
-      instructions,
-      courseId,
-      type = 'individual',
-      dueDate,
-      requirements,
-      collaboration,
-      versionControl,
-      learningObjectives,
-      writingStages,
-      aiSettings,
-      grading
-    } = req.body;
-
     const userId = req.userId!;
+    const assignmentData: CreateAssignmentInput = req.body;
 
-    // Verify course access
-    const course = await Course.findById(courseId);
-    if (!course) {
-      res.status(404).json({ error: 'Course not found' });
-      return;
-    }
-
-    // Check if user is the instructor or admin
-    const isInstructor = course.instructor.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isInstructor && !isAdmin) {
-      res.status(403).json({ error: 'Only course instructors can create assignments' });
-      return;
-    }
-
-    // Create assignment
-    const assignment = new Assignment({
-      title,
-      description,
-      instructions,
-      course: courseId,
-      instructor: userId,
-      type,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      requirements: requirements || {},
-      collaboration: {
-        enabled: type === 'collaborative',
-        allowRealTimeEditing: type === 'collaborative',
-        allowComments: true,
-        allowSuggestions: true,
-        requireApprovalForChanges: false,
-        ...collaboration
-      },
-      versionControl: {
-        autoSaveInterval: 30,
-        createVersionOnSubmit: true,
-        allowVersionRevert: false,
-        trackAllChanges: true,
-        ...versionControl
-      },
-      learningObjectives: learningObjectives || [],
-      writingStages: writingStages || [],
-      aiSettings: {
-        enabled: false,
-        globalBoundary: 'moderate',
-        allowedAssistanceTypes: [],
-        requireReflection: true,
-        reflectionPrompts: [],
-        stageSpecificSettings: [],
-        ...aiSettings
-      },
-      grading: {
-        enabled: false,
-        allowPeerReview: false,
-        ...grading
-      }
-    });
-
-    await assignment.save();
-
-    const populatedAssignment = await Assignment.findById(assignment._id)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title');
+    const assignment = await AssignmentService.createAssignment(assignmentData, userId);
 
     res.status(201).json({
       message: 'Assignment created successfully',
-      data: populatedAssignment
+      data: assignment
     });
   } catch (error) {
     console.error('Error creating assignment:', error);
-    res.status(500).json({ error: 'Failed to create assignment' });
+    const message = error instanceof Error ? error.message : 'Failed to create assignment';
+    const statusCode = message.includes('not found') ? 404 : 
+                      message.includes('denied') || message.includes('Only') ? 403 : 500;
+    res.status(statusCode).json({ error: message });
   }
 });
 
@@ -109,37 +36,13 @@ router.get('/course/:courseId', authenticate, async (req: AuthenticatedRequest, 
     const { courseId } = req.params;
     const { status, type } = req.query;
     const userId = req.userId!;
+    const userRole = req.user!.role;
 
-    // Verify course access
-    const course = await Course.findById(courseId);
-    if (!course) {
-      res.status(404).json({ error: 'Course not found' });
-      return;
-    }
+    const filters: any = {};
+    if (status) filters.status = status;
+    if (type) filters.type = type;
 
-    const isInstructor = course.instructor.toString() === userId;
-    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isInstructor && !isStudent && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this course' });
-      return;
-    }
-
-    // Build filter
-    const filter: any = { course: courseId };
-    if (status) filter.status = status;
-    if (type) filter.type = type;
-
-    // Students only see published assignments
-    if (!isInstructor && !isAdmin) {
-      filter.status = 'published';
-    }
-
-    const assignments = await Assignment.find(filter)
-      .populate('instructor', 'firstName lastName email')
-      .populate('submissionCount')
-      .sort({ createdAt: -1 });
+    const assignments = await AssignmentService.getAssignmentsByCourse(courseId, userId, userRole, filters);
 
     res.json({
       message: 'Assignments retrieved successfully',
@@ -147,7 +50,10 @@ router.get('/course/:courseId', authenticate, async (req: AuthenticatedRequest, 
     });
   } catch (error) {
     console.error('Error fetching assignments:', error);
-    res.status(500).json({ error: 'Failed to fetch assignments' });
+    const message = error instanceof Error ? error.message : 'Failed to fetch assignments';
+    const statusCode = message.includes('not found') ? 404 : 
+                      message.includes('denied') ? 403 : 500;
+    res.status(statusCode).json({ error: message });
   }
 });
 

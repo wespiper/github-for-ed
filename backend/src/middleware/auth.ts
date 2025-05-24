@@ -5,6 +5,7 @@ import { User, IUser } from '../models/User';
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
   userId?: string;
+  userRole?: string;
 }
 
 export const authenticate = async (
@@ -30,6 +31,7 @@ export const authenticate = async (
 
     req.user = user;
     req.userId = (user._id as any).toString();
+    req.userRole = user.role;
     next();
   } catch (error) {
     res.status(401).json({ error: 'Invalid or expired token' });
