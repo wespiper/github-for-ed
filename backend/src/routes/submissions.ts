@@ -536,4 +536,48 @@ router.patch('/:submissionId/submit', authenticate, async (req: AuthenticatedReq
   }
 });
 
+// Get submission versions
+router.get('/:submissionId/versions', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { submissionId } = req.params;
+    const { limit } = req.query;
+    const userId = req.userId!;
+
+    // Verify submission exists and user has access
+    const submission = await AssignmentSubmission.findById(submissionId);
+    if (!submission) {
+      res.status(404).json({ error: 'Submission not found' });
+      return;
+    }
+
+    // Check permissions
+    const canAccess = submission.author.toString() === userId ||
+                     submission.collaborators.some(c => c.toString() === userId);
+
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Get versions from DocumentVersion collection
+    const query = DocumentVersion.find({ document: submissionId })
+      .sort({ version: -1 })
+      .populate('author', 'firstName lastName email');
+
+    if (limit) {
+      query.limit(parseInt(limit as string));
+    }
+
+    const versions = await query.exec();
+
+    res.json({
+      message: 'Submission versions retrieved successfully',
+      data: versions
+    });
+  } catch (error) {
+    console.error('Error getting submission versions:', error);
+    res.status(500).json({ error: 'Failed to get submission versions' });
+  }
+});
+
 export default router;

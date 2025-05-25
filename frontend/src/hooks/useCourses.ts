@@ -38,6 +38,18 @@ export const useCourses = () => {
   });
 };
 
+// Get courses for current user (based on role)
+export const useMyCourses = () => {
+  return useQuery({
+    queryKey: ['courses', 'my-courses'],
+    queryFn: async (): Promise<Course[]> => {
+      const response = await api.get('/courses/my-courses');
+      return response.data.data || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
 export const useCreateCourse = () => {
   const queryClient = useQueryClient();
   

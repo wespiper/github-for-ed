@@ -55,16 +55,42 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response): 
   }
 });
 
-// Get all courses for instructor
-router.get('/my-courses', authenticate, requireRole(['educator']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Get courses for current user (both educators and students)
+router.get('/my-courses', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const instructorId = req.userId!;
+    const userId = req.userId!;
+    const userRole = req.user!.role;
     
-    const courses = await Course.find({ instructor: instructorId })
-      .populate('students', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+    let courses: ICourse[];
+    
+    if (userRole === 'educator') {
+      // Educators see their own courses
+      courses = await Course.find({ instructor: userId })
+        .populate('students', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else if (userRole === 'student') {
+      // Students see courses they're enrolled in
+      courses = await Course.find({ 
+        students: userId,
+        isActive: true 
+      })
+        .populate('instructor', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else if (userRole === 'admin') {
+      // Admins see all courses
+      courses = await Course.find()
+        .populate('instructor', 'firstName lastName email')
+        .populate('students', 'firstName lastName email')
+        .sort({ createdAt: -1 });
+    } else {
+      courses = [];
+    }
 
-    res.json({ courses });
+    res.json({ 
+      success: true,
+      data: courses,
+      totalCount: courses.length 
+    });
   } catch (error) {
     console.error('Get courses error:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -1,7 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-
-const API_BASE = 'http://localhost:5001/api/submissions';
+import { api } from '@/lib/api';
 
 // Types
 export interface AssignmentSubmission {
@@ -142,12 +140,12 @@ const submissionsAPI = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.assignment) params.append('assignment', filters.assignment);
     
-    const response = await axios.get(`${API_BASE}/my-submissions?${params}`);
+    const response = await api.get(`/submissions/my-submissions?${params}`);
     return response.data.data;
   },
 
   getById: async (submissionId: string): Promise<AssignmentSubmission> => {
-    const response = await axios.get(`${API_BASE}/${submissionId}`);
+    const response = await api.get(`/submissions/${submissionId}`);
     return response.data.data;
   },
 
@@ -157,38 +155,38 @@ const submissionsAPI = {
     currentVersion: number;
     diff: Record<string, unknown>;
   }> => {
-    const response = await axios.put(`${API_BASE}/${submissionId}/content`, data);
+    const response = await api.put(`/submissions/${submissionId}/content`, data);
     return response.data.data;
   },
 
   addComment: async (submissionId: string, data: CreateCommentData): Promise<AssignmentSubmission> => {
-    const response = await axios.post(`${API_BASE}/${submissionId}/comments`, data);
+    const response = await api.post(`/submissions/${submissionId}/comments`, data);
     return response.data.data;
   },
 
   replyToComment: async (submissionId: string, commentId: string, content: string): Promise<AssignmentSubmission> => {
-    const response = await axios.post(`${API_BASE}/${submissionId}/comments/${commentId}/reply`, { content });
+    const response = await api.post(`/submissions/${submissionId}/comments/${commentId}/reply`, { content });
     return response.data.data;
   },
 
   resolveComment: async (submissionId: string, commentId: string): Promise<AssignmentSubmission> => {
-    const response = await axios.patch(`${API_BASE}/${submissionId}/comments/${commentId}/resolve`);
+    const response = await api.patch(`/submissions/${submissionId}/comments/${commentId}/resolve`);
     return response.data.data;
   },
 
   addCollaborator: async (submissionId: string, collaboratorId: string): Promise<AssignmentSubmission> => {
-    const response = await axios.post(`${API_BASE}/${submissionId}/collaborators`, { collaboratorId });
+    const response = await api.post(`/submissions/${submissionId}/collaborators`, { collaboratorId });
     return response.data.data;
   },
 
   submitForGrading: async (submissionId: string): Promise<AssignmentSubmission> => {
-    const response = await axios.patch(`${API_BASE}/${submissionId}/submit`);
+    const response = await api.patch(`/submissions/${submissionId}/submit`);
     return response.data.data;
   },
 
   getVersions: async (submissionId: string, limit?: number) => {
     const params = limit ? `?limit=${limit}` : '';
-    const response = await axios.get(`http://localhost:5001/api/documents/${submissionId}/versions${params}`);
+    const response = await api.get(`/submissions/${submissionId}/versions${params}`);
     return response.data.data;
   }
 };

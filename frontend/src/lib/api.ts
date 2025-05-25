@@ -22,9 +22,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear token but let the auth store handle the redirect
       localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Import and call the auth store logout method
+      import('@/stores/authStore').then(({ useAuthStore }) => {
+        useAuthStore.getState().logout();
+      });
     }
     return Promise.reject(error);
   }

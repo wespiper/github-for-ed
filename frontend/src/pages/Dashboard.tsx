@@ -1,115 +1,49 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyTemplates } from "@/hooks/useAssignmentTemplates";
-import { useMyCourseAssignments, useAssignmentsDueSoon } from "@/hooks/useCourseAssignments";
+import { useAssignmentsDueSoon } from "@/hooks/useCourseAssignments";
+import { useMyCourses } from "@/hooks/useCourses";
+import { EducatorDashboard } from "@/components/dashboard/EducatorDashboard";
+import { StudentWritingDashboard } from "@/components/analytics/StudentWritingDashboard";
 import {
     BookOpen,
     FileText,
-    Users,
     TrendingUp,
     Clock,
-    FileCode,
     Layers,
-    CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Dashboard = () => {
     const { user } = useAuth();
     
-    // Fetch template and assignment data for educators
-    const { data: myTemplates } = useMyTemplates({ status: 'published' });
-    const { data: myCourseAssignments } = useMyCourseAssignments({ status: 'published' });
+    // Fetch user-specific data
+    const { data: myCourses, isLoading: coursesLoading } = useMyCourses();
     const { data: assignmentsDueSoon } = useAssignmentsDueSoon(7);
 
     if (!user) return null;
 
-    return (
-        <div className="container mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight text-ink-900">
-                    {user.role === "educator"
-                        ? `Welcome back, ${user.firstName}!`
-                        : `Welcome back, ${user.firstName}!`}
-                </h1>
-                <p className="text-ink-600 mt-2">
-                    {user.role === "educator"
-                        ? "Watch your writers grow and help their words find power through thoughtful guidance."
-                        : "Continue branching your ideas and growing as a writer through meaningful practice."}
-                </p>
-            </div>
+    // For educators, use the sophisticated EducatorDashboard
+    if (user.role === 'educator') {
+        return <EducatorDashboard />;
+    }
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {user.role === "educator" ? (
-                    <>
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-forest-50 rounded-lg">
-                                        <BookOpen className="h-5 w-5 text-forest-600" />
-                                    </div>
-                                    <h3 className="text-sm font-medium text-ink-900">
-                                        Active Courses
-                                    </h3>
-                                </div>
-                            </div>
-                            <div className="text-3xl font-bold text-ink-900 mb-1">
-                                3
-                            </div>
-                            <p className="text-sm text-ink-600">
-                                <span className="text-branch-600 font-medium">
-                                    +1
-                                </span>{" "}
-                                flourishing this semester
-                            </p>
-                        </div>
+    // For students, show the analytical writing dashboard along with simple overview
+    if (user.role === 'student') {
+        return (
+            <div className="space-y-8">
+                {/* Student Overview Section */}
+                <div className="container mx-auto py-8 px-4">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold tracking-tight text-ink-900">
+                            Welcome back, {user.firstName}!
+                        </h1>
+                        <p className="text-ink-600 mt-2">
+                            Continue branching your ideas and growing as a writer through meaningful practice.
+                        </p>
+                    </div>
 
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-scribe-50 rounded-lg">
-                                        <FileCode className="h-5 w-5 text-scribe-600" />
-                                    </div>
-                                    <h3 className="text-sm font-medium text-ink-900">
-                                        My Templates
-                                    </h3>
-                                </div>
-                            </div>
-                            <div className="text-3xl font-bold text-ink-900 mb-1">
-                                {myTemplates?.length || 0}
-                            </div>
-                            <p className="text-sm text-ink-600">
-                                <span className="text-scribe-600 font-medium">
-                                    Reusable
-                                </span>{" "}
-                                assignment templates
-                            </p>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-branch-50 rounded-lg">
-                                        <Layers className="h-5 w-5 text-branch-600" />
-                                    </div>
-                                    <h3 className="text-sm font-medium text-ink-900">
-                                        Course Assignments
-                                    </h3>
-                                </div>
-                            </div>
-                            <div className="text-3xl font-bold text-ink-900 mb-1">
-                                {myCourseAssignments?.length || 0}
-                            </div>
-                            <p className="text-sm text-ink-600">
-                                <span className="text-branch-600 font-medium">
-                                    Active
-                                </span>{" "}
-                                deployed assignments
-                            </p>
-                        </div>
-                    </>
-                ) : (
-                    <>
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {/* Student Dashboard Cards */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center space-x-3">
@@ -122,13 +56,24 @@ export const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="text-3xl font-bold text-ink-900 mb-1">
-                                2
+                                {coursesLoading ? "..." : myCourses?.length || 0}
                             </div>
                             <p className="text-sm text-ink-600">
-                                Writing &{" "}
-                                <span className="text-forest-600 font-medium">
-                                    Research Methods
-                                </span>
+                                {myCourses?.length ? (
+                                    <>
+                                        {myCourses.slice(0, 2).map((course, i) => (
+                                            <span key={course._id}>
+                                                {i > 0 && " & "}
+                                                <span className="text-forest-600 font-medium">
+                                                    {course.title}
+                                                </span>
+                                            </span>
+                                        ))}
+                                        {myCourses.length > 2 && ` & ${myCourses.length - 2} more`}
+                                    </>
+                                ) : (
+                                    "No enrolled courses"
+                                )}
                             </p>
                         </div>
 
@@ -144,13 +89,19 @@ export const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="text-3xl font-bold text-ink-900 mb-1">
-                                1
+                                {assignmentsDueSoon?.length || 0}
                             </div>
                             <p className="text-sm text-ink-600">
-                                <span className="text-scribe-600 font-medium">
-                                    Research Paper
-                                </span>{" "}
-                                ready Friday
+                                {assignmentsDueSoon?.length ? (
+                                    <>
+                                        <span className="text-scribe-600 font-medium">
+                                            {assignmentsDueSoon[0].template?.title || "Assignment"}
+                                        </span>{" "}
+                                        due soon
+                                    </>
+                                ) : (
+                                    "No assignments due"
+                                )}
                             </p>
                         </div>
 
@@ -166,91 +117,25 @@ export const Dashboard = () => {
                                 </div>
                             </div>
                             <div className="text-3xl font-bold text-ink-900 mb-1">
-                                B+
+                                {assignmentsDueSoon?.length ? `${assignmentsDueSoon.length}` : "0"}
                             </div>
                             <p className="text-sm text-ink-600">
                                 <span className="text-branch-600 font-medium">
-                                    Branching beautifully
+                                    {assignmentsDueSoon?.length ? "Active assignments" : "All caught up"}
                                 </span>{" "}
-                                each day
+                                this week
                             </p>
                         </div>
-                    </>
-                )}
-            </div>
+                    </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-                {/* Quick Actions */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200">
-                    <h2 className="text-xl font-semibold text-ink-900 mb-2">
-                        {user.role === "educator"
-                            ? "Quick Actions"
-                            : "Quick Actions"}
-                    </h2>
-                    <p className="text-ink-600 mb-6">
-                        {user.role === "educator"
-                            ? "Plant seeds of learning that will help your writers branch into their best selves."
-                            : "Continue growing your voice and letting your words find their natural shape."}
-                    </p>
-                    <div className="space-y-3">
-                        {user.role === "educator" ? (
-                            <>
-                                <Button
-                                    asChild
-                                    className="w-full h-auto p-6 justify-start bg-forest-600 hover:bg-forest-700"
-                                    size="lg"
-                                >
-                                    <Link to="/templates/create">
-                                        <FileCode size={20} />
-                                        <div className="text-left ml-3">
-                                            <div className="font-medium">
-                                                Create Assignment Template
-                                            </div>
-                                            <div className="text-sm opacity-90">
-                                                Reusable template with learning objectives
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </Button>
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="w-full h-auto p-6 justify-start border-forest-200 text-forest-700 hover:bg-forest-50"
-                                    size="lg"
-                                >
-                                    <Link to="/templates">
-                                        <Layers size={20} />
-                                        <div className="text-left ml-3">
-                                            <div className="font-medium">
-                                                Manage Templates
-                                            </div>
-                                            <div className="text-sm text-forest-600">
-                                                Browse, deploy, and share templates
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </Button>
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="w-full h-auto p-6 justify-start border-gray-200 text-gray-700 hover:bg-gray-50"
-                                    size="lg"
-                                >
-                                    <Link to="/courses/create">
-                                        <BookOpen size={20} />
-                                        <div className="text-left ml-3">
-                                            <div className="font-medium">
-                                                Create Course
-                                            </div>
-                                            <div className="text-sm text-gray-600">
-                                                Traditional course creation
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </Button>
-                            </>
-                        ) : (
-                            <>
+                    {/* Quick Actions for Students */}
+                    <div className="mt-8">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200">
+                            <h2 className="text-xl font-semibold text-ink-900 mb-2">Quick Actions</h2>
+                            <p className="text-ink-600 mb-6">
+                                Continue growing your voice and letting your words find their natural shape.
+                            </p>
+                            <div className="space-y-3">
                                 <Button
                                     asChild
                                     className="w-full h-auto p-6 justify-start bg-forest-600 hover:bg-forest-700"
@@ -286,129 +171,60 @@ export const Dashboard = () => {
                                         </div>
                                     </Link>
                                 </Button>
-                            </>
-                        )}
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="w-full h-auto p-6 justify-start border-gray-200 text-gray-700 hover:bg-gray-50"
+                                    size="lg"
+                                >
+                                    <Link to="/assignments">
+                                        <Layers size={20} />
+                                        <div className="text-left ml-3">
+                                            <div className="font-medium">
+                                                Browse All Assignments
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                See all assignments across courses
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Recent Activity or Writing Insights */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-ink-200">
-                    <h2 className="text-xl font-semibold text-ink-900 mb-2">
-                        {user.role === "educator"
-                            ? "Student Insights"
-                            : "Writing Progress"}
-                    </h2>
-                    <p className="text-ink-600 mb-6">
-                        {user.role === "educator"
-                            ? "Watch how your writers are branching into their potential."
-                            : "Beautiful moments from your recent writing adventures."}
-                    </p>
-                    <div className="space-y-4">
-                        {user.role === "educator" ? (
-                            <>
-                                <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-scribe-50 rounded-lg">
-                                        <FileCode className="h-4 w-4 text-scribe-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            {myTemplates?.length || 0} assignment templates created
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            ready to deploy across courses
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-branch-50 rounded-lg">
-                                        <Layers className="h-4 w-4 text-branch-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            {myCourseAssignments?.length || 0} deployed assignments active
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            templates working across courses
-                                        </p>
-                                    </div>
-                                </div>
-                                {assignmentsDueSoon && assignmentsDueSoon.length > 0 ? (
-                                    <div className="flex items-start space-x-3">
-                                        <div className="p-2 bg-highlight-50 rounded-lg">
-                                            <Clock className="h-4 w-4 text-highlight-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-ink-900">
-                                                {assignmentsDueSoon.length} assignments due this week
-                                            </p>
-                                            <p className="text-xs text-ink-500">
-                                                students approaching deadlines
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-start space-x-3">
-                                        <div className="p-2 bg-green-50 rounded-lg">
-                                            <CheckCircle className="h-4 w-4 text-green-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-ink-900">
-                                                No urgent deadlines this week
-                                            </p>
-                                            <p className="text-xs text-ink-500">
-                                                perfect time for template creation
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-branch-50 rounded-lg">
-                                        <TrendingUp className="h-4 w-4 text-branch-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            Your argument found its power ✨
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            B+ with beautiful branching ideas
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-scribe-50 rounded-lg">
-                                        <FileText className="h-4 w-4 text-scribe-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            Words flowing into research
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            1,247 words growing naturally
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start space-x-3">
-                                    <div className="p-2 bg-highlight-50 rounded-lg">
-                                        <Users className="h-4 w-4 text-highlight-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-ink-900">
-                                            Community reading awaits
-                                        </p>
-                                        <p className="text-xs text-ink-500">
-                                            help Sarah's narrative bloom
-                                        </p>
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                {/* Advanced Analytics Dashboard for Students */}
+                <div className="bg-ink-50 py-8">
+                    <div className="container mx-auto px-4">
+                        <StudentWritingDashboard studentId={user.id} />
                     </div>
                 </div>
             </div>
+        );
+    }
 
+    // Fallback for admin or other roles - show basic dashboard
+    return (
+        <div className="container mx-auto py-8 px-4">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold tracking-tight text-ink-900">
+                    Welcome back, {user.firstName}!
+                </h1>
+                <p className="text-ink-600 mt-2">
+                    Admin dashboard with system overview and management tools.
+                </p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-ink-200">
+                <h2 className="text-xl font-semibold text-ink-900 mb-4">System Overview</h2>
+                <p className="text-ink-600 mb-4">
+                    Role: <span className="font-medium">{user.role}</span>
+                </p>
+                <p className="text-ink-500">
+                    Advanced admin functionality is under development.
+                </p>
+            </div>
         </div>
     );
 };

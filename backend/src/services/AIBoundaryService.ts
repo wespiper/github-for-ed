@@ -3,6 +3,7 @@ import { AssignmentSubmission } from '../models/AssignmentSubmission';
 import { WritingSession } from '../models/WritingSession';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { EducationalAIService } from './ai/EducationalAIService';
 
 // Educational AI Actions - Focus on questions and prompts, never content generation
 export type AIEducationalAction = 
@@ -99,9 +100,49 @@ export interface AIAssistanceRequest {
   context: {
     currentStage?: string;
     contentSample: string;
-    specificRequest: string;
+    specificQuestion: string;
+    learningObjective: string;
   };
   timestamp: Date;
+}
+
+// Educational AI Response matching frontend expectations
+export interface AIAssistanceResponse {
+  requestId: string;
+  approved: boolean;
+  
+  // Educational guidance (questions/prompts, never answers)
+  educationalGuidance?: {
+    type: 'question' | 'prompt' | 'perspective' | 'challenge';
+    action: string;
+    content: string[];                // Array of questions/prompts
+    educationalRationale: string;     // Why this helps learning
+    expectedOutcome: string;          // What student should discover
+    reflectionPrompt: string;         // Required reflection
+  };
+  
+  // Learning-focused alternatives when denied
+  educationalAlternatives?: {
+    independentActions: string[];     // What student can do alone
+    resourceSuggestions: string[];    // Materials to consult
+    reflectionQuestions: string[];    // Questions to consider
+    learningObjective: string;        // Why independence matters
+  };
+  
+  // Always required
+  contributionTracking: {
+    mustBeAttributed: boolean;
+    visibleToEducator: boolean;
+    impactsAssessment: boolean;
+  };
+  
+  // Mandatory reflection requirements
+  mandatoryReflection: {
+    required: boolean;
+    minimumLength: number;
+    qualityThreshold: 'basic' | 'detailed' | 'analytical';
+    prompts: string[];
+  };
 }
 
 /*
@@ -182,21 +223,7 @@ export interface AIAccessProgression {
 }
 */
 
-// Maintain backward compatibility with existing implementation  
-export interface AIAssistanceResponse {
-  requestId: string;
-  approved: boolean;
-  assistanceProvided?: {
-    type: AIAssistanceType;
-    suggestions: string[];
-    explanation: string;
-    educationalRationale: string;
-  };
-  denialReason?: string;
-  reflectionPrompt?: string;
-  alternatives?: string[];
-  learningOpportunity: string;
-}
+// This interface is replaced by the new educational version above
 
 /*
 // FUTURE: Educational AI Analytics Interface (Phase 3B Implementation)
@@ -295,10 +322,92 @@ export class AIBoundaryService {
   
   /**
    * Evaluate whether AI assistance should be provided for a specific request
+   * TEMPORARY IMPLEMENTATION: Returns educational guidance for testing
    */
   static async evaluateAssistanceRequest(
     request: AIAssistanceRequest
   ): Promise<AIAssistanceResponse> {
+    // For now, return a mock educational response that matches frontend expectations
+    return this.createEducationalResponse(request);
+  }
+
+  /**
+   * Create a mock educational response for testing
+   */
+  private static createEducationalResponse(request: AIAssistanceRequest): AIAssistanceResponse {
+    const questions = this.generateStageQuestions(request.assistanceType, request.context);
+    
+    return {
+      requestId: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      approved: true,
+      educationalGuidance: {
+        type: 'question',
+        action: request.assistanceType,
+        content: questions,
+        educationalRationale: "These questions help you think deeper about your writing choices and develop critical thinking skills.",
+        expectedOutcome: "You should discover new perspectives and approaches to strengthen your argument.",
+        reflectionPrompt: "How did these questions change your thinking about your topic?"
+      },
+      contributionTracking: {
+        mustBeAttributed: true,
+        visibleToEducator: true,
+        impactsAssessment: false
+      },
+      mandatoryReflection: {
+        required: true,
+        minimumLength: 100,
+        qualityThreshold: 'basic',
+        prompts: [
+          "Explain how these questions helped you think about your writing differently.",
+          "What new ideas or approaches will you try based on this guidance?"
+        ]
+      }
+    };
+  }
+
+  /**
+   * Generate stage-appropriate questions
+   */
+  private static generateStageQuestions(assistanceType: string, context: any): string[] {
+    const stageQuestions: Record<string, string[]> = {
+      'generate_prompts': [
+        "What personal experiences have shaped your perspective on this topic?",
+        "How might someone who disagrees with you view this issue?",
+        "What assumptions are you making that might be worth questioning?"
+      ],
+      'suggest_perspectives': [
+        "What would an expert in this field emphasize differently?",
+        "How might this issue affect different communities or age groups?",
+        "What historical context might change how readers understand this topic?"
+      ],
+      'ask_clarifying_questions': [
+        "What is the most important point you want readers to understand?",
+        "What evidence would be most convincing to someone who disagrees?",
+        "Which part of your argument feels least developed right now?"
+      ],
+      'suggest_organization': [
+        "Which of your main points is strongest and deserves prominent placement?",
+        "How can you help readers follow your logic from one idea to the next?",
+        "Where might readers need more background information to understand your argument?"
+      ],
+      'evaluate_arguments': [
+        "What are the strongest counterarguments to your position?",
+        "Which of your claims needs the most support with evidence?",
+        "How would you respond to someone who says your argument is too simple?"
+      ]
+    };
+
+    return stageQuestions[assistanceType] || [
+      "What specific aspect of your writing are you trying to improve?",
+      "How does this part connect to your main argument?",
+      "What would make this section more compelling for your readers?"
+    ];
+  }
+
+  // Rest of the original complex implementation (currently not used)
+  private static async evaluateAssistanceRequestOriginal(
+    request: AIAssistanceRequest
+  ): Promise<any> {
     this.validateRequest(request);
     
     // Get assignment and its AI settings
@@ -577,7 +686,7 @@ export class AIBoundaryService {
     if (!mongoose.Types.ObjectId.isValid(request.assignmentId)) {
       throw new Error('Invalid assignment ID');
     }
-    if (!request.context.contentSample || !request.context.specificRequest) {
+    if (!request.context.contentSample || !request.context.specificQuestion) {
       throw new Error('Content sample and specific request are required');
     }
   }
@@ -700,81 +809,99 @@ export class AIBoundaryService {
     explanation: string;
     educationalRationale: string;
   }> {
-    // This would integrate with actual AI services in production
-    // For now, return structured educational assistance
-    
-    const assistanceMap = {
-      grammar: {
-        suggestions: [
-          'Consider reviewing subject-verb agreement in paragraph 2',
-          'Check for consistent verb tense throughout your writing',
-          'Review comma usage in complex sentences'
-        ],
-        explanation: 'These grammar suggestions focus on mechanical accuracy while preserving your voice and ideas.',
-        educationalRationale: 'Grammar checking helps you learn to self-edit and develop writing fluency.'
-      },
-      style: {
-        suggestions: [
-          'Consider varying your sentence lengths for better flow',
-          'Look for opportunities to use more specific, concrete language',
-          'Consider your audience when choosing formal vs. informal tone'
-        ],
-        explanation: 'Style suggestions help improve clarity and engagement while maintaining your unique voice.',
-        educationalRationale: 'Developing style awareness is key to effective communication across different contexts.'
-      },
-      structure: {
-        suggestions: [
-          'Consider strengthening your thesis statement to preview main points',
-          'Review paragraph transitions for logical flow',
-          'Ensure each paragraph has a clear main idea and supporting evidence'
-        ],
-        explanation: 'Structural feedback helps organize your ideas for maximum impact and clarity.',
-        educationalRationale: 'Learning to structure arguments is fundamental to critical thinking and persuasive writing.'
-      },
-      research: {
-        suggestions: [
-          'Consider using more recent sources to support your argument',
-          'Look for sources that offer different perspectives on this topic',
-          'Evaluate the credibility and bias of your current sources'
-        ],
-        explanation: 'Research assistance helps you find and evaluate credible sources.',
-        educationalRationale: 'Learning to research effectively is crucial for academic writing.'
-      },
-      citations: {
-        suggestions: [
-          'Check your citation format against the style guide',
-          'Ensure all borrowed ideas are properly attributed',
-          'Review in-text citations for consistency'
-        ],
-        explanation: 'Citation help ensures proper academic attribution.',
-        educationalRationale: 'Proper citation demonstrates academic integrity and scholarly habits.'
-      },
-      brainstorming: {
-        suggestions: [
-          'Try freewriting for 5 minutes on this topic',
-          'Consider what questions your audience might have',
-          'Think about personal experiences related to this subject'
-        ],
-        explanation: 'Brainstorming assistance helps generate and develop ideas.',
-        educationalRationale: 'Learning to generate original ideas builds creative thinking skills.'
-      },
-      outlining: {
-        suggestions: [
-          'Start with your main argument and identify 3-4 supporting points',
-          'Consider the logical flow from introduction to conclusion',
-          'Plan where your evidence will be most effective'
-        ],
-        explanation: 'Outlining assistance helps organize your ideas logically.',
-        educationalRationale: 'Good organization is fundamental to clear communication.'
-      }
-    };
-    
-    const assistance = assistanceMap[request.assistanceType] || assistanceMap.grammar;
-    
-    return {
-      type: request.assistanceType,
-      ...assistance
-    };
+    try {
+      // Use real AI service to generate educational questions
+      const questionSet = await EducationalAIService.generateEducationalQuestions(request, assignment);
+      
+      // Convert AI-generated questions to the expected format
+      const suggestions = questionSet.questions.map(q => q.question);
+      const explanation = questionSet.overallEducationalGoal;
+      const educationalRationale = questionSet.questions[0]?.educationalRationale || 
+        'AI assistance provides questions to guide your thinking and learning process.';
+      
+      return {
+        type: request.assistanceType,
+        suggestions,
+        explanation,
+        educationalRationale
+      };
+    } catch (error) {
+      console.error('Real AI assistance failed, using fallback:', error);
+      
+      // Fallback to educational alternatives if AI fails
+      const fallbackMap = {
+        grammar: {
+          suggestions: [
+            'What grammar patterns do you notice in your writing?',
+            'How can you check for subject-verb agreement in your paragraphs?',
+            'Which sentences might benefit from proofreading?'
+          ],
+          explanation: 'These questions help you develop self-editing skills.',
+          educationalRationale: 'Learning to identify and correct your own grammar builds writing independence.'
+        },
+        style: {
+          suggestions: [
+            'How does your word choice reflect your intended tone?',
+            'Where might you vary sentence length for better flow?',
+            'What voice do you want to convey to your audience?'
+          ],
+          explanation: 'These questions help you think about writing style and voice.',
+          educationalRationale: 'Developing style awareness improves communication effectiveness.'
+        },
+        structure: {
+          suggestions: [
+            'How does each paragraph advance your main argument?',
+            'What transitions would help readers follow your logic?',
+            'Where is your strongest evidence, and how can you highlight it?'
+          ],
+          explanation: 'These questions help you think about organization and flow.',
+          educationalRationale: 'Strong structure makes arguments more persuasive and easier to follow.'
+        },
+        brainstorming: {
+          suggestions: [
+            'What questions does your topic raise for you?',
+            'How does this connect to your personal experience?',
+            'What would someone who disagrees with you say?'
+          ],
+          explanation: 'These questions help expand your thinking about the topic.',
+          educationalRationale: 'Good questions lead to deeper exploration and original ideas.'
+        },
+        research: {
+          suggestions: [
+            'What types of sources would strengthen your argument?',
+            'How can you evaluate the credibility of your sources?',
+            'What perspectives might you be missing?'
+          ],
+          explanation: 'These questions guide your research process.',
+          educationalRationale: 'Critical evaluation of sources is essential for academic integrity.'
+        },
+        citations: {
+          suggestions: [
+            'How can you check your citation format?',
+            'Which ideas need attribution in your writing?',
+            'What citation style does your assignment require?'
+          ],
+          explanation: 'These questions help ensure proper academic attribution.',
+          educationalRationale: 'Proper citation shows respect for others\' intellectual work.'
+        },
+        outlining: {
+          suggestions: [
+            'What is your main argument or thesis?',
+            'How do your supporting points connect logically?',
+            'What order would be most persuasive for your audience?'
+          ],
+          explanation: 'These questions help you organize your ideas effectively.',
+          educationalRationale: 'Clear organization makes writing more compelling and easier to understand.'
+        }
+      };
+      
+      const fallback = fallbackMap[request.assistanceType] || fallbackMap.structure;
+      
+      return {
+        type: request.assistanceType,
+        ...fallback
+      };
+    }
   }
   
   private static createDenialResponse(
@@ -785,9 +912,23 @@ export class AIBoundaryService {
     return {
       requestId: new mongoose.Types.ObjectId().toString(),
       approved: false,
-      denialReason: reason,
-      alternatives,
-      learningOpportunity: educationalRationale
+      educationalAlternatives: {
+        independentActions: alternatives,
+        resourceSuggestions: ['Review assignment instructions', 'Consult course materials'],
+        reflectionQuestions: ['What can you try on your own first?', 'What specific help do you need?'],
+        learningObjective: educationalRationale
+      },
+      contributionTracking: {
+        mustBeAttributed: false,
+        visibleToEducator: true,
+        impactsAssessment: false
+      },
+      mandatoryReflection: {
+        required: false,
+        minimumLength: 0,
+        qualityThreshold: 'basic',
+        prompts: []
+      }
     };
   }
   

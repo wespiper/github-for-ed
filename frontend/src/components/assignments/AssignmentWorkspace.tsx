@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { WritingEditor } from "@/components/editor/WritingEditor";
 import { VersionTimeline } from "@/components/editor/VersionTimeline";
 import { WritingAnalytics } from "@/components/analytics/WritingAnalytics";
+import { EducationalAICoach } from "@/components/ai/EducationalAICoach";
 import { useAssignment } from "@/hooks/useAssignments";
 import {
     useSubmission,
@@ -21,6 +22,7 @@ export const AssignmentWorkspace = () => {
 
     const [showVersions, setShowVersions] = useState(false);
     const [showAnalytics, setShowAnalytics] = useState(false);
+    const [showAICoach, setShowAICoach] = useState(false);
     const [activeCollaborators, setActiveCollaborators] = useState<{ _id: string; firstName: string; lastName: string; email: string }[]>([]);
     const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
 
@@ -83,6 +85,26 @@ export const AssignmentWorkspace = () => {
             console.error("Manual save failed:", error);
         }
     }, [submissionId, submission, updateSubmission]);
+
+    // Determine current writing stage based on word count and content
+    const getCurrentWritingStage = () => {
+        if (!submission) return 'brainstorming';
+        
+        const wordCount = submission.wordCount || 0;
+        const hasStructure = submission.content.includes('<h') || submission.content.includes('<p');
+        
+        if (wordCount < 100) return 'brainstorming';
+        if (wordCount < 500 && !hasStructure) return 'drafting';
+        if (wordCount >= 500 && hasStructure) return 'revising';
+        return 'editing';
+    };
+
+    // Handle AI reflection submissions
+    const handleAIReflection = useCallback((reflection: { prompt: string; response: string }) => {
+        // In production, this would be saved to the backend
+        console.log('AI Reflection recorded:', reflection);
+        // Could update submission with reflection metadata here
+    }, []);
 
     if (assignmentLoading || submissionLoading) {
         return (
@@ -221,6 +243,20 @@ export const AssignmentWorkspace = () => {
                                 >
                                     Analytics
                                 </button>
+                                {canEdit && !isSubmitted && (
+                                    <button
+                                        onClick={() =>
+                                            setShowAICoach(!showAICoach)
+                                        }
+                                        className={`px-3 py-1 text-sm rounded-md ${
+                                            showAICoach
+                                                ? "bg-scribe-200 text-scribe-700"
+                                                : "bg-ink-100 text-ink-700 hover:bg-ink-200"
+                                        }`}
+                                    >
+                                        🎯 AI Coach
+                                    </button>
+                                )}
                             </div>
 
                             {/* Save button */}
@@ -272,7 +308,7 @@ export const AssignmentWorkspace = () => {
                     {/* Main Editor Area */}
                     <div
                         className={`${
-                            showVersions || showAnalytics
+                            showVersions || showAnalytics || showAICoach
                                 ? "lg:col-span-8"
                                 : "lg:col-span-12"
                         }`}
@@ -441,8 +477,8 @@ export const AssignmentWorkspace = () => {
                             )}
                     </div>
 
-                    {/* Sidebar - Versions & Analytics */}
-                    {(showVersions || showAnalytics) && (
+                    {/* Sidebar - Versions, Analytics & AI Coach */}
+                    {(showVersions || showAnalytics || showAICoach) && (
                         <div className="lg:col-span-4">
                             <div className="sticky top-24 space-y-6">
                                 {showVersions && (
@@ -476,6 +512,18 @@ export const AssignmentWorkspace = () => {
                                             totalVersions={
                                                 submission.currentVersion
                                             }
+                                        />
+                                    </div>
+                                )}
+
+                                {showAICoach && canEdit && !isSubmitted && (
+                                    <div className="bg-white rounded-lg shadow-sm p-6">
+                                        <EducationalAICoach
+                                            studentId={user?.id || ''}
+                                            assignmentId={assignmentId!}
+                                            currentStage={getCurrentWritingStage() as 'brainstorming' | 'drafting' | 'revising' | 'editing'}
+                                            contentSample={submission.content.substring(0, 500)}
+                                            onReflectionRequired={handleAIReflection}
                                         />
                                     </div>
                                 )}

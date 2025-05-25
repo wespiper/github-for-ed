@@ -222,18 +222,17 @@ router.post('/ai-assistance-request',
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const studentId = req.userId!;
-      const { assignmentId, submissionId, assistanceType, context } = req.body;
+      const { assignmentId, action, context } = req.body;
       
-      if (!assignmentId || !assistanceType || !context) {
-        res.status(400).json({ message: 'Assignment ID, assistance type, and context are required' });
+      if (!assignmentId || !action || !context) {
+        res.status(400).json({ message: 'Assignment ID, action, and context are required' });
         return;
       }
       
       const request = {
         studentId,
         assignmentId,
-        submissionId,
-        assistanceType,
+        assistanceType: action, // Map action to assistanceType for the service
         context,
         timestamp: new Date()
       };

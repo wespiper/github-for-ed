@@ -42,7 +42,9 @@
       "mcp__ide__getDiagnostics",
       "Bash(npm test:*)",
       "Bash(ls:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(node:*)",
+      "Bash(npm run seed:*)"
     ],
     "deny": []
   }

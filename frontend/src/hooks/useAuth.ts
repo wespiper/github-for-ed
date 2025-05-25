@@ -26,7 +26,7 @@ const authApi = {
 };
 
 export const useAuth = () => {
-  const { login: setAuth, logout: clearAuth, user, isAuthenticated } = useAuthStore();
+  const { login: setAuth, logout: clearAuth, user, isAuthenticated, isHydrated } = useAuthStore();
   const queryClient = useQueryClient();
 
   const registerMutation = useMutation({
@@ -48,9 +48,15 @@ export const useAuth = () => {
   const profileQuery = useQuery({
     queryKey: ['profile'],
     queryFn: authApi.getProfile,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && isHydrated,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false, // Don't retry on auth errors
   });
+
+  // Handle profile query errors
+  if (profileQuery.error && isAuthenticated) {
+    clearAuth();
+  }
 
   const updateProfileMutation = useMutation({
     mutationFn: authApi.updateProfile,

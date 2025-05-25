@@ -1,18 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { api } from '@/lib/api';
 import { type Assignment, type CreateAssignmentInput } from '@shared/types';
-
-const API_BASE = 'http://localhost:5001/api/assignments';
 
 // API functions
 const assignmentsAPI = {
   create: async (data: CreateAssignmentInput): Promise<Assignment> => {
-    const response = await axios.post(API_BASE, data);
+    const response = await api.post('/assignments', data);
     return response.data.data;
   },
 
   getByInstructor: async (): Promise<Assignment[]> => {
-    const response = await axios.get(`${API_BASE}/my-assignments`);
+    const response = await api.get('/assignments/my-assignments');
     return response.data.data;
   },
 
@@ -24,27 +22,27 @@ const assignmentsAPI = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.type) params.append('type', filters.type);
     
-    const response = await axios.get(`${API_BASE}/course/${courseId}?${params}`);
+    const response = await api.get(`/assignments/course/${courseId}?${params}`);
     return response.data.data;
   },
 
   getById: async (assignmentId: string): Promise<Assignment> => {
-    const response = await axios.get(`${API_BASE}/${assignmentId}`);
+    const response = await api.get(`/assignments/${assignmentId}`);
     return response.data.data;
   },
 
   update: async (assignmentId: string, data: Partial<CreateAssignmentInput>): Promise<Assignment> => {
-    const response = await axios.put(`${API_BASE}/${assignmentId}`, data);
+    const response = await api.put(`/assignments/${assignmentId}`, data);
     return response.data.data;
   },
 
   publish: async (assignmentId: string): Promise<Assignment> => {
-    const response = await axios.patch(`${API_BASE}/${assignmentId}/publish`);
+    const response = await api.patch(`/assignments/${assignmentId}/publish`);
     return response.data.data;
   },
 
   createSubmission: async (assignmentId: string, data: { title?: string; isCollaborative?: boolean }) => {
-    const response = await axios.post(`${API_BASE}/${assignmentId}/submit`, data);
+    const response = await api.post(`/assignments/${assignmentId}/submit`, data);
     return response.data.data;
   },
 
@@ -52,12 +50,12 @@ const assignmentsAPI = {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     
-    const response = await axios.get(`${API_BASE}/${assignmentId}/submissions?${params}`);
+    const response = await api.get(`/assignments/${assignmentId}/submissions?${params}`);
     return response.data.data;
   },
 
   delete: async (assignmentId: string): Promise<void> => {
-    await axios.delete(`${API_BASE}/${assignmentId}`);
+    await api.delete(`/assignments/${assignmentId}`);
   }
 };
 
