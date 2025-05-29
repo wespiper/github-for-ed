@@ -183,4 +183,131 @@ router.get('/users', authenticate, requireRole(['admin']), async (req: Authentic
   }
 });
 
+// Get API endpoints (admin only)
+router.get('/api-endpoints', authenticate, requireRole(['admin']), async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const endpoints = [
+      {
+        category: 'Authentication',
+        routes: [
+          { method: 'POST', path: '/api/auth/register', description: 'Register new user', roles: ['public'] },
+          { method: 'POST', path: '/api/auth/login', description: 'User login', roles: ['public'] },
+          { method: 'GET', path: '/api/auth/me', description: 'Get current user profile', roles: ['student', 'educator', 'admin'] },
+          { method: 'PUT', path: '/api/auth/profile', description: 'Update user profile', roles: ['student', 'educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Admin',
+        routes: [
+          { method: 'POST', path: '/api/admin/switch-role', description: 'Switch user role (admin only)', roles: ['admin'] },
+          { method: 'POST', path: '/api/admin/toggle-my-role', description: 'Toggle own role between student/educator', roles: ['student', 'educator'] },
+          { method: 'GET', path: '/api/admin/users', description: 'Get all users', roles: ['admin'] },
+          { method: 'GET', path: '/api/admin/api-endpoints', description: 'View API endpoints', roles: ['admin'] }
+        ]
+      },
+      {
+        category: 'Courses',
+        routes: [
+          { method: 'GET', path: '/api/courses', description: 'Get courses for current user', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/courses', description: 'Create new course', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/courses/:id', description: 'Get course details', roles: ['student', 'educator', 'admin'] },
+          { method: 'PUT', path: '/api/courses/:id', description: 'Update course', roles: ['educator', 'admin'] },
+          { method: 'DELETE', path: '/api/courses/:id', description: 'Delete course', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Assignments',
+        routes: [
+          { method: 'GET', path: '/api/assignments', description: 'Get assignments for current user', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/assignments', description: 'Create new assignment', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/assignments/:id', description: 'Get assignment details', roles: ['student', 'educator', 'admin'] },
+          { method: 'PUT', path: '/api/assignments/:id', description: 'Update assignment', roles: ['educator', 'admin'] },
+          { method: 'DELETE', path: '/api/assignments/:id', description: 'Delete assignment', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Assignment Templates',
+        routes: [
+          { method: 'GET', path: '/api/assignment-templates', description: 'Get assignment templates', roles: ['educator', 'admin'] },
+          { method: 'POST', path: '/api/assignment-templates', description: 'Create assignment template', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/assignment-templates/:id', description: 'Get template details', roles: ['educator', 'admin'] },
+          { method: 'PUT', path: '/api/assignment-templates/:id', description: 'Update template', roles: ['educator', 'admin'] },
+          { method: 'DELETE', path: '/api/assignment-templates/:id', description: 'Delete template', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Course Assignments',
+        routes: [
+          { method: 'GET', path: '/api/course-assignments/:courseId', description: 'Get assignments for course', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/course-assignments/:courseId/deploy/:templateId', description: 'Deploy template to course', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Documents',
+        routes: [
+          { method: 'GET', path: '/api/documents', description: 'Get user documents', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/documents', description: 'Create new document', roles: ['student', 'educator', 'admin'] },
+          { method: 'GET', path: '/api/documents/:id', description: 'Get document details', roles: ['student', 'educator', 'admin'] },
+          { method: 'PUT', path: '/api/documents/:id', description: 'Update document', roles: ['student', 'educator', 'admin'] },
+          { method: 'DELETE', path: '/api/documents/:id', description: 'Delete document', roles: ['student', 'educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Submissions',
+        routes: [
+          { method: 'GET', path: '/api/submissions', description: 'Get user submissions', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/submissions', description: 'Create submission', roles: ['student'] },
+          { method: 'GET', path: '/api/submissions/:id', description: 'Get submission details', roles: ['student', 'educator', 'admin'] },
+          { method: 'PUT', path: '/api/submissions/:id', description: 'Update submission', roles: ['student', 'educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Learning Objectives',
+        routes: [
+          { method: 'GET', path: '/api/learning-objectives', description: 'Get learning objectives', roles: ['educator', 'admin'] },
+          { method: 'POST', path: '/api/learning-objectives', description: 'Create learning objective', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/learning-objectives/:id', description: 'Get objective details', roles: ['educator', 'admin'] },
+          { method: 'PUT', path: '/api/learning-objectives/:id', description: 'Update objective', roles: ['educator', 'admin'] },
+          { method: 'DELETE', path: '/api/learning-objectives/:id', description: 'Delete objective', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Analytics',
+        routes: [
+          { method: 'GET', path: '/api/analytics/writing-process/:assignmentId', description: 'Get writing process analytics', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/analytics/student-progress/:studentId', description: 'Get student progress', roles: ['educator', 'admin'] },
+          { method: 'GET', path: '/api/analytics/course-overview/:courseId', description: 'Get course analytics', roles: ['educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'Notifications',
+        routes: [
+          { method: 'GET', path: '/api/notifications', description: 'Get user notifications', roles: ['student', 'educator', 'admin'] },
+          { method: 'POST', path: '/api/notifications', description: 'Create notification', roles: ['educator', 'admin'] },
+          { method: 'PUT', path: '/api/notifications/:id/read', description: 'Mark notification as read', roles: ['student', 'educator', 'admin'] }
+        ]
+      },
+      {
+        category: 'System',
+        routes: [
+          { method: 'GET', path: '/api/health', description: 'Health check endpoint', roles: ['public'] }
+        ]
+      }
+    ];
+
+    res.json({ 
+      success: true,
+      data: endpoints,
+      message: 'API endpoints retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get API endpoints error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      message: 'Failed to retrieve API endpoints'
+    });
+  }
+});
+
 export default router;
