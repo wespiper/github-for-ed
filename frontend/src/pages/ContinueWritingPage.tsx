@@ -41,7 +41,7 @@ export const ContinueWritingPage = () => {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {inProgressSubmissions.map((submission) => (
                             <div
-                                key={submission._id}
+                                key={submission.id}
                                 className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-center justify-between mb-3">
@@ -83,7 +83,7 @@ export const ContinueWritingPage = () => {
                                     className="w-full"
                                     size="sm"
                                 >
-                                    <Link to={`/writing/assignment/${submission.assignment?._id}/submission/${submission._id}`}>
+                                    <Link to={`/writing/assignment/${submission.assignment?.id}/submission/${submission.id}`}>
                                         Continue Writing
                                     </Link>
                                 </Button>
@@ -120,7 +120,7 @@ export const ContinueWritingPage = () => {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {myCourseAssignments.slice(0, 6).map((assignment) => (
                             <div
-                                key={assignment._id}
+                                key={assignment.id}
                                 className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-center space-x-3 mb-3">
@@ -156,7 +156,7 @@ export const ContinueWritingPage = () => {
                                     className="w-full"
                                     size="sm"
                                 >
-                                    <Link to={`/assignments/${assignment._id}`}>
+                                    <Link to={`/assignments/${assignment.id}`}>
                                         Start Assignment
                                     </Link>
                                 </Button>
@@ -187,7 +187,7 @@ export const ContinueWritingPage = () => {
                 ) : recentSubmissions.length > 0 ? (
                     <div className="bg-white rounded-xl shadow-sm border border-ink-200 divide-y divide-ink-100">
                         {recentSubmissions.map((submission) => (
-                            <div key={submission._id} className="p-4">
+                            <div key={submission.id} className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <div className="p-2 bg-scribe-50 rounded-lg">

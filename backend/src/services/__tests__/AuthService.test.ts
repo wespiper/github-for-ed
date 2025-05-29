@@ -1,15 +1,21 @@
 import { AuthService } from '../AuthService';
-import { User } from '../../models/User';
 import { generateToken } from '../../utils/jwt';
 import { RegisterInput, LoginInput, UpdateProfileInput } from '@shared/types';
 
-// Mock the dependencies
-jest.mock('../../models/User', () => ({
-  User: jest.fn()
-}));
+// Mock Prisma
+const mockPrisma = {
+  user: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn()
+  },
+  $disconnect: jest.fn()
+};
+
+jest.mock('../../lib/prisma', () => mockPrisma);
 jest.mock('../../utils/jwt');
 
-const { User: MockedUser } = require('../../models/User');
 const mockGenerateToken = generateToken as jest.MockedFunction<typeof generateToken>;
 
 describe('AuthService', () => {
@@ -27,29 +33,30 @@ describe('AuthService', () => {
     };
 
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       firstName: 'John',
       lastName: 'Doe',
-      role: 'student',
+      role: 'student' as const,
       isVerified: false,
+      passwordHash: 'hashedPassword',
       createdAt: new Date(),
-      save: jest.fn().mockResolvedValue(true)
+      updatedAt: new Date()
     };
 
     it('should register user successfully with valid data', async () => {
       // Arrange
-      MockedUser.findOne = jest.fn().mockResolvedValue(null); // No existing user
-      MockedUser.mockImplementation(() => mockUser as any);
+      mockPrisma.user.findUnique.mockResolvedValue(null); // No existing user
+      mockPrisma.user.create.mockResolvedValue(mockUser as any);
       mockGenerateToken.mockReturnValue('mock_token');
 
       // Act
       const result = await AuthService.registerUser(validRegistrationData);
 
       // Assert
-      expect(MockedUser.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
-      expect(mockUser.save).toHaveBeenCalled();
-      expect(mockGenerateToken).toHaveBeenCalledWith(mockUser);
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(mockPrisma.user.create).toHaveBeenCalled();
+      expect(mockGenerateToken).toHaveBeenCalledWith(expect.objectContaining({ email: 'test@example.com' }));
       expect(result.message).toBe('User registered successfully');
       expect(result.token).toBe('mock_token');
       expect(result.user.email).toBe('test@example.com');
@@ -57,7 +64,7 @@ describe('AuthService', () => {
 
     it('should throw error if user already exists', async () => {
       // Arrange
-      MockedUser.findOne = jest.fn().mockResolvedValue(mockUser as any);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
 
       // Act & Assert
       await expect(
@@ -123,28 +130,31 @@ describe('AuthService', () => {
     };
 
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       firstName: 'John',
       lastName: 'Doe',
-      role: 'student',
+      role: 'student' as const,
       isVerified: false,
+      passwordHash: 'hashedPassword',
       createdAt: new Date(),
-      comparePassword: jest.fn()
+      updatedAt: new Date()
     };
 
     it('should authenticate user successfully with valid credentials', async () => {
       // Arrange
-      MockedUser.findOne = jest.fn().mockResolvedValue(mockUser as any);
-      mockUser.comparePassword.mockResolvedValue(true);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      // Mock bcrypt.compare for password verification
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
       mockGenerateToken.mockReturnValue('mock_token');
 
       // Act
       const result = await AuthService.authenticateUser(validLoginData);
 
       // Assert
-      expect(MockedUser.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
-      expect(mockUser.comparePassword).toHaveBeenCalledWith('password123');
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedPassword');
       expect(mockGenerateToken).toHaveBeenCalledWith(mockUser);
       expect(result.message).toBe('Login successful');
       expect(result.token).toBe('mock_token');
@@ -153,7 +163,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      MockedUser.findOne = jest.fn().mockResolvedValue(null);
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -163,8 +173,9 @@ describe('AuthService', () => {
 
     it('should throw error if password is incorrect', async () => {
       // Arrange
-      MockedUser.findOne = jest.fn().mockResolvedValue(mockUser as any);
-      mockUser.comparePassword.mockResolvedValue(false);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
 
       // Act & Assert
       await expect(
@@ -185,25 +196,34 @@ describe('AuthService', () => {
 
   describe('getUserProfile', () => {
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       firstName: 'John',
       lastName: 'Doe',
-      role: 'student',
+      role: 'student' as const,
       isVerified: false,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     it('should return user profile successfully', async () => {
       // Arrange
-      MockedUser.findById = jest.fn().mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockUser)
-      });
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
 
       // Act
-      const result = await AuthService.getUserProfile('507f1f77bcf86cd799439011');
+      const result = await AuthService.getUserProfile('123e4567-e89b-12d3-a456-426614174000');
 
       // Assert
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: '123e4567-e89b-12d3-a456-426614174000' },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true
+        })
+      });
       expect(result.user.email).toBe('test@example.com');
       expect(result.user.firstName).toBe('John');
       expect(result.user.role).toBe('student');
@@ -211,9 +231,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      MockedUser.findById = jest.fn().mockReturnValue({
-        select: jest.fn().mockResolvedValue(null)
-      });
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -230,40 +248,43 @@ describe('AuthService', () => {
     };
 
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       firstName: 'Jane',
       lastName: 'Smith',
-      role: 'student',
+      role: 'student' as const,
       bio: 'Updated bio',
       isVerified: false,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     it('should update user profile successfully', async () => {
       // Arrange
-      MockedUser.findByIdAndUpdate = jest.fn().mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockUser)
-      });
+      mockPrisma.user.update.mockResolvedValue(mockUser as any);
 
       // Act
-      const result = await AuthService.updateUserProfile('507f1f77bcf86cd799439011', updateData);
+      const result = await AuthService.updateUserProfile('123e4567-e89b-12d3-a456-426614174000', updateData);
 
       // Assert
-      expect(MockedUser.findByIdAndUpdate).toHaveBeenCalledWith(
-        '507f1f77bcf86cd799439011',
-        { firstName: 'Jane', lastName: 'Smith', bio: 'Updated bio' },
-        { new: true, runValidators: true }
-      );
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: '123e4567-e89b-12d3-a456-426614174000' },
+        data: { firstName: 'Jane', lastName: 'Smith', bio: 'Updated bio' },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true
+        })
+      });
       expect(result.user.firstName).toBe('Jane');
       expect(result.user.bio).toBe('Updated bio');
     });
 
     it('should throw error if user not found', async () => {
       // Arrange
-      MockedUser.findByIdAndUpdate = jest.fn().mockReturnValue({
-        select: jest.fn().mockResolvedValue(null)
-      });
+      mockPrisma.user.update.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -277,7 +298,7 @@ describe('AuthService', () => {
 
       // Act & Assert
       await expect(
-        AuthService.updateUserProfile('507f1f77bcf86cd799439011', invalidData)
+        AuthService.updateUserProfile('123e4567-e89b-12d3-a456-426614174000', invalidData)
       ).rejects.toThrow('Bio cannot exceed 500 characters');
     });
 
@@ -287,54 +308,61 @@ describe('AuthService', () => {
 
       // Act & Assert
       await expect(
-        AuthService.updateUserProfile('507f1f77bcf86cd799439011', invalidData)
+        AuthService.updateUserProfile('123e4567-e89b-12d3-a456-426614174000', invalidData)
       ).rejects.toThrow('First name must be at least 2 characters long');
     });
   });
 
   describe('changePassword', () => {
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
-      comparePassword: jest.fn(),
-      password: '',
-      save: jest.fn().mockResolvedValue(true)
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      passwordHash: 'hashedPassword',
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     it('should change password successfully', async () => {
       // Arrange
-      MockedUser.findById = jest.fn().mockResolvedValue(mockUser as any);
-      mockUser.comparePassword.mockResolvedValue(true);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('newHashedPassword');
+      mockPrisma.user.update.mockResolvedValue({ ...mockUser, passwordHash: 'newHashedPassword' } as any);
 
       // Act
-      await AuthService.changePassword('507f1f77bcf86cd799439011', 'oldpassword', 'newpassword123');
+      await AuthService.changePassword('123e4567-e89b-12d3-a456-426614174000', 'oldpassword', 'newpassword123');
 
       // Assert
-      expect(mockUser.comparePassword).toHaveBeenCalledWith('oldpassword');
-      expect(mockUser.password).toBe('newpassword123');
-      expect(mockUser.save).toHaveBeenCalled();
+      expect(bcrypt.compare).toHaveBeenCalledWith('oldpassword', 'hashedPassword');
+      expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: '123e4567-e89b-12d3-a456-426614174000' },
+        data: { passwordHash: 'newHashedPassword' }
+      });
     });
 
     it('should throw error if current password is incorrect', async () => {
       // Arrange
-      MockedUser.findById = jest.fn().mockResolvedValue(mockUser as any);
-      mockUser.comparePassword.mockResolvedValue(false);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      const bcrypt = require('bcryptjs');
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
 
       // Act & Assert
       await expect(
-        AuthService.changePassword('507f1f77bcf86cd799439011', 'wrongpassword', 'newpassword123')
+        AuthService.changePassword('123e4567-e89b-12d3-a456-426614174000', 'wrongpassword', 'newpassword123')
       ).rejects.toThrow('Current password is incorrect');
     });
 
     it('should throw error if new password is too short', async () => {
       // Act & Assert
       await expect(
-        AuthService.changePassword('507f1f77bcf86cd799439011', 'oldpassword', '123')
+        AuthService.changePassword('123e4567-e89b-12d3-a456-426614174000', 'oldpassword', '123')
       ).rejects.toThrow('Password must be at least 6 characters long');
     });
 
     it('should throw error if user not found', async () => {
       // Arrange
-      MockedUser.findById = jest.fn().mockResolvedValue(null);
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
       // Act & Assert
       await expect(

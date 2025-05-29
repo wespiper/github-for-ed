@@ -23,7 +23,7 @@ export const AssignmentWorkspace = () => {
     const [showVersions, setShowVersions] = useState(false);
     const [showAnalytics, setShowAnalytics] = useState(false);
     const [showAICoach, setShowAICoach] = useState(false);
-    const [activeCollaborators, setActiveCollaborators] = useState<{ _id: string; firstName: string; lastName: string; email: string }[]>([]);
+    const [activeCollaborators, setActiveCollaborators] = useState<{ id: string; firstName: string; lastName: string; email: string }[]>([]);
     const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
 
     const { data: assignment, isLoading: assignmentLoading } = useAssignment(
@@ -38,10 +38,10 @@ export const AssignmentWorkspace = () => {
 
     // Real-time collaboration simulation (would integrate with WebSocket in production)
     useEffect(() => {
-        if (submission?.collaboration.isCollaborative) {
+        if (submission?.collaborationSettings.isCollaborative) {
             // Simulate active collaborators
             setActiveCollaborators(
-                submission.collaborators.filter((c: { _id: string }) => c._id !== user?.id)
+                submission.collaborators?.filter((c: { id: string }) => c.id !== user?.id) || []
             );
         }
     }, [submission, user]);
@@ -54,11 +54,7 @@ export const AssignmentWorkspace = () => {
             try {
                 await updateSubmission.mutateAsync({
                     submissionId,
-                    data: {
-                        content,
-                        saveType: "auto",
-                        sessionDuration: 1, // Track session time
-                    },
+                    content,
                 });
                 setLastSaveTime(new Date());
             } catch (error) {
@@ -75,10 +71,7 @@ export const AssignmentWorkspace = () => {
         try {
             await updateSubmission.mutateAsync({
                 submissionId,
-                data: {
-                    content: submission.content,
-                    saveType: "manual",
-                },
+                content: submission.content || '',
             });
             setLastSaveTime(new Date());
         } catch (error) {
@@ -91,7 +84,7 @@ export const AssignmentWorkspace = () => {
         if (!submission) return 'brainstorming';
         
         const wordCount = submission.wordCount || 0;
-        const hasStructure = submission.content.includes('<h') || submission.content.includes('<p');
+        const hasStructure = submission.content?.includes('<h') || submission.content?.includes('<p');
         
         if (wordCount < 100) return 'brainstorming';
         if (wordCount < 500 && !hasStructure) return 'drafting';
@@ -144,9 +137,9 @@ export const AssignmentWorkspace = () => {
 
     // Check if user can edit
     const canEdit =
-        submission.author._id === user?.id ||
-        submission.collaborators.some(
-            (collab: { _id: string }) => collab._id === user?.id
+        submission.author?.id === user?.id ||
+        submission.collaborators?.some(
+            (collab: { id: string }) => collab.id === user?.id
         ) ||
         user?.role === "admin";
 
@@ -194,14 +187,14 @@ export const AssignmentWorkspace = () => {
 
                         <div className="flex items-center space-x-4">
                             {/* Collaboration Indicators */}
-                            {submission.collaboration.isCollaborative && (
+                            {submission.collaborationSettings.isCollaborative && (
                                 <div className="flex items-center space-x-2">
                                     <div className="flex -space-x-2">
                                         {activeCollaborators
                                             .slice(0, 3)
                                             .map((collaborator) => (
                                                 <div
-                                                    key={collaborator._id}
+                                                    key={collaborator.id}
                                                     className="relative w-8 h-8 bg-scribe-500 text-white rounded-full flex items-center justify-center text-xs font-medium border-2 border-white"
                                                     title={`${collaborator.firstName} ${collaborator.lastName}`}
                                                 >
@@ -278,7 +271,7 @@ export const AssignmentWorkspace = () => {
                                     <span>{submission.wordCount} words</span>
                                     <span>•</span>
                                     <span>
-                                        {submission.estimatedReadingTime} min
+                                        {submission.estimatedReadingTime || Math.ceil((submission.wordCount || 0) / 200)} min
                                         read
                                     </span>
                                     {isSubmitted && (
@@ -387,21 +380,22 @@ export const AssignmentWorkspace = () => {
                             {/* Writing Editor */}
                             <div className="p-6">
                                 <WritingEditor
-                                    content={submission.content}
+                                    content={submission.content || ''}
                                     onUpdate={handleContentUpdate}
                                     onSave={handleManualSave}
                                     placeholder="Start writing your assignment..."
                                     autoSave={
-                                        assignment.versionControl
-                                            .autoSaveInterval > 0
+                                        assignment.versionControl &&
+                                        assignment.versionControl.autoSaveInterval > 0
                                     }
                                     autoSaveInterval={
                                         assignment.versionControl
-                                            .autoSaveInterval * 1000
+                                            ? assignment.versionControl.autoSaveInterval * 1000
+                                            : 30000
                                     }
                                     editable={canEdit && !isSubmitted}
                                     maxCharacters={
-                                        assignment.requirements.maxWords
+                                        assignment.requirements?.maxWords
                                             ? assignment.requirements.maxWords *
                                               6
                                             : undefined
@@ -486,7 +480,7 @@ export const AssignmentWorkspace = () => {
                                         <VersionTimeline
                                             versions={versions || []}
                                             currentVersion={
-                                                submission.currentVersion
+                                                submission.currentVersion ?? 1
                                             }
                                             onVersionSelect={(version) =>
                                                 console.log(
@@ -510,7 +504,7 @@ export const AssignmentWorkspace = () => {
                                                 submission.wordCount
                                             }
                                             totalVersions={
-                                                submission.currentVersion
+                                                submission.currentVersion ?? 1
                                             }
                                         />
                                     </div>
@@ -522,7 +516,7 @@ export const AssignmentWorkspace = () => {
                                             studentId={user?.id || ''}
                                             assignmentId={assignmentId!}
                                             currentStage={getCurrentWritingStage() as 'brainstorming' | 'drafting' | 'revising' | 'editing'}
-                                            contentSample={submission.content.substring(0, 500)}
+                                            contentSample={submission.content?.substring(0, 500) || ''}
                                             onReflectionRequired={handleAIReflection}
                                         />
                                     </div>

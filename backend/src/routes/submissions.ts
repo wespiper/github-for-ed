@@ -1,11 +1,14 @@
 import { Router, Response } from 'express';
-import { AssignmentSubmission, IAssignmentSubmission } from '../models/AssignmentSubmission';
-import { Assignment } from '../models/Assignment';
-import { DocumentVersion } from '../models/DocumentVersion';
+import prisma from '../lib/prisma';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { Types } from 'mongoose';
 
 const router = Router();
+
+// Helper function to validate UUID format
+const isValidUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
 
 // Helper function to calculate text differences
 const calculateDiff = (oldText: string, newText: string) => {
@@ -20,27 +23,75 @@ const calculateDiff = (oldText: string, newText: string) => {
   return { addedWords, deletedWords, addedChars, deletedChars };
 };
 
+// Helper function to count words
+const countWords = (text: string): number => {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+};
+
 // Get user's assignment submissions
 router.get('/my-submissions', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { status, assignment } = req.query;
 
-    const filter: any = {
-      $or: [
-        { author: userId },
-        { collaborators: userId }
+    // Build where clause for Prisma
+    const whereClause: any = {
+      OR: [
+        { authorId: userId },
+        { collaborators: { some: { userId: userId } } }
       ]
     };
 
-    if (status) filter.status = status;
-    if (assignment) filter.assignment = assignment;
+    if (status && typeof status === 'string') {
+      whereClause.status = status;
+    }
 
-    const submissions = await AssignmentSubmission.find(filter)
-      .populate('assignment', 'title dueDate course')
-      .populate('author', 'firstName lastName email')
-      .populate('collaborators', 'firstName lastName email')
-      .sort({ lastSavedAt: -1 });
+    if (assignment && typeof assignment === 'string' && isValidUUID(assignment)) {
+      whereClause.assignmentId = assignment;
+    }
+
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: whereClause,
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            dueDate: true,
+            course: {
+              select: {
+                id: true,
+                title: true
+              }
+            }
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        collaborators: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    });
 
     res.json({
       message: 'Submissions retrieved successfully',
@@ -52,18 +103,67 @@ router.get('/my-submissions', authenticate, async (req: AuthenticatedRequest, re
   }
 });
 
-// Get a specific submission
-router.get('/:submissionId', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Get submission by ID
+router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { submissionId } = req.params;
+    const { id } = req.params;
     const userId = req.userId!;
+    const userRole = req.user!.role;
 
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'title dueDate requirements collaboration instructor course')
-      .populate('author', 'firstName lastName email')
-      .populate('collaborators', 'firstName lastName email')
-      .populate('comments.author', 'firstName lastName email')
-      .populate('comments.replies.author', 'firstName lastName email');
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid submission ID format' });
+      return;
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            instructions: true,
+            dueDate: true,
+            instructorId: true,
+            course: {
+              select: {
+                id: true,
+                title: true,
+                instructorId: true
+              }
+            }
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        collaborators: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          }
+        },
+        documents: {
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            updatedAt: true
+          }
+        }
+      }
+    });
 
     if (!submission) {
       res.status(404).json({ error: 'Submission not found' });
@@ -71,14 +171,16 @@ router.get('/:submissionId', authenticate, async (req: AuthenticatedRequest, res
     }
 
     // Check access permissions
-    const assignment = submission.assignment as any;
-    const isAuthor = (submission.author as any)._id.toString() === userId;
-    const isCollaborator = submission.collaborators.some((collab: any) => collab._id.toString() === userId);
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
+    const isAuthor = submission.authorId === userId;
+    const isCollaborator = submission.collaborators.some(collab => collab.userId === userId);
+    const isAssignmentOwner = submission.assignment.instructorId === userId;
+    const isCourseOwner = submission.assignment.course.instructorId === userId;
+    const isAdmin = userRole === 'admin';
 
-    if (!isAuthor && !isCollaborator && !isInstructor && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this submission' });
+    const hasAccess = isAuthor || isCollaborator || isAssignmentOwner || isCourseOwner || isAdmin;
+
+    if (!hasAccess) {
+      res.status(403).json({ error: 'Access denied to submission' });
       return;
     }
 
@@ -92,366 +194,283 @@ router.get('/:submissionId', authenticate, async (req: AuthenticatedRequest, res
   }
 });
 
-// Update submission content (auto-save and real-time collaboration)
-router.put('/:submissionId/content', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Create or update submission
+router.post('/:assignmentId', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { submissionId } = req.params;
-    const { content, title, saveType = 'auto', sessionDuration } = req.body;
+    const { assignmentId } = req.params;
     const userId = req.userId!;
+    const { title, content } = req.body;
 
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'collaboration versionControl');
-
-    if (!submission) {
-      res.status(404).json({ error: 'Submission not found' });
+    if (!isValidUUID(assignmentId)) {
+      res.status(400).json({ error: 'Invalid assignment ID format' });
       return;
     }
 
-    // Check edit permissions
-    const isAuthor = submission.author.toString() === userId;
-    const isCollaborator = submission.collaborators.some((collab: any) => collab.toString() === userId);
-    const assignment = submission.assignment as any;
-    const canEdit = isAuthor || isCollaborator || assignment.collaboration.allowRealTimeEditing;
-
-    if (!canEdit) {
-      res.status(403).json({ error: 'No edit permissions for this submission' });
-      return;
-    }
-
-    const oldContent = submission.content;
-    const oldTitle = submission.title;
-    const oldWordCount = submission.wordCount;
-
-    // Calculate differences
-    const diff = calculateDiff(oldContent, content);
-
-    // Update submission content
-    submission.content = content;
-    if (title) submission.title = title;
-    submission.lastSavedAt = new Date();
-
-    // Update collaboration tracking
-    if (submission.collaboration.isCollaborative) {
-      submission.collaboration.lastActiveAt = new Date();
-      if (!submission.collaboration.activeUsers.includes(new Types.ObjectId(userId))) {
-        submission.collaboration.activeUsers.push(new Types.ObjectId(userId));
+    // Verify assignment exists and user has access
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        course: {
+          select: {
+            id: true,
+            instructorId: true
+          }
+        }
       }
+    });
+
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
     }
 
-    // Update analytics
-    const currentDate = new Date().toDateString();
-    let todayPattern = submission.analytics.writingPattern.find(
-      pattern => new Date(pattern.date).toDateString() === currentDate
-    );
+    // Check if user is enrolled in the course
+    const enrollment = await prisma.courseEnrollment.findFirst({
+      where: {
+        courseId: assignment.courseId,
+        studentId: userId,
+        status: 'active'
+      }
+    });
 
-    if (!todayPattern) {
-      todayPattern = {
-        date: new Date(),
-        wordsWritten: 0,
-        timeSpent: 0,
-        revisionsCount: 0
-      };
-      submission.analytics.writingPattern.push(todayPattern);
+    if (!enrollment) {
+      res.status(403).json({ error: 'Not enrolled in course' });
+      return;
     }
 
-    todayPattern.wordsWritten += diff.addedWords;
-    todayPattern.revisionsCount += 1;
-    if (sessionDuration) {
-      todayPattern.timeSpent += sessionDuration;
-      submission.analytics.totalWritingTime += sessionDuration;
-    }
+    // Check if submission already exists
+    let submission = await prisma.assignmentSubmission.findFirst({
+      where: {
+        assignmentId,
+        authorId: userId
+      }
+    });
 
-    // Update contributor stats
-    let contributorStat = submission.analytics.collaborationMetrics.contributorStats.find(
-      stat => stat.user.toString() === userId
-    );
+    const wordCount = countWords(content || '');
 
-    if (!contributorStat) {
-      contributorStat = {
-        user: new Types.ObjectId(userId),
-        wordsContributed: 0,
-        editsCount: 0,
-        commentsCount: 0
-      };
-      submission.analytics.collaborationMetrics.contributorStats.push(contributorStat);
-    }
-
-    contributorStat.wordsContributed += diff.addedWords;
-    contributorStat.editsCount += 1;
-
-    await submission.save();
-
-    // Create version if significant changes
-    const shouldCreateVersion = 
-      saveType === 'manual' || 
-      diff.addedWords > 25 || 
-      diff.deletedWords > 25 ||
-      Math.abs(diff.addedChars) > 200;
-
-    if (shouldCreateVersion) {
-      const latestVersion = await DocumentVersion.getLatestVersion(submissionId);
-      
-      const newVersion = new DocumentVersion({
-        document: submissionId,
-        version: latestVersion + 1,
-        content,
-        title: title || submission.title,
-        changes: {
-          type: saveType,
-          description: saveType === 'auto' ? 'Auto-save checkpoint' : 'Manual save',
-          ...diff
+    if (submission) {
+      // Update existing submission
+      submission = await prisma.assignmentSubmission.update({
+        where: { id: submission.id },
+        data: {
+          title: title || submission.title,
+          content: content || submission.content,
+          wordCount,
+          status: 'draft'
         },
-        author: userId,
-        metadata: {
-          wordCount: submission.wordCount,
-          characterCount: submission.characterCount,
-          readingTime: submission.estimatedReadingTime
+        include: {
+          assignment: {
+            select: {
+              id: true,
+              title: true,
+              dueDate: true
+            }
+          },
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
         }
       });
-
-      await newVersion.save();
-      submission.currentVersion = latestVersion + 1;
-
-      // Create major milestone if significant progress
-      if (diff.addedWords > 100 || saveType === 'manual') {
-        submission.majorMilestones.push({
-          version: latestVersion + 1,
-          timestamp: new Date(),
-          description: `Added ${diff.addedWords} words - ${saveType} save`,
-          wordCount: submission.wordCount,
-          author: new Types.ObjectId(userId)
-        });
-      }
-
-      await submission.save();
+    } else {
+      // Create new submission
+      submission = await prisma.assignmentSubmission.create({
+        data: {
+          assignmentId,
+          authorId: userId,
+          title: title || assignment.title,
+          content: content || '',
+          wordCount,
+          status: 'draft'
+        },
+        include: {
+          assignment: {
+            select: {
+              id: true,
+              title: true,
+              dueDate: true
+            }
+          },
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
     }
 
     res.json({
-      message: 'Submission updated successfully',
+      message: 'Submission saved successfully',
+      data: submission
+    });
+  } catch (error) {
+    console.error('Error saving submission:', error);
+    res.status(500).json({ error: 'Failed to save submission' });
+  }
+});
+
+// Submit assignment for grading
+router.patch('/:id/submit', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId!;
+
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid submission ID format' });
+      return;
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id },
+      include: {
+        assignment: {
+          select: {
+            dueDate: true,
+            title: true
+          }
+        }
+      }
+    });
+
+    if (!submission) {
+      res.status(404).json({ error: 'Submission not found' });
+      return;
+    }
+
+    // Check if user is the author
+    if (submission.authorId !== userId) {
+      res.status(403).json({ error: 'Only submission author can submit' });
+      return;
+    }
+
+    // Check if already submitted
+    if (submission.status === 'submitted') {
+      res.status(400).json({ error: 'Submission already submitted' });
+      return;
+    }
+
+    // Check word count requirement (basic validation)
+    if (submission.wordCount < 50) {
+      res.status(400).json({ 
+        error: 'Submission too short. Minimum 50 words required.',
+        currentWordCount: submission.wordCount
+      });
+      return;
+    }
+
+    // Update submission status
+    const updatedSubmission = await prisma.assignmentSubmission.update({
+      where: { id },
       data: {
-        submission,
-        versionCreated: shouldCreateVersion,
-        currentVersion: submission.currentVersion,
-        diff
+        status: 'submitted',
+        submittedAt: new Date()
+      },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            dueDate: true
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
       }
     });
-  } catch (error) {
-    console.error('Error updating submission:', error);
-    res.status(500).json({ error: 'Failed to update submission' });
-  }
-});
-
-// Add comment to submission
-router.post('/:submissionId/comments', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { submissionId } = req.params;
-    const { content, position, type = 'comment' } = req.body;
-    const userId = req.userId!;
-
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'instructor course');
-
-    if (!submission) {
-      res.status(404).json({ error: 'Submission not found' });
-      return;
-    }
-
-    // Check comment permissions
-    const assignment = submission.assignment as any;
-    const isAuthor = submission.author.toString() === userId;
-    const isCollaborator = submission.collaborators.some((collab: any) => collab.toString() === userId);
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isAuthor && !isCollaborator && !isInstructor && !isAdmin) {
-      res.status(403).json({ error: 'No permission to comment on this submission' });
-      return;
-    }
-
-    const newComment = {
-      id: new Types.ObjectId(),
-      author: new Types.ObjectId(userId),
-      content,
-      position,
-      type,
-      resolved: false,
-      createdAt: new Date(),
-      replies: []
-    };
-
-    submission.comments.push(newComment);
-
-    // Update contributor stats for comments
-    let contributorStat = submission.analytics.collaborationMetrics.contributorStats.find(
-      stat => stat.user.toString() === userId
-    );
-
-    if (contributorStat) {
-      contributorStat.commentsCount += 1;
-    }
-
-    await submission.save();
-
-    const populatedSubmission = await AssignmentSubmission.findById(submissionId)
-      .populate('comments.author', 'firstName lastName email');
-
-    res.status(201).json({
-      message: 'Comment added successfully',
-      data: populatedSubmission
-    });
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    res.status(500).json({ error: 'Failed to add comment' });
-  }
-});
-
-// Reply to comment
-router.post('/:submissionId/comments/:commentId/reply', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { submissionId, commentId } = req.params;
-    const { content } = req.body;
-    const userId = req.userId!;
-
-    const submission = await AssignmentSubmission.findById(submissionId);
-    if (!submission) {
-      res.status(404).json({ error: 'Submission not found' });
-      return;
-    }
-
-    const comment = submission.comments.find(c => c.id.toString() === commentId);
-    if (!comment) {
-      res.status(404).json({ error: 'Comment not found' });
-      return;
-    }
-
-    const reply = {
-      author: new Types.ObjectId(userId),
-      content,
-      createdAt: new Date()
-    };
-
-    comment.replies = comment.replies || [];
-    comment.replies.push(reply);
-
-    await submission.save();
 
     res.json({
-      message: 'Reply added successfully',
-      data: submission
+      message: 'Assignment submitted successfully',
+      data: updatedSubmission
     });
   } catch (error) {
-    console.error('Error adding reply:', error);
-    res.status(500).json({ error: 'Failed to add reply' });
-  }
-});
-
-// Resolve comment
-router.patch('/:submissionId/comments/:commentId/resolve', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { submissionId, commentId } = req.params;
-    const userId = req.userId!;
-
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'instructor');
-
-    if (!submission) {
-      res.status(404).json({ error: 'Submission not found' });
-      return;
-    }
-
-    const comment = submission.comments.find(c => c.id.toString() === commentId);
-    if (!comment) {
-      res.status(404).json({ error: 'Comment not found' });
-      return;
-    }
-
-    // Check permissions - author, instructor, or comment creator can resolve
-    const assignment = submission.assignment as any;
-    const isAuthor = submission.author.toString() === userId;
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isCommentAuthor = comment.author.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isAuthor && !isInstructor && !isCommentAuthor && !isAdmin) {
-      res.status(403).json({ error: 'No permission to resolve this comment' });
-      return;
-    }
-
-    comment.resolved = true;
-    await submission.save();
-
-    res.json({
-      message: 'Comment resolved successfully',
-      data: submission
-    });
-  } catch (error) {
-    console.error('Error resolving comment:', error);
-    res.status(500).json({ error: 'Failed to resolve comment' });
+    console.error('Error submitting assignment:', error);
+    res.status(500).json({ error: 'Failed to submit assignment' });
   }
 });
 
 // Add collaborator to submission
-router.post('/:submissionId/collaborators', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+router.post('/:id/collaborators', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { submissionId } = req.params;
-    const { collaboratorId } = req.body;
+    const { id } = req.params;
     const userId = req.userId!;
+    const { collaboratorId, role = 'collaborator' } = req.body;
 
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'collaboration maxCollaborators course');
+    if (!isValidUUID(id) || !isValidUUID(collaboratorId)) {
+      res.status(400).json({ error: 'Invalid ID format' });
+      return;
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id }
+    });
 
     if (!submission) {
       res.status(404).json({ error: 'Submission not found' });
       return;
     }
 
-    // Check permissions - only author can add collaborators
-    const isAuthor = submission.author.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isAuthor && !isAdmin) {
-      res.status(403).json({ error: 'Only the submission author can add collaborators' });
+    // Check if user is the author
+    if (submission.authorId !== userId) {
+      res.status(403).json({ error: 'Only submission author can add collaborators' });
       return;
     }
 
-    // Check if collaboration is enabled
-    const assignment = submission.assignment as any;
-    if (!assignment.collaboration.enabled) {
-      res.status(400).json({ error: 'Collaboration is not enabled for this assignment' });
+    // Check if user exists
+    const collaborator = await prisma.user.findUnique({
+      where: { id: collaboratorId }
+    });
+
+    if (!collaborator) {
+      res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    // Check collaborator limit
-    if (assignment.maxCollaborators && submission.collaborators.length >= assignment.maxCollaborators) {
-      res.status(400).json({ error: 'Maximum number of collaborators reached' });
-      return;
-    }
+    // Check if already a collaborator
+    const existingCollaboration = await prisma.submissionCollaborator.findFirst({
+      where: {
+        submissionId: id,
+        userId: collaboratorId
+      }
+    });
 
-    // Check if user is already a collaborator
-    if (submission.collaborators.some((collab: any) => collab.toString() === collaboratorId)) {
+    if (existingCollaboration) {
       res.status(400).json({ error: 'User is already a collaborator' });
       return;
     }
 
-    submission.collaborators.push(new Types.ObjectId(collaboratorId));
-    submission.collaboration.isCollaborative = true;
-
-    // Add to contributor stats
-    submission.analytics.collaborationMetrics.contributorStats.push({
-      user: new Types.ObjectId(collaboratorId),
-      wordsContributed: 0,
-      editsCount: 0,
-      commentsCount: 0
+    // Add collaborator
+    const collaboration = await prisma.submissionCollaborator.create({
+      data: {
+        submissionId: id,
+        userId: collaboratorId,
+        role
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
     });
-
-    await submission.save();
-
-    const updatedSubmission = await AssignmentSubmission.findById(submissionId)
-      .populate('collaborators', 'firstName lastName email');
 
     res.json({
       message: 'Collaborator added successfully',
-      data: updatedSubmission
+      data: collaboration
     });
   } catch (error) {
     console.error('Error adding collaborator:', error);
@@ -459,124 +478,155 @@ router.post('/:submissionId/collaborators', authenticate, async (req: Authentica
   }
 });
 
-// Submit for grading
-router.patch('/:submissionId/submit', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Get submission analytics (for educators)
+router.get('/:id/analytics', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { submissionId } = req.params;
+    const { id } = req.params;
     const userId = req.userId!;
+    const userRole = req.user!.role;
 
-    const submission = await AssignmentSubmission.findById(submissionId)
-      .populate('assignment', 'dueDate versionControl');
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid submission ID format' });
+      return;
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id },
+      include: {
+        assignment: {
+          select: {
+            instructorId: true,
+            course: {
+              select: {
+                instructorId: true
+              }
+            }
+          }
+        }
+      }
+    });
 
     if (!submission) {
       res.status(404).json({ error: 'Submission not found' });
       return;
     }
 
-    // Check permissions
-    const isAuthor = submission.author.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
+    // Check if user has permission to view analytics
+    const isAssignmentOwner = submission.assignment.instructorId === userId;
+    const isCourseOwner = submission.assignment.course.instructorId === userId;
+    const isAdmin = userRole === 'admin';
 
-    if (!isAuthor && !isAdmin) {
-      res.status(403).json({ error: 'Only the submission author can submit for grading' });
+    if (!isAssignmentOwner && !isCourseOwner && !isAdmin) {
+      res.status(403).json({ error: 'Access denied to submission analytics' });
       return;
     }
 
-    submission.status = 'submitted';
-    submission.submittedAt = new Date();
-
-    // Create final version if enabled
-    const assignment = submission.assignment as any;
-    if (assignment.versionControl.createVersionOnSubmit) {
-      const latestVersion = await DocumentVersion.getLatestVersion(submissionId);
-      
-      const finalVersion = new DocumentVersion({
-        document: submissionId,
-        version: latestVersion + 1,
-        content: submission.content,
-        title: submission.title,
-        changes: {
-          type: 'manual',
-          description: 'Final submission for grading',
-          addedChars: 0,
-          deletedChars: 0,
-          addedWords: 0,
-          deletedWords: 0
-        },
-        author: userId,
-        metadata: {
-          wordCount: submission.wordCount,
-          characterCount: submission.characterCount,
-          readingTime: submission.estimatedReadingTime
+    // Get writing sessions for this submission
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        document: {
+          submissionId: id
         }
-      });
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        duration: true,
+        activity: true
+      },
+      orderBy: {
+        startTime: 'asc'
+      }
+    });
 
-      await finalVersion.save();
-      submission.currentVersion = latestVersion + 1;
+    // Calculate basic analytics
+    const totalSessions = writingSessions.length;
+    const totalWritingTime = writingSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const averageSessionLength = totalSessions > 0 ? totalWritingTime / totalSessions : 0;
 
-      // Add final milestone
-      submission.majorMilestones.push({
-        version: latestVersion + 1,
-        timestamp: new Date(),
-        description: 'Final submission for grading',
-        wordCount: submission.wordCount,
-        author: new Types.ObjectId(userId)
-      });
-    }
-
-    await submission.save();
+    const analytics = {
+      submissionId: id,
+      wordCount: submission.wordCount,
+      totalSessions,
+      totalWritingTime,
+      averageSessionLength,
+      status: submission.status,
+      submittedAt: submission.submittedAt,
+      lastActivity: submission.updatedAt,
+      writingSessions: writingSessions.map(session => ({
+        id: session.id,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: session.duration,
+        activity: session.activity
+      }))
+    };
 
     res.json({
-      message: 'Submission submitted for grading successfully',
-      data: submission
+      message: 'Submission analytics retrieved successfully',
+      data: analytics
     });
   } catch (error) {
-    console.error('Error submitting for grading:', error);
-    res.status(500).json({ error: 'Failed to submit for grading' });
+    console.error('Error fetching submission analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch submission analytics' });
   }
 });
 
-// Get submission versions
-router.get('/:submissionId/versions', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Delete submission (only if not submitted)
+router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { submissionId } = req.params;
-    const { limit } = req.query;
+    const { id } = req.params;
     const userId = req.userId!;
+    const userRole = req.user!.role;
 
-    // Verify submission exists and user has access
-    const submission = await AssignmentSubmission.findById(submissionId);
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid submission ID format' });
+      return;
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id },
+      include: {
+        assignment: {
+          select: {
+            instructorId: true
+          }
+        }
+      }
+    });
+
     if (!submission) {
       res.status(404).json({ error: 'Submission not found' });
       return;
     }
 
-    // Check permissions
-    const canAccess = submission.author.toString() === userId ||
-                     submission.collaborators.some(c => c.toString() === userId);
+    // Check permission
+    const isAuthor = submission.authorId === userId;
+    const isAssignmentOwner = submission.assignment.instructorId === userId;
+    const isAdmin = userRole === 'admin';
 
-    if (!canAccess) {
+    if (!isAuthor && !isAssignmentOwner && !isAdmin) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
 
-    // Get versions from DocumentVersion collection
-    const query = DocumentVersion.find({ document: submissionId })
-      .sort({ version: -1 })
-      .populate('author', 'firstName lastName email');
-
-    if (limit) {
-      query.limit(parseInt(limit as string));
+    // Cannot delete submitted assignments (unless you're the instructor/admin)
+    if (submission.status === 'submitted' && isAuthor && !isAssignmentOwner && !isAdmin) {
+      res.status(400).json({ error: 'Cannot delete submitted assignment' });
+      return;
     }
 
-    const versions = await query.exec();
+    await prisma.assignmentSubmission.delete({
+      where: { id }
+    });
 
     res.json({
-      message: 'Submission versions retrieved successfully',
-      data: versions
+      message: 'Submission deleted successfully'
     });
   } catch (error) {
-    console.error('Error getting submission versions:', error);
-    res.status(500).json({ error: 'Failed to get submission versions' });
+    console.error('Error deleting submission:', error);
+    res.status(500).json({ error: 'Failed to delete submission' });
   }
 });
 

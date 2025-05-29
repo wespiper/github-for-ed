@@ -1,13 +1,18 @@
-import { Assignment, IAssignment } from '../models/Assignment';
-import { Course } from '../models/Course';
+/**
+ * Assignment Service - PostgreSQL/Prisma Version
+ * 
+ * Business logic for assignment management using Prisma ORM
+ */
+
+import prisma from '../lib/prisma';
+import { Prisma, Assignment } from '@prisma/client';
 import { CreateAssignmentInput, UpdateAssignmentInput, AssignmentValidation } from '@shared/types';
-import { Types } from 'mongoose';
 
 export class AssignmentService {
   /**
    * Create a new assignment with comprehensive validation
    */
-  static async createAssignment(data: CreateAssignmentInput, userId: string): Promise<IAssignment> {
+  static async createAssignment(data: CreateAssignmentInput, userId: string): Promise<Assignment> {
     // Validate input data
     this.validateCreateAssignmentInput(data);
     
@@ -17,23 +22,42 @@ export class AssignmentService {
     // Validate educational requirements
     this.validateEducationalRequirements(data);
     
-    // Create assignment with defaults
+    // Build assignment data with defaults
     const assignmentData = this.buildAssignmentData(data, userId);
     
-    const assignment = new Assignment(assignmentData);
-    await assignment.save();
+    // Create assignment with relations
+    const assignment = await prisma.assignment.create({
+      data: assignmentData,
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
     
-    // Return populated assignment
-    return await Assignment.findById(assignment._id)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title') as IAssignment;
+    return assignment;
   }
   
   /**
    * Update an existing assignment
    */
-  static async updateAssignment(assignmentId: string, data: UpdateAssignmentInput, userId: string): Promise<IAssignment> {
-    const assignment = await Assignment.findById(assignmentId);
+  static async updateAssignment(assignmentId: string, data: UpdateAssignmentInput, userId: string): Promise<Assignment> {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: { course: true }
+    });
+    
     if (!assignment) {
       throw new Error('Assignment not found');
     }
@@ -47,19 +71,51 @@ export class AssignmentService {
     }
     
     // Update assignment
-    Object.assign(assignment, data);
-    await assignment.save();
+    const updatedAssignment = await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: {
+        ...(data.title && { title: data.title }),
+        ...(data.instructions && { instructions: data.instructions }),
+        ...(data.type && { type: data.type }),
+        ...(data.dueDate && { dueDate: data.dueDate }),
+        ...(data.requirements && { requirements: data.requirements as any }),
+        ...(data.writingStages && { writingStages: data.writingStages as any }),
+        ...(data.learningObjectives && { learningObjectives: data.learningObjectives as any }),
+        ...(data.aiSettings && { aiSettings: data.aiSettings as any }),
+        ...(data.grading && { gradingCriteria: data.grading as any }),
+        ...(data.status && { status: data.status }),
+        updatedAt: new Date()
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
     
-    return await Assignment.findById(assignmentId)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title') as IAssignment;
+    return updatedAssignment;
   }
   
   /**
    * Publish an assignment
    */
-  static async publishAssignment(assignmentId: string, userId: string): Promise<IAssignment> {
-    const assignment = await Assignment.findById(assignmentId);
+  static async publishAssignment(assignmentId: string, userId: string): Promise<Assignment> {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: { course: true }
+    });
+    
     if (!assignment) {
       throw new Error('Assignment not found');
     }
@@ -70,17 +126,216 @@ export class AssignmentService {
     // Validate assignment is ready for publication
     await this.validateForPublication(assignment);
     
-    assignment.status = 'published';
-    assignment.publishedAt = new Date();
-    await assignment.save();
+    const publishedAssignment = await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: 'published',
+        updatedAt: new Date()
+      },
+      include: {
+        instructor: true,
+        course: true
+      }
+    });
     
-    return assignment;
+    return publishedAssignment;
+  }
+  
+  /**
+   * Get assignment by ID with relations
+   */
+  static async getAssignmentById(assignmentId: string, includeSubmissions = false): Promise<Assignment | null> {
+    return await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            instructor: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        submissions: includeSubmissions ? {
+          include: {
+            author: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          }
+        } : false,
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      }
+    });
+  }
+  
+  /**
+   * Get assignments by course
+   */
+  static async getAssignmentsByCourse(courseId: string, userId: string, userRole: string, filters: any = {}): Promise<Assignment[]> {
+    // Verify course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        enrollments: {
+          where: { studentId: userId }
+        }
+      }
+    });
+    
+    if (!course) {
+      throw new Error('Course not found');
+    }
+    
+    // Check access permissions
+    const isInstructor = course.instructorId === userId;
+    const isStudent = course.enrollments.length > 0;
+    const isAdmin = userRole === 'admin';
+    
+    if (!isInstructor && !isStudent && !isAdmin) {
+      throw new Error('Access denied to this course');
+    }
+    
+    const where: Prisma.AssignmentWhereInput = {
+      courseId
+    };
+    
+    // Apply filters
+    if (filters.status) where.status = filters.status;
+    if (filters.type) where.type = filters.type;
+    
+    // Students can only see published assignments
+    if (!isInstructor && !isAdmin) {
+      where.status = 'published';
+    }
+    
+    return await prisma.assignment.findMany({
+      where,
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      },
+      orderBy: {
+        dueDate: 'asc'
+      }
+    });
+  }
+  
+  /**
+   * Get assignments by instructor
+   */
+  static async getAssignmentsByInstructor(instructorId: string): Promise<Assignment[]> {
+    return await prisma.assignment.findMany({
+      where: {
+        instructorId
+      },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+  
+  /**
+   * Search assignments with filters
+   */
+  static async searchAssignments(filters: {
+    search?: string;
+    courseId?: string;
+    status?: string;
+    type?: string;
+    hasAI?: boolean;
+    dueBefore?: Date;
+    dueAfter?: Date;
+  }): Promise<Assignment[]> {
+    const where: Prisma.AssignmentWhereInput = {};
+    
+    if (filters.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { instructions: { contains: filters.search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (filters.courseId) where.courseId = filters.courseId;
+    if (filters.status) where.status = filters.status;
+    if (filters.type) where.type = filters.type;
+    
+    if (filters.dueBefore || filters.dueAfter) {
+      where.dueDate = {};
+      if (filters.dueBefore) where.dueDate.lte = filters.dueBefore;
+      if (filters.dueAfter) where.dueDate.gte = filters.dueAfter;
+    }
+    
+    return await prisma.assignment.findMany({
+      where,
+      include: {
+        course: true,
+        instructor: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
   }
   
   /**
    * Validate assignment educational requirements
    */
-  static validateAssignmentEducationalRequirements(assignment: IAssignment): AssignmentValidation {
+  static validateAssignmentEducationalRequirements(assignment: any): AssignmentValidation {
     const errors: string[] = [];
     const warnings: string[] = [];
     
@@ -88,95 +343,51 @@ export class AssignmentService {
     if (!assignment.title?.trim()) {
       errors.push('Title is required');
     }
-    if (!assignment.description?.trim()) {
-      errors.push('Description is required');
-    }
     if (!assignment.instructions?.trim()) {
       errors.push('Instructions are required');
     }
     
     // Validate learning objectives
-    if (!assignment.learningObjectives || assignment.learningObjectives.length === 0) {
+    const learningObjectives = assignment.learningObjectives as any[];
+    if (!learningObjectives || learningObjectives.length === 0) {
       warnings.push('No learning objectives defined');
     } else {
-      const totalWeight = assignment.learningObjectives.reduce((sum, obj) => sum + obj.weight, 0);
-      if (totalWeight !== 100) {
-        errors.push('Learning objectives weights must sum to 100%');
+      // Check if weights sum to 100
+      const totalWeight = learningObjectives.reduce((sum, obj) => sum + (obj.weight || 0), 0);
+      if (Math.abs(totalWeight - 100) > 0.01) {
+        errors.push(`Learning objective weights must sum to 100% (currently ${totalWeight}%)`);
       }
     }
     
     // Validate writing stages
-    if (assignment.writingStages && assignment.writingStages.length > 0) {
-      const orders = assignment.writingStages.map(stage => stage.order);
+    const writingStages = assignment.writingStages as any[];
+    if (!writingStages || writingStages.length === 0) {
+      warnings.push('No writing stages defined');
+    } else {
+      // Check for unique order values
+      const orders = writingStages.map(stage => stage.order);
       const uniqueOrders = new Set(orders);
-      if (orders.length !== uniqueOrders.size) {
+      if (uniqueOrders.size !== orders.length) {
         errors.push('Writing stages must have unique order values');
       }
     }
     
-    // Validate AI settings
-    if (assignment.aiSettings.enabled && assignment.aiSettings.stageSpecificSettings) {
-      const stageIds = new Set(assignment.writingStages?.map(stage => stage.id) || []);
-      for (const setting of assignment.aiSettings.stageSpecificSettings) {
-        if (!stageIds.has(setting.stageId)) {
-          errors.push(`AI setting references invalid stage ID: ${setting.stageId}`);
-        }
-      }
-    }
+    // Educational metrics
+    const educationalMetrics = {
+      bloomsLevelDistribution: this.calculateBloomsDistribution(learningObjectives),
+      categoryDistribution: this.calculateCategoryDistribution(learningObjectives),
+      averageWeight: learningObjectives?.length > 0 
+        ? learningObjectives.reduce((sum, obj) => sum + (obj.weight || 0), 0) / learningObjectives.length 
+        : 0,
+      totalObjectives: learningObjectives?.length || 0
+    };
     
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
+      educationalMetrics
     };
-  }
-  
-  /**
-   * Get assignments by course with proper access control
-   */
-  static async getAssignmentsByCourse(courseId: string, userId: string, userRole: string, filters: any = {}): Promise<IAssignment[]> {
-    // Verify course access
-    const course = await Course.findById(courseId);
-    if (!course) {
-      throw new Error('Course not found');
-    }
-    
-    const isInstructor = course.instructor.toString() === userId;
-    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
-    const isAdmin = userRole === 'admin';
-    
-    if (!isInstructor && !isStudent && !isAdmin) {
-      throw new Error('Access denied to this course');
-    }
-    
-    // Build filter
-    const filter: any = { course: courseId };
-    Object.assign(filter, filters);
-    
-    // Students only see published assignments
-    if (!isInstructor && !isAdmin) {
-      filter.status = 'published';
-    }
-    
-    return await Assignment.find(filter)
-      .populate('instructor', 'firstName lastName email')
-      .populate('submissionCount')
-      .sort({ createdAt: -1 });
-  }
-  
-  /**
-   * Archive an assignment (soft delete)
-   */
-  static async archiveAssignment(assignmentId: string, userId: string): Promise<void> {
-    const assignment = await Assignment.findById(assignmentId);
-    if (!assignment) {
-      throw new Error('Assignment not found');
-    }
-    
-    await this.validateAssignmentAccess(assignment, userId);
-    
-    assignment.status = 'archived';
-    await assignment.save();
   }
   
   // Private helper methods
@@ -184,9 +395,6 @@ export class AssignmentService {
   private static validateCreateAssignmentInput(data: CreateAssignmentInput): void {
     if (!data.title?.trim()) {
       throw new Error('Assignment title is required');
-    }
-    if (!data.description?.trim()) {
-      throw new Error('Assignment description is required');
     }
     if (!data.instructions?.trim()) {
       throw new Error('Assignment instructions are required');
@@ -197,108 +405,104 @@ export class AssignmentService {
   }
   
   private static async validateCourseAccess(courseId: string, userId: string): Promise<void> {
-    const course = await Course.findById(courseId);
+    const course = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
+    
     if (!course) {
       throw new Error('Course not found');
     }
     
-    const isInstructor = course.instructor.toString() === userId;
-    // Note: We'd need to get user role from somewhere, possibly pass it as parameter
-    // For now, assuming instructor access is sufficient
-    if (!isInstructor) {
-      throw new Error('Only course instructors can create assignments');
+    if (course.instructorId !== userId) {
+      throw new Error('Only the course instructor can create assignments');
     }
   }
   
-  private static async validateAssignmentAccess(assignment: IAssignment, userId: string): Promise<void> {
-    const isInstructor = assignment.instructor.toString() === userId;
-    // Note: Would check admin role if passed as parameter
-    if (!isInstructor) {
-      throw new Error('Only the assignment creator can modify it');
+  private static validateEducationalRequirements(data: CreateAssignmentInput): void {
+    const validation = this.validateAssignmentEducationalRequirements(data);
+    if (!validation.isValid) {
+      throw new Error(`Educational validation failed: ${validation.errors.join(', ')}`);
     }
   }
   
-  private static validateEducationalRequirements(data: CreateAssignmentInput | UpdateAssignmentInput): void {
-    // Validate learning objectives weights if provided
-    if (data.learningObjectives && data.learningObjectives.length > 0) {
-      const totalWeight = data.learningObjectives.reduce((sum, obj) => sum + obj.weight, 0);
-      if (totalWeight !== 100) {
-        throw new Error('Learning objectives weights must sum to 100%');
-      }
-    }
-    
-    // Validate writing stages have unique orders if provided
-    if (data.writingStages && data.writingStages.length > 0) {
-      const orders = data.writingStages.map(stage => stage.order);
-      const uniqueOrders = new Set(orders);
-      if (orders.length !== uniqueOrders.size) {
-        throw new Error('Writing stages must have unique order values');
-      }
-    }
-    
-    // Validate AI stage settings reference valid stages if provided
-    if (data.aiSettings?.stageSpecificSettings && data.writingStages) {
-      const stageIds = new Set(data.writingStages.map(stage => stage.id));
-      for (const setting of data.aiSettings.stageSpecificSettings) {
-        if (!stageIds.has(setting.stageId)) {
-          throw new Error(`AI setting references invalid stage ID: ${setting.stageId}`);
-        }
-      }
-    }
-  }
-  
-  private static buildAssignmentData(data: CreateAssignmentInput, userId: string): any {
+  private static buildAssignmentData(data: CreateAssignmentInput, userId: string): Prisma.AssignmentCreateInput {
     return {
       title: data.title,
-      description: data.description,
       instructions: data.instructions,
-      course: new Types.ObjectId(data.courseId),
-      instructor: new Types.ObjectId(userId),
+      requirements: (data.requirements || {}) as any,
+      writingStages: (data.writingStages || []) as any,
+      learningObjectives: (data.learningObjectives || []) as any,
+      aiSettings: (data.aiSettings || {}) as any,
+      gradingCriteria: (data.grading || {}) as any,
+      dueDate: data.dueDate,
+      stageDueDates: {},
+      status: 'draft',
       type: data.type || 'individual',
-      dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-      requirements: data.requirements || {},
-      collaboration: {
-        enabled: data.type === 'collaborative',
-        allowRealTimeEditing: data.type === 'collaborative',
-        allowComments: true,
-        allowSuggestions: true,
-        requireApprovalForChanges: false,
-        ...data.collaboration
+      collaborationSettings: data.collaboration || {},
+      versionControlSettings: data.versionControl || {},
+      course: {
+        connect: { id: data.courseId }
       },
-      versionControl: {
-        autoSaveInterval: 30,
-        createVersionOnSubmit: true,
-        allowVersionRevert: false,
-        trackAllChanges: true,
-        ...data.versionControl
-      },
-      learningObjectives: data.learningObjectives || [],
-      writingStages: data.writingStages || [],
-      aiSettings: {
-        enabled: false,
-        globalBoundary: 'moderate' as const,
-        allowedAssistanceTypes: [],
-        requireReflection: true,
-        reflectionPrompts: [],
-        stageSpecificSettings: [],
-        ...data.aiSettings
-      },
-      grading: {
-        enabled: false,
-        allowPeerReview: false,
-        ...data.grading
+      instructor: {
+        connect: { id: userId }
       }
     };
   }
   
-  private static async validateForPublication(assignment: IAssignment): Promise<void> {
-    const validation = this.validateAssignmentEducationalRequirements(assignment);
-    if (!validation.isValid) {
-      throw new Error(`Cannot publish assignment: ${validation.errors.join(', ')}`);
+  private static hasEducationalData(data: UpdateAssignmentInput): boolean {
+    return !!(data.learningObjectives || data.writingStages || data.grading);
+  }
+  
+  private static async validateAssignmentAccess(assignment: any, userId: string): Promise<void> {
+    if (assignment.instructorId !== userId) {
+      // Check if user is course instructor
+      const course = await prisma.course.findUnique({
+        where: { id: assignment.courseId }
+      });
+      
+      if (!course || course.instructorId !== userId) {
+        throw new Error('You do not have permission to modify this assignment');
+      }
     }
   }
   
-  private static hasEducationalData(data: UpdateAssignmentInput): boolean {
-    return !!(data.learningObjectives || data.writingStages || data.aiSettings);
+  private static async validateForPublication(assignment: any): Promise<void> {
+    const validation = this.validateAssignmentEducationalRequirements(assignment);
+    
+    if (!validation.isValid) {
+      throw new Error(`Cannot publish assignment: ${validation.errors.join(', ')}`);
+    }
+    
+    if (!assignment.dueDate) {
+      throw new Error('Due date is required for publication');
+    }
+    
+    if (new Date(assignment.dueDate) < new Date()) {
+      throw new Error('Due date must be in the future');
+    }
+  }
+  
+  private static calculateBloomsDistribution(objectives: any[]): Record<number, number> {
+    const distribution: Record<number, number> = {};
+    if (!objectives) return distribution;
+    
+    objectives.forEach(obj => {
+      const level = obj.bloomsLevel || 1;
+      distribution[level] = (distribution[level] || 0) + (obj.weight || 0);
+    });
+    
+    return distribution;
+  }
+  
+  private static calculateCategoryDistribution(objectives: any[]): Record<string, number> {
+    const distribution: Record<string, number> = {};
+    if (!objectives) return distribution;
+    
+    objectives.forEach(obj => {
+      const category = obj.category || 'uncategorized';
+      distribution[category] = (distribution[category] || 0) + (obj.weight || 0);
+    });
+    
+    return distribution;
   }
 }

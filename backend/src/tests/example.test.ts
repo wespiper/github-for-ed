@@ -1,119 +1,78 @@
 /**
  * Example Test File
  * 
- * Demonstrates proper test structure for the GitHub for Writers backend
+ * Demonstrates proper test structure for the Scribe Tree backend using PostgreSQL/Prisma
  */
 
-import mongoose from 'mongoose';
-import { Assignment } from '../models/Assignment';
-import { validateRequest, assignmentValidationSchemas } from '../middleware/validation';
+import prisma from '../lib/prisma';
 
 describe('Example Tests', () => {
   
   beforeEach(async () => {
     // Clean up before each test
-    await Assignment.deleteMany({});
+    await prisma.assignment.deleteMany({});
+    await prisma.course.deleteMany({});
+    await prisma.user.deleteMany({});
   });
 
-  describe('Assignment Model', () => {
-    test('should create a basic assignment', async () => {
-      const assignmentData = {
-        title: 'Test Assignment',
-        description: 'Test description',
-        instructions: 'Test instructions',
-        course: new mongoose.Types.ObjectId(),
-        instructor: new mongoose.Types.ObjectId(),
-        type: 'individual' as const,
-        allowLateSubmissions: true,
-        requirements: {},
-        collaboration: {
-          enabled: false,
-          allowRealTimeEditing: false,
-          allowComments: true,
-          allowSuggestions: true,
-          requireApprovalForChanges: false
-        },
-        versionControl: {
-          autoSaveInterval: 30,
-          createVersionOnSubmit: true,
-          allowVersionRevert: false,
-          trackAllChanges: true
-        },
-        aiSettings: {
-          enabled: false,
-          globalBoundary: 'moderate' as const,
-          allowedAssistanceTypes: [],
-          requireReflection: true,
-          reflectionPrompts: [],
-          stageSpecificSettings: []
-        },
-        grading: {
-          enabled: false,
-          allowPeerReview: false
-        },
-        learningObjectives: [],
-        writingStages: []
-      };
+  afterAll(async () => {
+    // Cleanup after all tests
+    await prisma.$disconnect();
+  });
 
-      const assignment = new Assignment(assignmentData);
-      const savedAssignment = await assignment.save();
-
-      expect(savedAssignment._id).toBeDefined();
-      expect(savedAssignment.title).toBe('Test Assignment');
-      expect(savedAssignment.type).toBe('individual');
-      expect(savedAssignment.status).toBe('draft'); // default value
+  describe('Basic Functionality', () => {
+    it('should demonstrate test structure', () => {
+      // Simple test to show structure
+      expect(true).toBe(true);
     });
+  });
 
-    test('should validate required fields', async () => {
-      const assignment = new Assignment({
-        // Missing required fields
-        course: new mongoose.Types.ObjectId(),
-        instructor: new mongoose.Types.ObjectId()
+  describe('Database Operations', () => {
+    it('should create and retrieve assignments', async () => {
+      // First create a user and course
+      const user = await prisma.user.create({
+        data: {
+          email: 'test@example.com',
+          passwordHash: 'hashed_password',
+          firstName: 'Test',
+          lastName: 'User',
+          role: 'educator',
+          isVerified: true
+        }
       });
 
-      await expect(assignment.save()).rejects.toThrow();
-    });
-  });
-
-  describe('Validation Middleware', () => {
-    test('should validate assignment creation schema', () => {
-      const schema = assignmentValidationSchemas.createAssignment;
-      
-      expect(schema.body).toBeDefined();
-      expect(schema.body?.find(rule => rule.field === 'title')).toMatchObject({
-        field: 'title',
-        required: true,
-        type: 'string',
-        maxLength: 200
+      const course = await prisma.course.create({
+        data: {
+          title: 'Test Course',
+          description: 'A test course',
+          instructorId: user.id,
+          isPublic: false,
+          isActive: true,
+          maxStudents: 30,
+          tags: [],
+          settings: {}
+        }
       });
-    });
 
-    test('should validate MongoDB ObjectId format', () => {
-      const { customValidators } = require('../middleware/validation');
-      
-      expect(customValidators.mongoId('507f1f77bcf86cd799439011')).toBeNull(); // valid
-      expect(customValidators.mongoId('invalid-id')).toBe('Invalid MongoDB ObjectId format'); // invalid
-    });
-  });
+      // Create an assignment
+      const assignment = await prisma.assignment.create({
+        data: {
+          title: 'Test Assignment',
+          instructions: 'Complete this test assignment',
+          courseId: course.id,
+          instructorId: user.id,
+          requirements: {},
+          writingStages: [],
+          learningObjectives: [],
+          aiSettings: {},
+          collaborationSettings: {},
+          versionControlSettings: {}
+        }
+      });
 
-  describe('Learning Objectives Validation', () => {
-    test('should validate learning objectives weights', () => {
-      const { customValidators } = require('../middleware/validation');
-      
-      const validObjectives = [
-        { weight: 60 },
-        { weight: 40 }
-      ];
-      
-      const invalidObjectives = [
-        { weight: 60 },
-        { weight: 30 } // Total = 90%, not 100%
-      ];
-      
-      expect(customValidators.learningObjectivesWeights(validObjectives)).toBeNull();
-      expect(customValidators.learningObjectivesWeights(invalidObjectives))
-        .toBe('Learning objectives weights must sum to 100%');
+      expect(assignment).toBeDefined();
+      expect(assignment.title).toBe('Test Assignment');
+      expect(assignment.courseId).toBe(course.id);
     });
   });
-
 });

@@ -231,7 +231,7 @@ export const AssignmentCreationWizard = ({ isOpen, onClose }: AssignmentCreation
                         </SelectTrigger>
                         <SelectContent>
                             {courses?.map((course) => (
-                                <SelectItem key={course._id} value={course._id}>
+                                <SelectItem key={course.id} value={course.id}>
                                     {course.title}
                                 </SelectItem>
                             ))}

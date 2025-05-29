@@ -1,31 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { type LearningObjective, type BloomsLevel, type SubjectArea } from '@shared/types';
 
-export interface LearningObjectivePreset {
-  id: string;
-  description: string;
-  category: 'knowledge' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
-  bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
-  assessmentCriteria: string[];
-  weight: number;
-  subject: string;
-}
-
-export interface BloomsLevel {
-  level: number;
-  name: string;
-  description: string;
-  presets: LearningObjectivePreset[];
-  count: number;
-}
-
-export interface SubjectArea {
-  key: string;
-  name: string;
-  count: number;
-  presets: LearningObjectivePreset[];
-}
+// Type alias for backwards compatibility
+export type LearningObjectivePreset = LearningObjective;
 
 export interface AssessmentTemplate {
   subject: string;

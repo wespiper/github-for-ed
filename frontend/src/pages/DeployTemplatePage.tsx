@@ -29,7 +29,7 @@ export const DeployTemplatePage = () => {
         if (template?.writingStages) {
             setDeployData(prev => ({
                 ...prev,
-                stageDueDates: template.writingStages.map(stage => ({
+                stageDueDates: template.writingStages.map((stage: { id: string }) => ({
                     stageId: stage.id,
                     dueDate: ''
                 }))
@@ -162,7 +162,7 @@ export const DeployTemplatePage = () => {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {template.learningObjectives.map((objective) => (
+                                    {template.learningObjectives.map((objective: { id: string; category: string; description: string; bloomsLevel: string | number; weight?: number }) => (
                                         <div key={objective.id} className="border rounded-lg p-3">
                                             <div className="flex items-start gap-2 mb-2">
                                                 <Badge className={getCategoryColor(objective.category)}>
@@ -191,7 +191,7 @@ export const DeployTemplatePage = () => {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {template.writingStages.map((stage) => (
+                                    {template.writingStages.map((stage: { id: string; name: string; order: number; description: string; durationDays?: number; allowAI: boolean; aiAssistanceLevel: string }) => (
                                         <div key={stage.id} className="border rounded-lg p-3">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <span className="text-sm font-medium">Stage {stage.order}</span>
@@ -230,7 +230,7 @@ export const DeployTemplatePage = () => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             {courses?.map((course) => (
-                                                <SelectItem key={course._id} value={course._id}>
+                                                <SelectItem key={course.id} value={course.id}>
                                                     {course.title}
                                                 </SelectItem>
                                             ))}
@@ -308,7 +308,7 @@ export const DeployTemplatePage = () => {
                                         <p className="text-sm text-ink-600">
                                             Set specific due dates for each writing stage. Leave blank to use only the main assignment due date.
                                         </p>
-                                        {template.writingStages.map((stage) => (
+                                        {template.writingStages.map((stage: { id: string; name: string; order: number }) => (
                                             <div key={stage.id}>
                                                 <label className="block text-sm font-medium text-ink-700 mb-1">
                                                     Stage {stage.order}: {stage.name}

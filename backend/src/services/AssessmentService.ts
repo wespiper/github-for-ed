@@ -1,8 +1,5 @@
-import { Assignment } from '../models/Assignment';
-import { AssignmentSubmission } from '../models/AssignmentSubmission';
-import { DocumentVersion } from '../models/DocumentVersion';
-import { User } from '../models/User';
-import mongoose from 'mongoose';
+import prisma from '../lib/prisma';
+import { randomUUID } from 'crypto';
 
 export interface RubricCriterion {
   id: string;
@@ -128,12 +125,15 @@ export class AssessmentService {
     this.validateObjectId(rubricData.assignmentId);
     
     // Verify assignment ownership
-    const assignment = await Assignment.findById(rubricData.assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: rubricData.assignmentId },
+      select: { id: true, instructorId: true },
+    });
     if (!assignment) {
       throw new Error('Assignment not found');
     }
     
-    if (assignment.instructor.toString() !== instructorId) {
+    if (assignment.instructorId !== instructorId) {
       throw new Error('Only the assignment instructor can create rubrics');
     }
     
@@ -143,7 +143,7 @@ export class AssessmentService {
     // Generate criterion IDs and calculate total points
     const criteria = rubricData.criteria.map(criterion => ({
       ...criterion,
-      id: new mongoose.Types.ObjectId().toString()
+      id: randomUUID()
     }));
     
     const totalPoints = criteria.reduce((sum, criterion) => {
@@ -152,7 +152,7 @@ export class AssessmentService {
     }, 0);
     
     const rubric: AssessmentRubric = {
-      id: new mongoose.Types.ObjectId().toString(),
+      id: randomUUID(),
       title: rubricData.title,
       description: rubricData.description,
       assignmentId: rubricData.assignmentId,
@@ -197,7 +197,17 @@ export class AssessmentService {
     
     // Get submission and rubric
     const [submission, rubric] = await Promise.all([
-      AssignmentSubmission.findById(assessmentData.submissionId),
+      prisma.assignmentSubmission.findUnique({
+        where: { id: assessmentData.submissionId },
+        include: {
+          assignment: {
+            select: { instructorId: true, courseId: true }
+          },
+          author: {
+            select: { id: true, firstName: true, lastName: true }
+          }
+        }
+      }),
       this.getRubricById(assessmentData.rubricId)
     ]);
     
@@ -275,20 +285,35 @@ export class AssessmentService {
     this.validateObjectId(assignmentId);
     
     // Verify assignment ownership
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { 
+        id: true, 
+        instructorId: true,
+        title: true,
+        courseId: true 
+      }
+    });
     if (!assignment) {
       throw new Error('Assignment not found');
     }
     
-    if (assignment.instructor.toString() !== instructorId) {
+    if (assignment.instructorId !== instructorId) {
       throw new Error('Only the assignment instructor can set up peer assessment');
     }
     
     // Get submissions for participants
-    const submissions = await AssignmentSubmission.find({
-      assignment: assignmentId,
-      student: { $in: configuration.participantIds },
-      status: 'submitted'
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: { 
+        assignmentId: assignmentId,
+        authorId: { in: configuration.participantIds },
+        status: 'submitted'
+      },
+      include: {
+        author: {
+          select: { id: true, firstName: true, lastName: true }
+        }
+      }
     });
     
     if (submissions.length < 2) {
@@ -338,8 +363,11 @@ export class AssessmentService {
     this.validateObjectId(rubricId);
     
     // Verify permissions
-    const assignment = await Assignment.findById(assignmentId);
-    if (!assignment || assignment.instructor.toString() !== instructorId) {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, instructorId: true }
+    });
+    if (!assignment || assignment.instructorId !== instructorId) {
       throw new Error('Access denied');
     }
     
@@ -469,8 +497,9 @@ export class AssessmentService {
   // Private helper methods
   
   private static validateObjectId(id: string): void {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error(`Invalid ObjectId: ${id}`);
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      throw new Error(`Invalid UUID: ${id}`);
     }
   }
   
@@ -517,14 +546,20 @@ export class AssessmentService {
     submission: any,
     rubric: any
   ): Promise<void> {
-    const assessor = await User.findById(assessorId);
+    const assessor = await prisma.user.findUnique({
+      where: { id: assessorId },
+      select: { id: true, role: true, firstName: true, lastName: true }
+    });
     if (!assessor) {
       throw new Error('Assessor not found');
     }
     
     // Check if assessor is instructor
-    const assignment = await Assignment.findById(submission.assignment);
-    if (assignment && assignment.instructor.toString() === assessorId) {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: submission.assignmentId },
+      select: { instructorId: true }
+    });
+    if (assignment && assignment.instructorId === assessorId) {
       return; // Instructor can always assess
     }
     
@@ -603,9 +638,12 @@ export class AssessmentService {
     assessorId: string,
     submission: any
   ): Promise<'instructor' | 'peer' | 'self'> {
-    const assignment = await Assignment.findById(submission.assignment);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: submission.assignmentId },
+      select: { instructorId: true }
+    });
     
-    if (assignment && assignment.instructor.toString() === assessorId) {
+    if (assignment && assignment.instructorId === assessorId) {
       return 'instructor';
     }
     
@@ -712,12 +750,16 @@ export class AssessmentService {
     assignmentId: string,
     assessments: any[]
   ): Promise<any[]> {
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { learningObjectives: true }
+    });
     if (!assignment || !assignment.learningObjectives) {
       return [];
     }
     
-    return assignment.learningObjectives.map((objective: any) => {
+    const learningObjectives = assignment.learningObjectives as any[];
+    return learningObjectives.map((objective: any) => {
       // Calculate progress based on related criteria assessments
       const relatedAssessments = assessments.flatMap(assessment =>
         assessment.criteriaScores.filter((score: any) => 

@@ -1,19 +1,107 @@
 import { Router, Response } from 'express';
-import { CourseAssignment, ICourseAssignment } from '../models/CourseAssignment';
-import { AssignmentTemplate } from '../models/AssignmentTemplate';
-import { Course } from '../models/Course';
+import prisma from '../lib/prisma';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Helper function to extract instructor ID from populated or non-populated field
-const getInstructorId = (instructor: any): string => {
-  return typeof instructor === 'object' && instructor._id 
-    ? instructor._id.toString() 
-    : instructor.toString();
+// Get assignments for the authenticated user
+router.get('/my-assignments', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { status, course } = req.query;
+
+    // Build where clause based on filters
+    const whereClause: any = {};
+    
+    if (status) {
+      whereClause.status = status as string;
+    }
+    
+    if (course) {
+      if (!isValidUUID(course as string)) {
+        res.status(400).json({ error: 'Invalid course ID format' });
+        return;
+      }
+      whereClause.courseId = course as string;
+    }
+
+    // Check user role to determine access level
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    // Build assignment query based on user role
+    let assignmentWhere: any = { ...whereClause };
+    
+    if (user?.role !== 'admin') {
+      // For students and educators, only show assignments from courses they're enrolled in
+      assignmentWhere.course = {
+        enrollments: {
+          some: {
+            studentId: userId
+          }
+        }
+      };
+    }
+    // For admins, show all assignments (no additional filtering)
+
+    const assignments = await prisma.assignment.findMany({
+      where: assignmentWhere,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true
+          }
+        },
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        submissions: {
+          where: {
+            authorId: userId
+          },
+          select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            wordCount: true
+          }
+        }
+      },
+      orderBy: [
+        { dueDate: 'asc' },
+        { createdAt: 'desc' }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching user assignments:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch assignments',
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+    });
+  }
+});
+
+// Helper function to validate UUID format
+const isValidUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
 };
 
-// Deploy template to course
+// Deploy template to course (create assignment from template)
 router.post('/deploy', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
@@ -22,183 +110,225 @@ router.post('/deploy', authenticate, requireRole(['educator', 'admin']), async (
       dueDate,
       customInstructions,
       courseSpecificRequirements,
-      stageDueDates,
       allowLateSubmissions = true,
       maxCollaborators
     } = req.body;
 
     const userId = req.userId!;
 
+    // Validate required fields
+    if (!templateId || !courseId) {
+      res.status(400).json({ error: 'Template ID and Course ID are required' });
+      return;
+    }
+
+    if (!isValidUUID(templateId) || !isValidUUID(courseId)) {
+      res.status(400).json({ error: 'Invalid template or course ID format' });
+      return;
+    }
+
     // Verify template exists and is accessible
-    const template = await AssignmentTemplate.findById(templateId);
+    const template = await prisma.assignmentTemplate.findUnique({
+      where: { id: templateId },
+      include: {
+        instructor: {
+          select: { id: true, firstName: true, lastName: true }
+        }
+      }
+    });
+
     if (!template) {
       res.status(404).json({ error: 'Template not found' });
       return;
     }
 
     // Check template access
-    const isTemplateOwner = getInstructorId(template.instructor) === userId;
-    const isTemplatePublic = template.isPublic && template.status === 'published';
+    const isTemplateOwner = template.instructorId === userId;
+    const isTemplatePublic = template.isPublic;
     const isAdmin = req.user!.role === 'admin';
-
-    // Allow deployment of own templates regardless of status
     const hasTemplateAccess = isTemplateOwner || isTemplatePublic || isAdmin;
 
-    // Debug logging
-    console.log('Template deployment access check:', {
-      templateId,
-      instructorId: getInstructorId(template.instructor),
-      currentUserId: userId,
-      isTemplateOwner,
-      templateIsPublic: template.isPublic,
-      templateStatus: template.status,
-      isTemplatePublic,
-      isAdmin,
-      userRole: req.user!.role,
-      hasTemplateAccess
-    });
-
     if (!hasTemplateAccess) {
-      res.status(403).json({ 
-        error: 'Access denied to this template',
-        debug: {
-          isTemplateOwner,
-          isTemplatePublic,
-          isAdmin,
-          templateStatus: template.status,
-          templateIsPublic: template.isPublic,
-          note: 'You can only deploy templates you own, public published templates, or if you are an admin'
-        }
-      });
+      res.status(403).json({ error: 'Access denied to template' });
       return;
     }
 
     // Verify course exists and user has access
-    const course = await Course.findById(courseId);
+    const course = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
+
     if (!course) {
       res.status(404).json({ error: 'Course not found' });
       return;
     }
 
     // Check course access
-    const isCourseInstructor = course.instructor.toString() === userId;
-    if (!isCourseInstructor && !isAdmin) {
-      res.status(403).json({ error: 'Only course instructors can deploy assignments' });
+    const isCourseOwner = course.instructorId === userId;
+    const hasCourseAccess = isCourseOwner || isAdmin;
+
+    if (!hasCourseAccess) {
+      res.status(403).json({ error: 'Access denied to course' });
       return;
     }
 
-    // Check if template is already deployed to this course
-    const existingDeployment = await CourseAssignment.findOne({ 
-      template: templateId, 
-      course: courseId 
-    });
-    
-    if (existingDeployment) {
-      res.status(400).json({ error: 'Template is already deployed to this course' });
-      return;
-    }
-
-    // Validate stage due dates reference valid stages
-    if (stageDueDates && stageDueDates.length > 0) {
-      const templateStageIds = new Set(template.writingStages.map(stage => stage.id));
-      for (const stageDue of stageDueDates) {
-        if (!templateStageIds.has(stageDue.stageId)) {
-          res.status(400).json({ 
-            error: `Invalid stage ID in due dates: ${stageDue.stageId}` 
-          });
-          return;
+    // Create assignment from template
+    const assignment = await prisma.assignment.create({
+      data: {
+        templateId,
+        courseId,
+        instructorId: userId,
+        title: template.title,
+        instructions: customInstructions || template.instructions,
+        requirements: {
+          ...(template.requirements as object || {}),
+          ...(courseSpecificRequirements || {}),
+          allowLateSubmissions,
+          maxCollaborators
+        },
+        learningObjectives: template.learningObjectives as any,
+        writingStages: template.writingStages as any,
+        aiSettings: template.aiSettings as any,
+        gradingCriteria: template.gradingCriteria as any,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        status: 'published'
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            title: true,
+            usageCount: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
         }
       }
-    }
-
-    // Create course assignment
-    const courseAssignment = new CourseAssignment({
-      template: templateId,
-      course: courseId,
-      instructor: userId,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      customInstructions,
-      courseSpecificRequirements,
-      stageDueDates,
-      allowLateSubmissions,
-      maxCollaborators,
-      status: 'draft'
     });
 
-    await courseAssignment.save();
-    
-    // Populate for response
-    await courseAssignment.populate([
-      { path: 'template', select: 'title type learningObjectives writingStages' },
-      { path: 'course', select: 'title' },
-      { path: 'instructor', select: 'firstName lastName email' }
-    ]);
-    
+    // Increment template usage count
+    await prisma.assignmentTemplate.update({
+      where: { id: templateId },
+      data: {
+        usageCount: {
+          increment: 1
+        }
+      }
+    });
+
     res.status(201).json({
       success: true,
-      data: courseAssignment
+      data: assignment
     });
   } catch (error) {
     console.error('Error deploying template:', error);
-    if (error instanceof Error && (error as any).code === 11000) {
-      res.status(400).json({ error: 'Template is already deployed to this course' });
-    } else {
-      res.status(500).json({ error: 'Failed to deploy template' });
-    }
+    res.status(500).json({ error: 'Failed to deploy template' });
   }
 });
 
-// Get course assignments for instructor
-router.get('/my-assignments', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const { status, course } = req.query;
-    
-    let filters: any = {};
-    if (status) filters.status = status;
-    if (course) filters.course = course;
-    
-    const assignments = await (CourseAssignment as any).findByInstructor(userId, filters);
-    
-    res.json({
-      success: true,
-      data: assignments
-    });
-  } catch (error) {
-    console.error('Error fetching instructor assignments:', error);
-    res.status(500).json({ error: 'Failed to fetch assignments' });
-  }
-});
-
-// Get course assignments for a specific course
+// Get all assignments for a course
 router.get('/course/:courseId', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { courseId } = req.params;
     const userId = req.userId!;
     const userRole = req.user!.role;
-    
-    // Verify course access
-    const course = await Course.findById(courseId);
+
+    if (!isValidUUID(courseId)) {
+      res.status(400).json({ error: 'Invalid course ID format' });
+      return;
+    }
+
+    // Check course access
+    const course = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
+
     if (!course) {
       res.status(404).json({ error: 'Course not found' });
       return;
     }
-    
-    // Check access (instructor, enrolled student, or admin)
-    const isInstructor = course.instructor.toString() === userId;
-    const isStudent = course.students.includes(userId as any);
+
+    const isCourseOwner = course.instructorId === userId;
     const isAdmin = userRole === 'admin';
-    
-    if (!isInstructor && !isStudent && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this course' });
+
+    // Check if user is enrolled in course (for students)
+    let isEnrolled = false;
+    if (userRole === 'student') {
+      const enrollment = await prisma.courseEnrollment.findFirst({
+        where: {
+          courseId,
+          studentId: userId,
+          status: 'active'
+        }
+      });
+      isEnrolled = !!enrollment;
+    }
+
+    const hasAccess = isCourseOwner || isAdmin || isEnrolled;
+
+    if (!hasAccess) {
+      res.status(403).json({ error: 'Access denied to course' });
       return;
     }
-    
-    // Students can only see published assignments
-    const statusFilter = isInstructor || isAdmin ? {} : { status: 'published' };
-    
-    const assignments = await (CourseAssignment as any).findByCourse(courseId, statusFilter);
-    
+
+    // Get assignments for the course
+    const assignments = await prisma.assignment.findMany({
+      where: { courseId },
+      include: {
+        template: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        submissions: userRole === 'student' ? {
+          where: { authorId: userId },
+          select: {
+            id: true,
+            status: true,
+            wordCount: true,
+            submittedAt: true,
+            updatedAt: true
+          }
+        } : {
+          select: {
+            id: true,
+            authorId: true,
+            status: true,
+            submittedAt: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
     res.json({
       success: true,
       data: assignments
@@ -209,51 +339,77 @@ router.get('/course/:courseId', authenticate, async (req: AuthenticatedRequest, 
   }
 });
 
-// Get assignment by ID with full configuration
+// Get assignment by ID
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.userId!;
     const userRole = req.user!.role;
-    
-    const assignment = await CourseAssignment.findById(id)
-      .populate([
-        { path: 'template' },
-        { path: 'course', select: 'title students' },
-        { path: 'instructor', select: 'firstName lastName email' }
-      ]);
-    
+
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid assignment ID format' });
+      return;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id },
+      include: {
+        template: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            instructorId: true
+          }
+        },
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
-    
-    // Check access
-    const course = assignment.course as any;
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isStudent = course.students.includes(userId);
+
+    // Check access permissions
+    const isOwner = assignment.instructorId === userId;
     const isAdmin = userRole === 'admin';
-    
-    if (!isInstructor && !isStudent && !isAdmin) {
-      res.status(403).json({ error: 'Access denied to this assignment' });
+
+    // Check if user is enrolled in course (for students)
+    let isEnrolled = false;
+    if (userRole === 'student') {
+      const enrollment = await prisma.courseEnrollment.findFirst({
+        where: {
+          courseId: assignment.courseId,
+          studentId: userId,
+          status: 'active'
+        }
+      });
+      isEnrolled = !!enrollment;
+    }
+
+    const hasAccess = isOwner || isAdmin || isEnrolled;
+
+    if (!hasAccess) {
+      res.status(403).json({ error: 'Access denied to assignment' });
       return;
     }
-    
-    // Students can only see published assignments
-    if (!isInstructor && !isAdmin && assignment.status !== 'published') {
-      res.status(403).json({ error: 'Assignment not yet published' });
-      return;
-    }
-    
-    // Get effective configuration (merged template + course overrides)
-    const effectiveConfig = await assignment.getEffectiveConfiguration();
-    
+
     res.json({
       success: true,
-      data: {
-        ...assignment.toJSON(),
-        effectiveConfiguration: effectiveConfig
-      }
+      data: assignment
     });
   } catch (error) {
     console.error('Error fetching assignment:', error);
@@ -261,208 +417,81 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
   }
 });
 
-// Update course assignment
+// Update assignment
 router.put('/:id', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.userId!;
     const userRole = req.user!.role;
-    
-    const assignment = await CourseAssignment.findById(id);
+
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid assignment ID format' });
+      return;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id }
+    });
+
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
-    
+
     // Check ownership
-    const isOwner = assignment.instructor.toString() === userId;
+    const isOwner = assignment.instructorId === userId;
     const isAdmin = userRole === 'admin';
-    
+
     if (!isOwner && !isAdmin) {
-      res.status(403).json({ error: 'Only assignment instructor can update assignment' });
+      res.status(403).json({ error: 'Only assignment owner can update assignment' });
       return;
     }
-    
-    // Validate stage due dates if provided
-    if (req.body.stageDueDates) {
-      await assignment.populate('template');
-      const template = assignment.template as any;
-      const templateStageIds = new Set(template.writingStages.map((stage: any) => stage.id));
-      
-      for (const stageDue of req.body.stageDueDates) {
-        if (!templateStageIds.has(stageDue.stageId)) {
-          res.status(400).json({ 
-            error: `Invalid stage ID in due dates: ${stageDue.stageId}` 
-          });
-          return;
+
+    // Update assignment
+    const updatedAssignment = await prisma.assignment.update({
+      where: { id },
+      data: {
+        title: req.body.title || assignment.title,
+        instructions: req.body.instructions || assignment.instructions,
+        requirements: req.body.requirements || assignment.requirements,
+        learningObjectives: req.body.learningObjectives || assignment.learningObjectives,
+        writingStages: req.body.writingStages || assignment.writingStages,
+        aiSettings: req.body.aiSettings || assignment.aiSettings,
+        gradingCriteria: req.body.gradingCriteria || assignment.gradingCriteria,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : assignment.dueDate,
+        status: req.body.status || assignment.status
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
         }
       }
-    }
-    
-    // Update assignment
-    Object.assign(assignment, req.body);
-    await assignment.save();
-    
-    // Populate for response
-    await assignment.populate([
-      { path: 'template', select: 'title type' },
-      { path: 'course', select: 'title' },
-      { path: 'instructor', select: 'firstName lastName email' }
-    ]);
-    
+    });
+
     res.json({
       success: true,
-      data: assignment
+      data: updatedAssignment
     });
   } catch (error) {
     console.error('Error updating assignment:', error);
     res.status(500).json({ error: 'Failed to update assignment' });
-  }
-});
-
-// Publish assignment
-router.patch('/:id/publish', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId!;
-    const userRole = req.user!.role;
-    
-    const assignment = await CourseAssignment.findById(id);
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
-    }
-    
-    // Check ownership
-    const isOwner = assignment.instructor.toString() === userId;
-    const isAdmin = userRole === 'admin';
-    
-    if (!isOwner && !isAdmin) {
-      res.status(403).json({ error: 'Only assignment instructor can publish assignment' });
-      return;
-    }
-    
-    assignment.status = 'published';
-    await assignment.save();
-    
-    res.json({
-      success: true,
-      data: assignment
-    });
-  } catch (error) {
-    console.error('Error publishing assignment:', error);
-    res.status(500).json({ error: 'Failed to publish assignment' });
-  }
-});
-
-// Get upcoming assignments
-router.get('/upcoming/all', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { course, days = 30 } = req.query;
-    const assignments = await (CourseAssignment as any).findUpcoming(course);
-    
-    res.json({
-      success: true,
-      data: assignments
-    });
-  } catch (error) {
-    console.error('Error fetching upcoming assignments:', error);
-    res.status(500).json({ error: 'Failed to fetch upcoming assignments' });
-  }
-});
-
-// Get assignments due soon
-router.get('/due-soon/all', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { course, days = 7 } = req.query;
-    const assignments = await (CourseAssignment as any).findDueSoon(parseInt(days as string), course);
-    
-    res.json({
-      success: true,
-      data: assignments
-    });
-  } catch (error) {
-    console.error('Error fetching assignments due soon:', error);
-    res.status(500).json({ error: 'Failed to fetch assignments due soon' });
-  }
-});
-
-// Create submission for assignment
-router.post('/:id/submit', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId!;
-    const { title, isCollaborative } = req.body;
-    
-    const assignment = await CourseAssignment.findById(id)
-      .populate('course', 'students');
-    
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
-    }
-    
-    // Check if assignment is published
-    if (assignment.status !== 'published') {
-      res.status(400).json({ error: 'Assignment is not yet published' });
-      return;
-    }
-    
-    // Check if user is enrolled in course
-    const course = assignment.course as any;
-    if (!course.students.includes(userId)) {
-      res.status(403).json({ error: 'You are not enrolled in this course' });
-      return;
-    }
-    
-    // Create submission
-    const submission = await assignment.createSubmission(userId, {
-      title,
-      isCollaborative
-    });
-    
-    res.status(201).json({
-      success: true,
-      data: submission
-    });
-  } catch (error) {
-    console.error('Error creating submission:', error);
-    res.status(500).json({ error: 'Failed to create submission' });
-  }
-});
-
-// Archive assignment
-router.patch('/:id/archive', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId!;
-    const userRole = req.user!.role;
-    
-    const assignment = await CourseAssignment.findById(id);
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
-    }
-    
-    // Check ownership
-    const isOwner = assignment.instructor.toString() === userId;
-    const isAdmin = userRole === 'admin';
-    
-    if (!isOwner && !isAdmin) {
-      res.status(403).json({ error: 'Only assignment instructor can archive assignment' });
-      return;
-    }
-    
-    assignment.status = 'archived';
-    await assignment.save();
-    
-    res.json({
-      success: true,
-      data: assignment
-    });
-  } catch (error) {
-    console.error('Error archiving assignment:', error);
-    res.status(500).json({ error: 'Failed to archive assignment' });
   }
 });
 
@@ -472,36 +501,47 @@ router.delete('/:id', authenticate, requireRole(['educator', 'admin']), async (r
     const { id } = req.params;
     const userId = req.userId!;
     const userRole = req.user!.role;
-    
-    const assignment = await CourseAssignment.findById(id);
+
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid assignment ID format' });
+      return;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id }
+    });
+
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
-    
+
     // Check ownership
-    const isOwner = assignment.instructor.toString() === userId;
+    const isOwner = assignment.instructorId === userId;
     const isAdmin = userRole === 'admin';
-    
+
     if (!isOwner && !isAdmin) {
-      res.status(403).json({ error: 'Only assignment instructor can delete assignment' });
+      res.status(403).json({ error: 'Only assignment owner can delete assignment' });
       return;
     }
-    
+
     // Check if assignment has submissions
-    const submissionCount = await require('../models/AssignmentSubmission').AssignmentSubmission.countDocuments({ 
-      assignment: id 
+    const submissionCount = await prisma.assignmentSubmission.count({
+      where: { assignmentId: id }
     });
-    
+
     if (submissionCount > 0) {
       res.status(400).json({ 
-        error: 'Cannot delete assignment with submissions. Archive it instead.' 
+        error: 'Cannot delete assignment with existing submissions',
+        submissionCount
       });
       return;
     }
-    
-    await CourseAssignment.findByIdAndDelete(id);
-    
+
+    await prisma.assignment.delete({
+      where: { id }
+    });
+
     res.json({
       success: true,
       message: 'Assignment deleted successfully'
@@ -509,6 +549,74 @@ router.delete('/:id', authenticate, requireRole(['educator', 'admin']), async (r
   } catch (error) {
     console.error('Error deleting assignment:', error);
     res.status(500).json({ error: 'Failed to delete assignment' });
+  }
+});
+
+// Get assignment submissions (for educators)
+router.get('/:id/submissions', authenticate, requireRole(['educator', 'admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId!;
+    const userRole = req.user!.role;
+
+    if (!isValidUUID(id)) {
+      res.status(400).json({ error: 'Invalid assignment ID format' });
+      return;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id }
+    });
+
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    // Check ownership
+    const isOwner = assignment.instructorId === userId;
+    const isAdmin = userRole === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({ error: 'Only assignment owner can view submissions' });
+      return;
+    }
+
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: { assignmentId: id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        collaborators: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: submissions
+    });
+  } catch (error) {
+    console.error('Error fetching assignment submissions:', error);
+    res.status(500).json({ error: 'Failed to fetch assignment submissions' });
   }
 });
 

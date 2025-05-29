@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader, JWTPayload } from '../utils/jwt';
-import { User, IUser } from '../models/User';
+import { User } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 export interface AuthenticatedRequest extends Request {
-  user?: IUser;
+  user?: User;
   userId?: string;
   userRole?: string;
 }
@@ -23,14 +24,17 @@ export const authenticate = async (
 
     const decoded: JWTPayload = verifyToken(token);
     
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
+    
     if (!user) {
       res.status(401).json({ error: 'User not found' });
       return;
     }
 
     req.user = user;
-    req.userId = (user._id as any).toString();
+    req.userId = user.id;
     req.userRole = user.role;
     next();
   } catch (error) {

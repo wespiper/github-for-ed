@@ -1,46 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { type AssignmentTemplate } from '@shared/types';
-
-// Types for Course Assignments
-export interface CourseAssignment {
-  _id: string;
-  template: AssignmentTemplate;
-  course: {
-    _id: string;
-    title: string;
-  };
-  instructor: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  dueDate?: string;
-  allowLateSubmissions: boolean;
-  maxCollaborators?: number;
-  customInstructions?: string;
-  customNotes?: string;
-  courseSpecificRequirements?: {
-    minWords?: number;
-    maxWords?: number;
-    requiredSections?: string[];
-    citationStyle?: 'APA' | 'MLA' | 'Chicago' | 'IEEE';
-    allowedResources?: string[];
-  };
-  stageDueDates?: {
-    stageId: string;
-    dueDate: string;
-  }[];
-  status: 'draft' | 'published' | 'in_progress' | 'completed' | 'archived';
-  publishedAt?: string;
-  submissionCount?: number;
-  isOverdue?: boolean;
-  daysRemaining?: number | null;
-  effectiveConfiguration?: Record<string, unknown>; // Merged template + course overrides
-  createdAt: string;
-  updatedAt: string;
-}
+import { type CourseAssignment } from '@shared/types';
 
 export interface DeployTemplateData {
   templateId: string;
@@ -229,7 +189,7 @@ export const useUpdateCourseAssignment = () => {
       courseAssignmentsAPI.update(assignmentId, data),
     onSuccess: (updatedAssignment) => {
       queryClient.invalidateQueries({ queryKey: ['course-assignments'] });
-      queryClient.setQueryData(['course-assignments', updatedAssignment._id], updatedAssignment);
+      queryClient.setQueryData(['course-assignments', updatedAssignment.id], updatedAssignment);
     }
   });
 };
@@ -242,7 +202,7 @@ export const usePublishCourseAssignment = () => {
     mutationFn: courseAssignmentsAPI.publish,
     onSuccess: (publishedAssignment) => {
       queryClient.invalidateQueries({ queryKey: ['course-assignments'] });
-      queryClient.setQueryData(['course-assignments', publishedAssignment._id], publishedAssignment);
+      queryClient.setQueryData(['course-assignments', publishedAssignment.id], publishedAssignment);
     }
   });
 };
@@ -289,7 +249,7 @@ export const useArchiveCourseAssignment = () => {
     mutationFn: courseAssignmentsAPI.archive,
     onSuccess: (archivedAssignment) => {
       queryClient.invalidateQueries({ queryKey: ['course-assignments'] });
-      queryClient.setQueryData(['course-assignments', archivedAssignment._id], archivedAssignment);
+      queryClient.setQueryData(['course-assignments', archivedAssignment.id], archivedAssignment);
     }
   });
 };

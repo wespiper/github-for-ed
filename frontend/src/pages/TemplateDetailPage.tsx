@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+// Button import removed - unused
 
 export const TemplateDetailPage = () => {
     const { templateId } = useParams<{ templateId: string }>();

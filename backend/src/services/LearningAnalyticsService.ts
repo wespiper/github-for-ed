@@ -1,9 +1,4 @@
-import { Assignment } from '../models/Assignment';
-import { AssignmentSubmission } from '../models/AssignmentSubmission';
-import { DocumentVersion } from '../models/DocumentVersion';
-import { WritingSession } from '../models/WritingSession';
-import { User } from '../models/User';
-import mongoose from 'mongoose';
+import prisma from '../lib/prisma';
 
 export interface WritingProgressMetrics {
   studentId: string;
@@ -47,35 +42,39 @@ export interface StudentWritingAnalytics {
     totalWritingTime: number;
     averageGrade?: number;
   };
-  learningObjectiveProgress: LearningObjectiveProgress[];
+  progressMetrics: WritingProgressMetrics[];
+  objectiveProgress: LearningObjectiveProgress[];
   writingPatterns: {
-    preferredWritingTimes: string[]; // hour ranges
+    peakProductivityHours: number[];
     averageSessionLength: number;
-    revisionFrequency: number;
-    collaborationLevel: number;
+    procrastinationTendency: number; // 0-1 scale
+    revisionIntensity: number; // edits per word written
   };
-  skillDevelopment: {
-    bloomsLevelDistribution: Record<number, number>;
-    categoryStrengths: Record<string, number>;
-    improvementAreas: string[];
+  collaborationMetrics: {
+    collaborativeAssignments: number;
+    leadershipInstances: number;
+    averageContributionPercentage: number;
+    peerFeedbackQuality: number;
   };
 }
 
-export interface EducatorInsights {
+export interface CourseAnalytics {
   courseId: string;
   instructorId: string;
   timeframe: {
     start: Date;
     end: Date;
   };
-  classMetrics: {
+  overallClassMetrics: {
     totalStudents: number;
     activeStudents: number;
     averageEngagement: number;
     assignmentCompletionRate: number;
+    averageGrade: number;
   };
-  learningObjectiveEffectiveness: {
-    objectiveId: string;
+  assignmentAnalytics: {
+    assignmentId: string;
+    title: string;
     description: string;
     averageStudentProgress: number;
     strugglingStudentsCount: number;
@@ -98,282 +97,969 @@ export interface EducatorInsights {
 export class LearningAnalyticsService {
   
   /**
+   * Validate UUID format
+   */
+  private static validateUUIDs(ids: Record<string, string>): void {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    for (const [key, value] of Object.entries(ids)) {
+      if (!uuidRegex.test(value)) {
+        throw new Error(`Invalid ${key}: ${value}`);
+      }
+    }
+  }
+
+  /**
    * Get comprehensive writing progress metrics for a specific assignment
    */
   static async getWritingProgressMetrics(
     studentId: string, 
     assignmentId: string
   ): Promise<WritingProgressMetrics> {
-    this.validateObjectIds({ studentId, assignmentId });
+    this.validateUUIDs({ studentId, assignmentId });
     
-    // Get assignment and submission data
-    const [assignment, submission] = await Promise.all([
-      Assignment.findById(assignmentId),
-      AssignmentSubmission.findOne({ assignment: assignmentId, student: studentId })
-    ]);
+    // Get assignment details
+    const assignment = await prisma.assignment.findUnique({ 
+      where: { id: assignmentId },
+      select: {
+        id: true,
+        title: true,
+        requirements: true,
+        dueDate: true
+      }
+    });
     
     if (!assignment) {
       throw new Error('Assignment not found');
     }
-    
+
+    // Get submission for this student
+    const submission = await prisma.assignmentSubmission.findFirst({ 
+      where: { 
+        assignmentId: assignmentId, 
+        authorId: studentId 
+      },
+      select: {
+        id: true,
+        content: true,
+        wordCount: true,
+        status: true,
+        updatedAt: true,
+        createdAt: true
+      }
+    });
+
     if (!submission) {
       return this.createEmptyProgressMetrics(studentId, assignmentId);
     }
-    
-    // Get writing sessions and document versions
-    const [writingSessions, documentVersions] = await Promise.all([
-      WritingSession.find({ 
-        assignment: assignmentId, 
-        student: studentId 
-      }).sort({ startTime: 1 }),
-      // TODO: Fix document reference
-      // DocumentVersion.find({ 
-      //   document: submission.document 
-      // }).sort({ createdAt: 1 })
-      [] as any[] // Temporary fix
-    ]);
-    
+
+    // Get documents for this submission
+    const submissionDocuments = await prisma.document.findMany({
+      where: {
+        submissionId: submission.id
+      },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    const primaryDocument = submissionDocuments[0];
+
+    // Get writing sessions for this assignment and student
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        userId: studentId,
+        document: {
+          assignmentId: assignmentId
+        }
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        duration: true,
+        activity: true,
+        createdAt: true,
+        documentId: true
+      },
+      orderBy: { startTime: 'asc' }
+    });
+
+    // Get document versions to track writing progression
+    const documentVersions = primaryDocument ? await prisma.documentVersion.findMany({
+      where: {
+        documentId: primaryDocument.id
+      },
+      select: {
+        id: true,
+        content: true,
+        changes: true,
+        createdAt: true,
+        version: true
+      },
+      orderBy: { version: 'asc' }
+    }) : [];
+
     return this.calculateProgressMetrics(
       studentId,
       assignmentId,
       assignment,
       submission,
       writingSessions,
-      documentVersions
+      documentVersions,
+      primaryDocument
     );
   }
-  
+
+  /**
+   * Calculate comprehensive progress metrics from raw data
+   */
+  private static calculateProgressMetrics(
+    studentId: string,
+    assignmentId: string,
+    assignment: any,
+    submission: any,
+    writingSessions: any[],
+    documentVersions: any[],
+    primaryDocument?: any
+  ): WritingProgressMetrics {
+    // Helper function to count words in text
+    const countWords = (text: string): number => {
+      if (!text) return 0;
+      return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    };
+
+    // Calculate total writing time and sessions
+    const totalSessions = writingSessions.length;
+    const totalWritingTime = writingSessions.reduce((sum, session) => {
+      return sum + (session.duration || 0);
+    }, 0);
+
+    // Calculate average session duration
+    const averageSessionDuration = totalSessions > 0 ? totalWritingTime / totalSessions : 0;
+
+    // Extract word count progression
+    const currentWordCount = submission.wordCount || (primaryDocument ? countWords(primaryDocument.content) : 0);
+    const initialWordCount = documentVersions.length > 0 
+      ? countWords(documentVersions[0].content || '') 
+      : 0;
+    
+    // Extract target from assignment requirements if available
+    const requirements = assignment.requirements as any;
+    const targetWordCount = requirements?.wordCount || requirements?.minimumWords || undefined;
+
+    // Calculate writing velocity (words per minute)
+    const totalWordsWritten = writingSessions.reduce((sum, session) => {
+      const activity = session.activity as any;
+      return sum + (activity?.wordsAdded || 0);
+    }, 0);
+    const writingVelocity = totalWritingTime > 0 ? totalWordsWritten / totalWritingTime : 0;
+
+    // Calculate completion percentage
+    let completionPercentage = 0;
+    if (submission.status === 'submitted') {
+      completionPercentage = 100;
+    } else if (targetWordCount && currentWordCount > 0) {
+      completionPercentage = Math.min((currentWordCount / targetWordCount) * 100, 95);
+    } else if (currentWordCount > 0) {
+      completionPercentage = 50; // Default for in-progress work
+    }
+
+    // Get last activity date
+    const lastActivity = writingSessions.length > 0 
+      ? new Date(Math.max(...writingSessions.map(s => new Date(s.startTime).getTime())))
+      : submission.updatedAt;
+
+    return {
+      studentId,
+      assignmentId,
+      totalSessions,
+      totalWritingTime,
+      wordCountProgress: {
+        initial: initialWordCount,
+        current: currentWordCount,
+        target: targetWordCount
+      },
+      versionCount: documentVersions.length,
+      lastActivity,
+      completionPercentage,
+      averageSessionDuration,
+      writingVelocity
+    };
+  }
+
   /**
    * Track learning objective progress across assignments
    */
-  static async getLearningObjectiveProgress(
+  static async trackLearningObjectiveProgress(
+    studentId: string,
+    courseId: string
+  ): Promise<LearningObjectiveProgress[]> {
+    this.validateUUIDs({ studentId, courseId });
+    
+    // Get all assignments for the course that have learning objectives
+    const assignments = await prisma.assignment.findMany({
+      where: { 
+        courseId: courseId,
+        learningObjectives: {
+          not: {}
+        }
+      },
+      select: {
+        id: true,
+        title: true,
+        learningObjectives: true,
+        createdAt: true
+      }
+    });
+    
+    if (assignments.length === 0) {
+      return [];
+    }
+    
+    // Get submissions for this student across all course assignments
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: {
+        assignmentId: { in: assignments.map(a => a.id) },
+        authorId: studentId
+      },
+      select: {
+        id: true,
+        assignmentId: true,
+        status: true,
+        submittedAt: true,
+        analytics: true,
+        updatedAt: true,
+        grade: true
+      }
+    });
+    
+    // Build progress tracking for each learning objective
+    const objectiveProgressMap = new Map<string, {
+      objective: any;
+      assignmentCount: number;
+      evidenceCount: number;
+      totalProgress: number;
+      lastUpdated: Date;
+      assignmentIds: string[];
+    }>();
+    
+    // Process each assignment
+    assignments.forEach(assignment => {
+      const learningObjectives = assignment.learningObjectives as any;
+      
+      if (!learningObjectives || typeof learningObjectives !== 'object') return;
+      
+      // Handle both array and object formats for learning objectives
+      const objectives = Array.isArray(learningObjectives) 
+        ? learningObjectives 
+        : Object.values(learningObjectives);
+      
+      objectives.forEach((objective: any) => {
+        if (!objective || typeof objective !== 'object') return;
+        
+        const objectiveId = objective.id || objective._id || `${assignment.id}_${objective.description?.substring(0, 20)}`;
+        
+        if (!objectiveProgressMap.has(objectiveId)) {
+          objectiveProgressMap.set(objectiveId, {
+            objective: {
+              id: objectiveId,
+              description: objective.description || 'Learning Objective',
+              category: objective.category || 'general',
+              bloomsLevel: objective.bloomsLevel || 1,
+              targetWeight: objective.weight || 1.0
+            },
+            assignmentCount: 0,
+            evidenceCount: 0,
+            totalProgress: 0,
+            lastUpdated: new Date(0),
+            assignmentIds: []
+          });
+        }
+        
+        const progress = objectiveProgressMap.get(objectiveId)!;
+        progress.assignmentCount += 1;
+        progress.assignmentIds.push(assignment.id);
+        
+        // Check if student has submitted this assignment
+        const submission = submissions.find(s => s.assignmentId === assignment.id);
+        if (submission && submission.submittedAt) {
+          progress.evidenceCount += 1;
+          
+          // Calculate progress based on submission status and grade
+          let objectiveProgress = 0;
+          if (submission.status === 'submitted') {
+            if (submission.grade) {
+              const grade = submission.grade as any;
+              objectiveProgress = grade.score || grade.percentage || 75; // Default to 75% if submitted
+            } else {
+              objectiveProgress = 75; // Default progress for submitted work without grade
+            }
+          } else if (submission.status === 'draft') {
+            objectiveProgress = 50; // Partial credit for in-progress work
+          }
+          
+          // Check analytics for specific objective progress if available
+          const analytics = submission.analytics as any;
+          if (analytics?.objectiveProgress?.[objectiveId]) {
+            objectiveProgress = analytics.objectiveProgress[objectiveId];
+          }
+          
+          progress.totalProgress += objectiveProgress;
+          
+          if (submission.updatedAt > progress.lastUpdated) {
+            progress.lastUpdated = submission.updatedAt;
+          }
+        }
+      });
+    });
+    
+    // Convert to final format
+    const results: LearningObjectiveProgress[] = [];
+    
+    objectiveProgressMap.forEach((progress) => {
+      const currentProgress = progress.evidenceCount > 0 
+        ? progress.totalProgress / progress.evidenceCount 
+        : 0;
+      
+      results.push({
+        objectiveId: progress.objective.id,
+        description: progress.objective.description,
+        category: progress.objective.category,
+        bloomsLevel: progress.objective.bloomsLevel,
+        targetWeight: progress.objective.targetWeight,
+        currentProgress: Math.round(currentProgress),
+        evidenceCount: progress.evidenceCount,
+        lastUpdated: progress.lastUpdated
+      });
+    });
+    
+    // Sort by category and progress
+    return results.sort((a, b) => {
+      if (a.category !== b.category) {
+        return a.category.localeCompare(b.category);
+      }
+      return b.currentProgress - a.currentProgress;
+    });
+  }
+
+  /**
+   * Create comprehensive analytics report for a student
+   */
+  static async generateStudentWritingAnalytics(
     studentId: string,
     courseId: string,
     timeframe?: { start: Date; end: Date }
-  ): Promise<LearningObjectiveProgress[]> {
-    this.validateObjectIds({ studentId, courseId });
+  ): Promise<StudentWritingAnalytics> {
+    this.validateUUIDs({ studentId, courseId });
     
-    const timeQuery = timeframe ? {
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    } : {};
-    
-    // Get all assignments and submissions for the course
-    const assignments = await Assignment.find({ 
-      course: courseId,
-      ...timeQuery 
-    }).populate('learningObjectives');
-    
-    const submissions = await AssignmentSubmission.find({
-      student: studentId,
-      assignment: { $in: assignments.map(a => a._id) }
+    const defaultTimeframe = timeframe || {
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      end: new Date()
+    };
+
+    // Get all assignments for the course
+    const assignments = await prisma.assignment.findMany({
+      where: { 
+        courseId: courseId,
+        createdAt: {
+          gte: defaultTimeframe.start,
+          lte: defaultTimeframe.end
+        }
+      },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        createdAt: true
+      }
     });
+
+    // Get all submissions for this student in the course
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: {
+        assignmentId: { in: assignments.map(a => a.id) },
+        authorId: studentId,
+        updatedAt: {
+          gte: defaultTimeframe.start,
+          lte: defaultTimeframe.end
+        }
+      },
+      select: {
+        id: true,
+        assignmentId: true,
+        status: true,
+        wordCount: true,
+        submittedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        grade: true,
+        collaborationSettings: true
+      }
+    });
+
+    // Get writing sessions for pattern analysis
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        userId: studentId,
+        startTime: {
+          gte: defaultTimeframe.start,
+          lte: defaultTimeframe.end
+        },
+        document: {
+          assignmentId: { in: assignments.map(a => a.id) }
+        }
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        duration: true,
+        activity: true,
+        documentId: true
+      }
+    });
+
+    // Calculate overall metrics
+    const completedAssignments = submissions.filter(s => s.status === 'submitted').length;
+    const totalWritingTime = writingSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const averageWordCount = submissions.length > 0 
+      ? submissions.reduce((sum, s) => sum + s.wordCount, 0) / submissions.length 
+      : 0;
     
-    // Group by learning objectives and calculate progress
-    const progressMap = new Map<string, LearningObjectiveProgress>();
-    
+    // Calculate average grade
+    const gradedSubmissions = submissions.filter(s => s.grade);
+    const averageGrade = gradedSubmissions.length > 0 
+      ? gradedSubmissions.reduce((sum, s) => {
+          const grade = s.grade as any;
+          return sum + (grade.score || grade.percentage || 0);
+        }, 0) / gradedSubmissions.length 
+      : undefined;
+
+    // Get progress metrics for each assignment
+    const progressMetrics: WritingProgressMetrics[] = [];
     for (const assignment of assignments) {
-      if (!assignment.learningObjectives) continue;
-      
-      for (const objective of assignment.learningObjectives) {
-        const submission = submissions.find(s => 
-          s.assignment.toString() === assignment._id.toString()
-        );
-        
-        const progress = this.calculateObjectiveProgress(objective, submission);
-        
-        if (progressMap.has(objective.id)) {
-          const existing = progressMap.get(objective.id)!;
-          existing.currentProgress = Math.max(existing.currentProgress, progress.currentProgress);
-          existing.evidenceCount += progress.evidenceCount;
-          if (progress.lastUpdated > existing.lastUpdated) {
-            existing.lastUpdated = progress.lastUpdated;
-          }
-        } else {
-          progressMap.set(objective.id, progress);
+      const submission = submissions.find(s => s.assignmentId === assignment.id);
+      if (submission) {
+        try {
+          const metrics = await this.getWritingProgressMetrics(studentId, assignment.id);
+          progressMetrics.push(metrics);
+        } catch (error) {
+          // Skip assignments that can't be analyzed
+          console.warn(`Skipping progress metrics for assignment ${assignment.id}:`, error);
         }
       }
     }
-    
-    return Array.from(progressMap.values());
-  }
-  
-  /**
-   * Generate comprehensive student writing analytics
-   */
-  static async getStudentWritingAnalytics(
-    studentId: string,
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ): Promise<StudentWritingAnalytics> {
-    this.validateObjectIds({ studentId, courseId });
-    
-    const [overallMetrics, learningObjectiveProgress, writingPatterns, skillDevelopment] = 
-      await Promise.all([
-        this.calculateOverallMetrics(studentId, courseId, timeframe),
-        this.getLearningObjectiveProgress(studentId, courseId, timeframe),
-        this.analyzeWritingPatterns(studentId, courseId, timeframe),
-        this.analyzeSkillDevelopment(studentId, courseId, timeframe)
-      ]);
-    
+
+    // Get learning objective progress
+    const objectiveProgress = await this.trackLearningObjectiveProgress(studentId, courseId);
+
+    // Analyze writing patterns
+    const writingPatterns = this.analyzeWritingPatterns(writingSessions, assignments, submissions);
+
+    // Analyze collaboration metrics
+    const collaborationMetrics = this.analyzeCollaborationMetrics(submissions);
+
     return {
       studentId,
       courseId,
-      timeframe,
-      overallMetrics,
-      learningObjectiveProgress,
+      timeframe: defaultTimeframe,
+      overallMetrics: {
+        totalAssignments: assignments.length,
+        completedAssignments,
+        averageWordCount: Math.round(averageWordCount),
+        totalWritingTime,
+        averageGrade
+      },
+      progressMetrics,
+      objectiveProgress,
       writingPatterns,
-      skillDevelopment
+      collaborationMetrics
     };
   }
-  
+
   /**
-   * Generate educator insights for course management
+   * Analyze writing patterns from session data
    */
-  static async getEducatorInsights(
-    instructorId: string,
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ): Promise<EducatorInsights> {
-    this.validateObjectIds({ instructorId, courseId });
-    
-    // Verify instructor access
-    const assignment = await Assignment.findOne({ 
-      course: courseId, 
-      instructor: instructorId 
+  private static analyzeWritingPatterns(
+    writingSessions: any[],
+    assignments: any[],
+    submissions: any[]
+  ): {
+    peakProductivityHours: number[];
+    averageSessionLength: number;
+    procrastinationTendency: number;
+    revisionIntensity: number;
+  } {
+    if (writingSessions.length === 0) {
+      return {
+        peakProductivityHours: [],
+        averageSessionLength: 0,
+        procrastinationTendency: 0,
+        revisionIntensity: 0
+      };
+    }
+
+    // Calculate peak productivity hours
+    const hourCounts = new Array(24).fill(0);
+    writingSessions.forEach(session => {
+      const hour = new Date(session.startTime).getHours();
+      hourCounts[hour] += session.duration || 0;
     });
     
-    if (!assignment) {
-      throw new Error('Access denied: You can only view insights for your own courses');
+    const maxHours = Math.max(...hourCounts);
+    const peakProductivityHours = hourCounts
+      .map((count, hour) => ({ hour, count }))
+      .filter(({ count }) => count >= maxHours * 0.8)
+      .map(({ hour }) => hour);
+
+    // Calculate average session length
+    const averageSessionLength = writingSessions.reduce((sum, session) => 
+      sum + (session.duration || 0), 0) / writingSessions.length;
+
+    // Calculate procrastination tendency
+    let procrastinationScore = 0;
+    submissions.forEach(submission => {
+      const assignment = assignments.find(a => a.id === submission.assignmentId);
+      if (assignment?.dueDate && submission.createdAt) {
+        const timeToDeadline = new Date(assignment.dueDate).getTime() - new Date(submission.createdAt).getTime();
+        const totalTime = new Date(assignment.dueDate).getTime() - new Date(assignment.createdAt).getTime();
+        
+        if (totalTime > 0) {
+          const procrastinationRatio = 1 - (timeToDeadline / totalTime);
+          procrastinationScore += Math.max(0, procrastinationRatio);
+        }
+      }
+    });
+    const procrastinationTendency = submissions.length > 0 ? procrastinationScore / submissions.length : 0;
+
+    // Calculate revision intensity (based on writing activity)
+    const totalWordsAdded = writingSessions.reduce((sum, session) => {
+      const activity = session.activity as any;
+      return sum + (activity?.wordsAdded || 0);
+    }, 0);
+    
+    const totalWordsDeleted = writingSessions.reduce((sum, session) => {
+      const activity = session.activity as any;
+      return sum + (activity?.wordsDeleted || 0);
+    }, 0);
+    
+    const revisionIntensity = totalWordsAdded > 0 ? totalWordsDeleted / totalWordsAdded : 0;
+
+    return {
+      peakProductivityHours,
+      averageSessionLength: Math.round(averageSessionLength),
+      procrastinationTendency: Math.round(procrastinationTendency * 100) / 100,
+      revisionIntensity: Math.round(revisionIntensity * 100) / 100
+    };
+  }
+
+  /**
+   * Analyze collaboration metrics from submissions
+   */
+  private static analyzeCollaborationMetrics(submissions: any[]): {
+    collaborativeAssignments: number;
+    leadershipInstances: number;
+    averageContributionPercentage: number;
+    peerFeedbackQuality: number;
+  } {
+    const collaborativeSubmissions = submissions.filter(s => {
+      const settings = s.collaborationSettings as any;
+      return settings?.isCollaborative || settings?.allowCollaboration;
+    });
+
+    // Simple metrics for now
+    const collaborativeAssignments = collaborativeSubmissions.length;
+    const leadershipInstances = 0; // Would need collaboration analytics to determine
+    const averageContributionPercentage = collaborativeAssignments > 0 ? 75 : 0; // Default assumption
+    const peerFeedbackQuality = 0; // Would need feedback data to calculate
+
+    return {
+      collaborativeAssignments,
+      leadershipInstances,
+      averageContributionPercentage,
+      peerFeedbackQuality
+    };
+  }
+
+  /**
+   * Generate course-level analytics for educators
+   */
+  static async generateCourseAnalytics(
+    courseId: string,
+    instructorId: string,
+    timeframe?: { start: Date; end: Date }
+  ): Promise<CourseAnalytics> {
+    this.validateUUIDs({ courseId, instructorId });
+    
+    const defaultTimeframe = timeframe || {
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      end: new Date()
+    };
+
+    // Verify instructor owns this course
+    const course = await prisma.course.findFirst({
+      where: {
+        id: courseId,
+        instructorId: instructorId
+      }
+    });
+
+    if (!course) {
+      throw new Error('Course not found or access denied');
     }
-    
-    const [classMetrics, objectiveEffectiveness, interventionRecommendations, developmentTrends] = 
-      await Promise.all([
-        this.calculateClassMetrics(courseId, timeframe),
-        this.analyzeLearningObjectiveEffectiveness(courseId, timeframe),
-        this.generateInterventionRecommendations(courseId, timeframe),
-        this.analyzeWritingDevelopmentTrends(courseId, timeframe)
-      ]);
-    
+
+    // Get all students enrolled in the course
+    const enrollments = await prisma.courseEnrollment.findMany({
+      where: {
+        courseId: courseId,
+        status: 'active'
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    const studentIds = enrollments.map(e => e.student.id);
+
+    // Get all assignments for the course in timeframe
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        courseId: courseId,
+        createdAt: {
+          gte: defaultTimeframe.start,
+          lte: defaultTimeframe.end
+        }
+      },
+      select: {
+        id: true,
+        title: true,
+        instructions: true,
+        dueDate: true,
+        createdAt: true
+      }
+    });
+
+    // Get all submissions for course assignments
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: {
+        assignmentId: { in: assignments.map(a => a.id) },
+        authorId: { in: studentIds }
+      },
+      select: {
+        id: true,
+        assignmentId: true,
+        authorId: true,
+        status: true,
+        wordCount: true,
+        submittedAt: true,
+        updatedAt: true,
+        grade: true
+      }
+    });
+
+    // Get writing sessions for engagement analysis
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        userId: { in: studentIds },
+        startTime: {
+          gte: defaultTimeframe.start,
+          lte: defaultTimeframe.end
+        },
+        document: {
+          assignmentId: { in: assignments.map(a => a.id) }
+        }
+      },
+      select: {
+        userId: true,
+        startTime: true,
+        duration: true
+      }
+    });
+
+    // Calculate overall class metrics
+    const overallClassMetrics = this.calculateClassMetrics(
+      enrollments, 
+      submissions, 
+      writingSessions, 
+      defaultTimeframe
+    );
+
+    // Analyze each assignment
+    const assignmentAnalytics = assignments.map(assignment => 
+      this.analyzeAssignmentPerformance(assignment, submissions, studentIds)
+    );
+
+    // Generate intervention recommendations
+    const interventionRecommendations = this.generateInterventionRecommendations(
+      studentIds, 
+      submissions, 
+      writingSessions
+    );
+
+    // Analyze writing development trends
+    const writingDevelopmentTrends = this.analyzeWritingDevelopmentTrends(
+      submissions, 
+      assignments,
+      studentIds
+    );
+
     return {
       courseId,
       instructorId,
-      timeframe,
-      classMetrics,
-      learningObjectiveEffectiveness: objectiveEffectiveness,
+      timeframe: defaultTimeframe,
+      overallClassMetrics,
+      assignmentAnalytics,
       interventionRecommendations,
-      writingDevelopmentTrends: developmentTrends
+      writingDevelopmentTrends
     };
   }
-  
+
   /**
-   * Identify students who may need intervention
+   * Calculate overall class performance metrics
    */
-  static async identifyAtRiskStudents(
-    courseId: string,
-    criteria: {
-      minimumEngagement?: number;
-      maxDaysSinceActivity?: number;
-      minimumCompletionRate?: number;
-    } = {}
-  ): Promise<{
-    studentId: string;
-    riskLevel: 'low' | 'medium' | 'high';
-    reasons: string[];
-    lastActivity: Date;
-    completionRate: number;
-    engagementScore: number;
-  }[]> {
-    this.validateObjectIds({ courseId });
+  private static calculateClassMetrics(
+    enrollments: any[],
+    submissions: any[],
+    writingSessions: any[],
+    timeframe: { start: Date; end: Date }
+  ): {
+    totalStudents: number;
+    activeStudents: number;
+    averageEngagement: number;
+    assignmentCompletionRate: number;
+    averageGrade: number;
+  } {
+    const totalStudents = enrollments.length;
     
-    const {
-      minimumEngagement = 0.3,
-      maxDaysSinceActivity = 7,
-      minimumCompletionRate = 0.5
-    } = criteria;
-    
-    // Get all students in the course
-    const assignments = await Assignment.find({ course: courseId });
-    const assignmentIds = assignments.map(a => a._id);
-    
-    const submissions = await AssignmentSubmission.aggregate([
-      { $match: { assignment: { $in: assignmentIds } } },
-      {
-        $group: {
-          _id: '$student',
-          totalSubmissions: { $sum: 1 },
-          completedSubmissions: {
-            $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] }
-          },
-          lastActivity: { $max: '$updatedAt' },
-          averageGrade: { $avg: '$grade' }
-        }
-      }
+    // Students with recent activity
+    const activeStudentIds = new Set([
+      ...submissions.filter(s => s.updatedAt >= timeframe.start).map(s => s.authorId),
+      ...writingSessions.filter(s => s.startTime >= timeframe.start).map(s => s.userId)
     ]);
+    const activeStudents = activeStudentIds.size;
+
+    // Calculate engagement based on writing session activity
+    const totalSessionTime = writingSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const averageEngagement = totalStudents > 0 ? totalSessionTime / totalStudents : 0;
+
+    // Calculate assignment completion rate
+    const submittedAssignments = submissions.filter(s => s.status === 'submitted').length;
+    const totalAssignmentOpportunities = submissions.length;
+    const assignmentCompletionRate = totalAssignmentOpportunities > 0 
+      ? (submittedAssignments / totalAssignmentOpportunities) * 100 
+      : 0;
+
+    // Calculate average grade
+    const gradedSubmissions = submissions.filter(s => s.grade);
+    const averageGrade = gradedSubmissions.length > 0 
+      ? gradedSubmissions.reduce((sum, s) => {
+          const grade = s.grade as any;
+          return sum + (grade.score || grade.percentage || 0);
+        }, 0) / gradedSubmissions.length 
+      : 0;
+
+    return {
+      totalStudents,
+      activeStudents,
+      averageEngagement: Math.round(averageEngagement),
+      assignmentCompletionRate: Math.round(assignmentCompletionRate),
+      averageGrade: Math.round(averageGrade)
+    };
+  }
+
+  /**
+   * Analyze performance for individual assignments
+   */
+  private static analyzeAssignmentPerformance(
+    assignment: any,
+    allSubmissions: any[],
+    studentIds: string[]
+  ): {
+    assignmentId: string;
+    title: string;
+    description: string;
+    averageStudentProgress: number;
+    strugglingStudentsCount: number;
+    recommendedActions: string[];
+  } {
+    const assignmentSubmissions = allSubmissions.filter(s => s.assignmentId === assignment.id);
     
-    const atRiskStudents = [];
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - maxDaysSinceActivity);
+    // Calculate average progress
+    const submittedCount = assignmentSubmissions.filter(s => s.status === 'submitted').length;
+    const draftCount = assignmentSubmissions.filter(s => s.status === 'draft').length;
+    const notStartedCount = studentIds.length - assignmentSubmissions.length;
     
-    for (const studentData of submissions) {
-      const completionRate = studentData.completedSubmissions / assignments.length;
-      const daysSinceActivity = Math.floor(
-        (Date.now() - new Date(studentData.lastActivity).getTime()) / (1000 * 60 * 60 * 24)
-      );
+    const averageStudentProgress = studentIds.length > 0 
+      ? ((submittedCount * 100) + (draftCount * 50)) / studentIds.length 
+      : 0;
+
+    // Identify struggling students (no submission or very low word count)
+    const strugglingStudentsCount = notStartedCount + 
+      assignmentSubmissions.filter(s => s.wordCount < 50).length;
+
+    // Generate recommendations based on performance
+    const recommendedActions: string[] = [];
+    
+    if (averageStudentProgress < 30) {
+      recommendedActions.push('Consider extending deadline or providing additional support');
+      recommendedActions.push('Host office hours to address common challenges');
+    }
+    
+    if (strugglingStudentsCount > studentIds.length * 0.3) {
+      recommendedActions.push('Reach out to struggling students individually');
+      recommendedActions.push('Review assignment clarity and expectations');
+    }
+    
+    if (submittedCount === 0 && assignment.dueDate && assignment.dueDate < new Date()) {
+      recommendedActions.push('Send assignment completion reminders');
+    }
+
+    return {
+      assignmentId: assignment.id,
+      title: assignment.title,
+      description: assignment.instructions?.substring(0, 100) + '...' || 'No description',
+      averageStudentProgress: Math.round(averageStudentProgress),
+      strugglingStudentsCount,
+      recommendedActions
+    };
+  }
+
+  /**
+   * Generate intervention recommendations for at-risk students
+   */
+  private static generateInterventionRecommendations(
+    studentIds: string[],
+    submissions: any[],
+    writingSessions: any[]
+  ): {
+    studentId: string;
+    urgency: 'low' | 'medium' | 'high';
+    reasons: string[];
+    suggestedActions: string[];
+  }[] {
+    const recommendations: any[] = [];
+
+    studentIds.forEach(studentId => {
+      const studentSubmissions = submissions.filter(s => s.authorId === studentId);
+      const studentSessions = writingSessions.filter(s => s.userId === studentId);
       
-      // Calculate engagement score based on activity patterns
-      const engagementScore = await this.calculateEngagementScore(
-        studentData._id.toString(), 
-        courseId
-      );
-      
-      const reasons = [];
-      let riskLevel: 'low' | 'medium' | 'high' = 'low';
-      
-      if (completionRate < minimumCompletionRate) {
-        reasons.push(`Low completion rate: ${Math.round(completionRate * 100)}%`);
-        riskLevel = 'medium';
+      const reasons: string[] = [];
+      const suggestedActions: string[] = [];
+      let urgency: 'low' | 'medium' | 'high' = 'low';
+
+      // Check for lack of activity
+      if (studentSessions.length === 0) {
+        reasons.push('No writing activity recorded');
+        suggestedActions.push('Schedule one-on-one check-in');
+        urgency = 'high';
       }
+
+      // Check for low submission rate
+      const submissionRate = studentSubmissions.filter(s => s.status === 'submitted').length / 
+        Math.max(studentSubmissions.length, 1);
       
-      if (daysSinceActivity > maxDaysSinceActivity) {
-        reasons.push(`Inactive for ${daysSinceActivity} days`);
-        riskLevel = 'high';
+      if (submissionRate < 0.5) {
+        reasons.push('Low assignment completion rate');
+        suggestedActions.push('Provide assignment planning support');
+        urgency = urgency === 'high' ? 'high' : 'medium';
       }
+
+      // Check for consistently low word counts
+      const avgWordCount = studentSubmissions.length > 0 
+        ? studentSubmissions.reduce((sum, s) => sum + s.wordCount, 0) / studentSubmissions.length 
+        : 0;
       
-      if (engagementScore < minimumEngagement) {
-        reasons.push(`Low engagement score: ${Math.round(engagementScore * 100)}%`);
-        if (riskLevel === 'low') riskLevel = 'medium';
+      if (avgWordCount < 100 && studentSubmissions.length > 0) {
+        reasons.push('Consistently low word counts in submissions');
+        suggestedActions.push('Offer writing development resources');
+        urgency = urgency === 'high' ? 'high' : 'medium';
       }
-      
+
+      // Only add if there are concerns
       if (reasons.length > 0) {
-        atRiskStudents.push({
-          studentId: studentData._id.toString(),
-          riskLevel,
+        recommendations.push({
+          studentId,
+          urgency,
           reasons,
-          lastActivity: studentData.lastActivity,
-          completionRate,
-          engagementScore
+          suggestedActions
         });
       }
-    }
-    
-    return atRiskStudents.sort((a, b) => {
-      const riskOrder = { high: 3, medium: 2, low: 1 };
-      return riskOrder[b.riskLevel] - riskOrder[a.riskLevel];
     });
+
+    return recommendations;
   }
-  
-  // Private helper methods
-  
-  private static validateObjectIds(ids: Record<string, string>): void {
-    for (const [key, id] of Object.entries(ids)) {
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new Error(`Invalid ${key}: ${id}`);
-      }
+
+  /**
+   * Analyze overall writing development trends
+   */
+  private static analyzeWritingDevelopmentTrends(
+    submissions: any[],
+    _assignments: any[],
+    _studentIds: string[]
+  ): {
+    overallProgress: number;
+    skillGrowthAreas: string[];
+    classStrengths: string[];
+    concernAreas: string[];
+  } {
+    // Calculate overall progress based on submission trends
+    const submittedSubmissions = submissions.filter(s => s.status === 'submitted');
+    const overallProgress = submissions.length > 0 
+      ? (submittedSubmissions.length / submissions.length) * 100 
+      : 0;
+
+    // Analyze word count trends
+    const avgWordCount = submissions.length > 0 
+      ? submissions.reduce((sum, s) => sum + s.wordCount, 0) / submissions.length 
+      : 0;
+
+    const skillGrowthAreas: string[] = [];
+    const classStrengths: string[] = [];
+    const concernAreas: string[] = [];
+
+    // Analyze patterns
+    if (avgWordCount > 500) {
+      classStrengths.push('Strong writing volume and engagement');
+    } else if (avgWordCount < 200) {
+      concernAreas.push('Low writing output across assignments');
+      skillGrowthAreas.push('Writing fluency and idea development');
     }
+
+    if (overallProgress > 80) {
+      classStrengths.push('High assignment completion rate');
+    } else if (overallProgress < 50) {
+      concernAreas.push('Low assignment completion rate');
+      skillGrowthAreas.push('Time management and assignment planning');
+    }
+
+    // Default skill areas if none identified
+    if (skillGrowthAreas.length === 0) {
+      skillGrowthAreas.push('Continued writing development');
+    }
+
+    return {
+      overallProgress: Math.round(overallProgress),
+      skillGrowthAreas,
+      classStrengths,
+      concernAreas
+    };
   }
-  
+
+  /**
+   * Helper method to create empty progress metrics
+   */
   private static createEmptyProgressMetrics(
-    studentId: string, 
+    studentId: string,
     assignmentId: string
   ): WritingProgressMetrics {
     return {
@@ -381,490 +1067,15 @@ export class LearningAnalyticsService {
       assignmentId,
       totalSessions: 0,
       totalWritingTime: 0,
-      wordCountProgress: { initial: 0, current: 0 },
+      wordCountProgress: {
+        initial: 0,
+        current: 0
+      },
       versionCount: 0,
       lastActivity: new Date(),
       completionPercentage: 0,
       averageSessionDuration: 0,
       writingVelocity: 0
     };
-  }
-  
-  private static calculateProgressMetrics(
-    studentId: string,
-    assignmentId: string,
-    assignment: any,
-    submission: any,
-    writingSessions: any[],
-    documentVersions: any[]
-  ): WritingProgressMetrics {
-    const totalWritingTime = writingSessions.reduce(
-      (sum, session) => sum + (session.duration || 0), 0
-    );
-    
-    const wordCounts = documentVersions.map(v => v.wordCount || 0);
-    const initialWordCount = wordCounts[0] || 0;
-    const currentWordCount = wordCounts[wordCounts.length - 1] || 0;
-    
-    const averageSessionDuration = writingSessions.length > 0 
-      ? totalWritingTime / writingSessions.length 
-      : 0;
-    
-    const writingVelocity = totalWritingTime > 0 
-      ? (currentWordCount - initialWordCount) / totalWritingTime 
-      : 0;
-    
-    // Calculate completion percentage based on submission status and requirements
-    let completionPercentage = 0;
-    if (submission.status === 'submitted') {
-      completionPercentage = 100;
-    } else if (submission.status === 'in_progress') {
-      // Estimate based on word count and requirements
-      const targetWordCount = assignment.requirements?.wordCount || 1000;
-      completionPercentage = Math.min(95, (currentWordCount / targetWordCount) * 100);
-    }
-    
-    return {
-      studentId,
-      assignmentId,
-      totalSessions: writingSessions.length,
-      totalWritingTime,
-      wordCountProgress: {
-        initial: initialWordCount,
-        current: currentWordCount,
-        target: assignment.requirements?.wordCount
-      },
-      versionCount: documentVersions.length,
-      lastActivity: submission.updatedAt,
-      completionPercentage,
-      averageSessionDuration,
-      writingVelocity
-    };
-  }
-  
-  private static calculateObjectiveProgress(
-    objective: any, 
-    submission: any
-  ): LearningObjectiveProgress {
-    // Calculate progress based on submission status and quality
-    let currentProgress = 0;
-    let evidenceCount = 0;
-    let lastUpdated = new Date();
-    
-    if (submission) {
-      evidenceCount = 1;
-      lastUpdated = submission.updatedAt;
-      
-      if (submission.status === 'submitted') {
-        if (submission.grade !== undefined) {
-          // Use actual grade if available
-          currentProgress = Math.max(0, Math.min(100, submission.grade));
-        } else {
-          // Estimate based on completion
-          currentProgress = 75; // Assume good progress for completed work
-        }
-      } else if (submission.status === 'in_progress') {
-        currentProgress = 40; // Partial progress for work in progress
-      }
-    }
-    
-    return {
-      objectiveId: objective.id,
-      description: objective.description,
-      category: objective.category,
-      bloomsLevel: objective.bloomsLevel,
-      targetWeight: objective.weight,
-      currentProgress,
-      evidenceCount,
-      lastUpdated
-    };
-  }
-  
-  private static async calculateOverallMetrics(
-    studentId: string,
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const assignments = await Assignment.find({
-      course: courseId,
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const submissions = await AssignmentSubmission.find({
-      student: studentId,
-      assignment: { $in: assignments.map(a => a._id) }
-    });
-    
-    const completedSubmissions = submissions.filter(s => s.status === 'submitted');
-    const totalWordCount = submissions.reduce((sum, s) => sum + (s.wordCount || 0), 0);
-    const averageGrade = completedSubmissions.length > 0
-      ? completedSubmissions.reduce((sum, s) => sum + (s.grade?.score || 0), 0) / completedSubmissions.length
-      : undefined;
-    
-    // Calculate total writing time from sessions
-    const writingSessions = await WritingSession.find({
-      user: studentId,
-      assignment: { $in: assignments.map(a => a._id) },
-      startTime: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const totalWritingTime = writingSessions.reduce(
-      (sum, session) => sum + (session.duration || 0), 0
-    );
-    
-    return {
-      totalAssignments: assignments.length,
-      completedAssignments: completedSubmissions.length,
-      averageWordCount: submissions.length > 0 ? totalWordCount / submissions.length : 0,
-      totalWritingTime,
-      averageGrade
-    };
-  }
-  
-  private static async analyzeWritingPatterns(
-    studentId: string,
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const assignments = await Assignment.find({
-      course: courseId,
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const writingSessions = await WritingSession.find({
-      user: studentId,
-      assignment: { $in: assignments.map(a => a._id) },
-      startTime: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    // Analyze preferred writing times
-    const hourCounts = new Array(24).fill(0);
-    writingSessions.forEach(session => {
-      const hour = new Date(session.startTime).getHours();
-      hourCounts[hour]++;
-    });
-    
-    const preferredWritingTimes = [];
-    const maxCount = Math.max(...hourCounts);
-    if (maxCount > 0) {
-      for (let i = 0; i < 24; i++) {
-        if (hourCounts[i] >= maxCount * 0.5) {
-          preferredWritingTimes.push(`${i}:00-${i + 1}:00`);
-        }
-      }
-    }
-    
-    const averageSessionLength = writingSessions.length > 0
-      ? writingSessions.reduce((sum, s) => sum + (s.duration || 0), 0) / writingSessions.length
-      : 0;
-    
-    // Get document versions for revision analysis
-    const submissions = await AssignmentSubmission.find({
-      student: studentId,
-      assignment: { $in: assignments.map(a => a._id) }
-    });
-    
-    let totalVersions = 0;
-    // TODO: Fix document reference - may need to be through different relationship
-    // for (const submission of submissions) {
-    //   if (submission.document) {
-    //     const versions = await DocumentVersion.countDocuments({
-    //       document: submission.document
-    //     });
-    //     totalVersions += versions;
-    //   }
-    // }
-    
-    const revisionFrequency = submissions.length > 0 
-      ? totalVersions / submissions.length 
-      : 0;
-    
-    return {
-      preferredWritingTimes,
-      averageSessionLength,
-      revisionFrequency,
-      collaborationLevel: 0 // Placeholder for future collaboration features
-    };
-  }
-  
-  private static async analyzeSkillDevelopment(
-    studentId: string,
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const learningObjectives = await this.getLearningObjectiveProgress(
-      studentId, 
-      courseId, 
-      timeframe
-    );
-    
-    // Analyze Bloom's level distribution
-    const bloomsLevelDistribution: Record<number, number> = {};
-    const categoryStrengths: Record<string, number> = {};
-    
-    learningObjectives.forEach(objective => {
-      bloomsLevelDistribution[objective.bloomsLevel] = 
-        (bloomsLevelDistribution[objective.bloomsLevel] || 0) + objective.currentProgress;
-      
-      categoryStrengths[objective.category] = 
-        (categoryStrengths[objective.category] || 0) + objective.currentProgress;
-    });
-    
-    // Identify improvement areas (objectives with low progress)
-    const improvementAreas = learningObjectives
-      .filter(obj => obj.currentProgress < 60)
-      .map(obj => obj.category)
-      .filter((category, index, arr) => arr.indexOf(category) === index);
-    
-    return {
-      bloomsLevelDistribution,
-      categoryStrengths,
-      improvementAreas
-    };
-  }
-  
-  private static async calculateClassMetrics(
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const assignments = await Assignment.find({
-      course: courseId,
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const submissions = await AssignmentSubmission.find({
-      assignment: { $in: assignments.map(a => a._id) }
-    });
-    
-    // Get unique students
-    const uniqueStudents = new Set(submissions.map(s => s.author.toString()));
-    const totalStudents = uniqueStudents.size;
-    
-    // Calculate active students (students with recent activity)
-    const recentCutoff = new Date();
-    recentCutoff.setDate(recentCutoff.getDate() - 7);
-    const activeStudents = submissions.filter(s => s.updatedAt >= recentCutoff).length;
-    
-    // Calculate completion rate
-    const totalPossibleSubmissions = assignments.length * totalStudents;
-    const completedSubmissions = submissions.filter(s => s.status === 'submitted').length;
-    const assignmentCompletionRate = totalPossibleSubmissions > 0 
-      ? completedSubmissions / totalPossibleSubmissions 
-      : 0;
-    
-    // Calculate average engagement (simplified metric)
-    const averageEngagement = totalStudents > 0 ? activeStudents / totalStudents : 0;
-    
-    return {
-      totalStudents,
-      activeStudents,
-      averageEngagement,
-      assignmentCompletionRate
-    };
-  }
-  
-  private static async analyzeLearningObjectiveEffectiveness(
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const assignments = await Assignment.find({
-      course: courseId,
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const objectiveMap = new Map();
-    
-    // Collect all learning objectives and their progress across students
-    for (const assignment of assignments) {
-      if (!assignment.learningObjectives) continue;
-      
-      const submissions = await AssignmentSubmission.find({
-        assignment: assignment._id
-      });
-      
-      for (const objective of assignment.learningObjectives) {
-        if (!objectiveMap.has(objective.id)) {
-          objectiveMap.set(objective.id, {
-            objectiveId: objective.id,
-            description: objective.description,
-            progressData: [],
-            strugglingCount: 0
-          });
-        }
-        
-        const objectiveData = objectiveMap.get(objective.id);
-        
-        for (const submission of submissions) {
-          const progress = this.calculateObjectiveProgress(objective, submission);
-          objectiveData.progressData.push(progress.currentProgress);
-          
-          if (progress.currentProgress < 60) {
-            objectiveData.strugglingCount++;
-          }
-        }
-      }
-    }
-    
-    // Generate effectiveness analysis
-    return Array.from(objectiveMap.values()).map(data => {
-      const averageProgress = data.progressData.length > 0
-        ? data.progressData.reduce((sum: number, p: number) => sum + p, 0) / data.progressData.length
-        : 0;
-      
-      const recommendedActions = [];
-      if (averageProgress < 50) {
-        recommendedActions.push('Consider breaking down into smaller objectives');
-        recommendedActions.push('Provide additional scaffolding materials');
-      } else if (averageProgress < 70) {
-        recommendedActions.push('Review assignment instructions for clarity');
-        recommendedActions.push('Consider peer collaboration opportunities');
-      }
-      
-      if (data.strugglingCount > data.progressData.length * 0.3) {
-        recommendedActions.push('Identify students needing individual support');
-      }
-      
-      return {
-        objectiveId: data.objectiveId,
-        description: data.description,
-        averageStudentProgress: averageProgress,
-        strugglingStudentsCount: data.strugglingCount,
-        recommendedActions
-      };
-    });
-  }
-  
-  private static async generateInterventionRecommendations(
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const atRiskStudents = await this.identifyAtRiskStudents(courseId, {
-      minimumEngagement: 0.3,
-      maxDaysSinceActivity: 7,
-      minimumCompletionRate: 0.5
-    });
-    
-    return atRiskStudents.map(student => ({
-      studentId: student.studentId,
-      urgency: student.riskLevel,
-      reasons: student.reasons,
-      suggestedActions: this.generateActionRecommendations(student)
-    }));
-  }
-  
-  private static generateActionRecommendations(student: any): string[] {
-    const actions = [];
-    
-    if (student.completionRate < 0.5) {
-      actions.push('Schedule one-on-one check-in meeting');
-      actions.push('Review assignment requirements and deadlines');
-    }
-    
-    if (student.reasons.some((r: string) => r.includes('Inactive'))) {
-      actions.push('Send encouraging check-in message');
-      actions.push('Offer flexible deadline if appropriate');
-    }
-    
-    if (student.engagementScore < 0.3) {
-      actions.push('Explore alternative assignment formats');
-      actions.push('Connect with academic support services');
-    }
-    
-    actions.push('Monitor progress weekly');
-    
-    return actions;
-  }
-  
-  private static async analyzeWritingDevelopmentTrends(
-    courseId: string,
-    timeframe: { start: Date; end: Date }
-  ) {
-    const assignments = await Assignment.find({
-      course: courseId,
-      createdAt: { $gte: timeframe.start, $lte: timeframe.end }
-    });
-    
-    const submissions = await AssignmentSubmission.find({
-      assignment: { $in: assignments.map(a => a._id) }
-    });
-    
-    // Calculate overall progress (simplified)
-    const completedSubmissions = submissions.filter(s => s.status === 'submitted');
-    const overallProgress = submissions.length > 0 
-      ? completedSubmissions.length / submissions.length 
-      : 0;
-    
-    // Analyze skill categories from learning objectives
-    const skillCategories = new Set();
-    const categoryProgress = new Map();
-    
-    for (const assignment of assignments) {
-      if (assignment.learningObjectives) {
-        assignment.learningObjectives.forEach((obj: any) => {
-          skillCategories.add(obj.category);
-          if (!categoryProgress.has(obj.category)) {
-            categoryProgress.set(obj.category, []);
-          }
-        });
-      }
-    }
-    
-    // Generate trend analysis (simplified)
-    const skillGrowthAreas = Array.from(skillCategories).slice(0, 3) as string[];
-    const classStrengths = overallProgress > 0.7 
-      ? ['Assignment completion', 'Student engagement'] 
-      : ['Student participation'];
-    const concernAreas = overallProgress < 0.5 
-      ? ['Assignment completion rates', 'Student engagement']
-      : [];
-    
-    return {
-      overallProgress,
-      skillGrowthAreas,
-      classStrengths,
-      concernAreas
-    };
-  }
-  
-  private static async calculateEngagementScore(
-    studentId: string,
-    courseId: string
-  ): Promise<number> {
-    const assignments = await Assignment.find({ course: courseId });
-    const assignmentIds = assignments.map(a => a._id);
-    
-    const [submissions, writingSessions] = await Promise.all([
-      AssignmentSubmission.find({
-        student: studentId,
-        assignment: { $in: assignmentIds }
-      }),
-      WritingSession.find({
-        student: studentId,
-        assignment: { $in: assignmentIds }
-      })
-    ]);
-    
-    // Calculate engagement based on multiple factors
-    const submissionRate = assignments.length > 0 
-      ? submissions.length / assignments.length 
-      : 0;
-    
-    const averageSessionLength = writingSessions.length > 0
-      ? writingSessions.reduce((sum, s) => sum + (s.duration || 0), 0) / writingSessions.length
-      : 0;
-    
-    const recentActivity = writingSessions.filter(s => {
-      const daysSince = (Date.now() - s.startTime.getTime()) / (1000 * 60 * 60 * 24);
-      return daysSince <= 7;
-    }).length;
-    
-    // Weighted engagement score
-    const engagementScore = (
-      submissionRate * 0.5 +
-      Math.min(averageSessionLength / 60, 1) * 0.3 + // Normalize to 0-1 based on 60 min sessions
-      Math.min(recentActivity / 3, 1) * 0.2 // Normalize based on 3 recent sessions
-    );
-    
-    return Math.max(0, Math.min(1, engagementScore));
   }
 }

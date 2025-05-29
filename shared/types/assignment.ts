@@ -1,5 +1,5 @@
 /**
- * Shared Assignment Types for GitHub for Education
+ * Shared Assignment Types for Scribe Tree
  * 
  * This file contains all assignment-related type definitions shared between
  * frontend and backend to ensure consistency and eliminate duplication.
@@ -16,6 +16,30 @@ export interface LearningObjective {
   bloomsLevel: 1 | 2 | 3 | 4 | 5 | 6;
   assessmentCriteria: string[];
   weight: number; // percentage of overall grade (0-100)
+  subject?: string; // subject area for preset objectives
+}
+
+/**
+ * Bloom's Taxonomy Level Interface
+ * Represents a cognitive level with associated presets
+ */
+export interface BloomsLevel {
+  level: number;
+  name: string;
+  description: string;
+  presets: LearningObjective[];
+  count: number;
+}
+
+/**
+ * Subject Area Interface
+ * Represents an academic subject with learning objectives
+ */
+export interface SubjectArea {
+  key: string;
+  name: string;
+  presets: LearningObjective[];
+  count: number;
 }
 
 /**
@@ -128,6 +152,12 @@ export type AssignmentType = 'individual' | 'collaborative' | 'peer-review';
 export type AssignmentStatus = 'draft' | 'published' | 'in_progress' | 'completed' | 'archived';
 
 /**
+ * Submission Status Enum
+ * Tracks the lifecycle state of a student submission
+ */
+export type SubmissionStatus = 'not_started' | 'draft' | 'in_progress' | 'submitted' | 'returned' | 'graded';
+
+/**
  * Citation Style Enum
  * Supported academic citation formats
  */
@@ -137,7 +167,7 @@ export type CitationStyle = 'APA' | 'MLA' | 'Chicago' | 'IEEE';
  * Bloom's Taxonomy Levels
  * Cognitive complexity levels for learning objectives
  */
-export type BloomsLevel = 1 | 2 | 3 | 4 | 5 | 6;
+export type BloomsTaxonomyLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
  * Learning Objective Categories
@@ -181,61 +211,44 @@ export type AIAssistanceType =
  * Complete assignment structure for database storage and API responses
  */
 export interface Assignment {
-  _id: string;
+  id: string;
+  templateId?: string;
+  courseId: string;
+  instructorId: string;
   title: string;
-  description: string;
   instructions: string;
-  course: {
-    _id: string;
+  requirements: Record<string, any>;
+  writingStages: Record<string, any>;
+  learningObjectives: Record<string, any>;
+  aiSettings: Record<string, any>;
+  gradingCriteria?: Record<string, any>;
+  dueDate?: string; // ISO date string
+  stageDueDates?: Record<string, any>;
+  status: string;
+  type: string;
+  collaborationSettings: Record<string, any>;
+  versionControlSettings: Record<string, any>;
+  
+  // Computed/virtual properties for frontend compatibility
+  isOverdue?: boolean;
+  versionControl?: Record<string, any>; // Alias for versionControlSettings
+  
+  // Relations when populated
+  template?: AssignmentTemplate;
+  course?: {
+    id: string;
     title: string;
-    students?: string[];
   };
-  instructor: {
-    _id: string;
+  instructor?: {
+    id: string;
     firstName: string;
     lastName: string;
     email: string;
   };
   
-  // Assignment Configuration
-  type: AssignmentType;
-  dueDate?: string; // ISO date string for frontend compatibility
-  allowLateSubmissions: boolean;
-  maxCollaborators?: number;
-  
-  // Writing Requirements
-  requirements: WritingRequirements;
-  
-  // Collaboration Settings
-  collaboration: CollaborationSettings;
-  
-  // Version Control Settings
-  versionControl: VersionControlSettings;
-  
-  // Learning Objectives (Educational Focus)
-  learningObjectives: LearningObjective[];
-
-  // Writing Process Stages (Scaffold Learning)
-  writingStages: WritingStage[];
-
-  // AI Integration (Educational Boundaries)
-  aiSettings: AISettings;
-  
-  // Assignment Status
-  status: AssignmentStatus;
-  publishedAt?: string; // ISO date string
-  
-  // Grading and Feedback
-  grading: GradingSettings;
-  
-  // Computed fields (from virtuals)
-  submissionCount?: number;
-  isOverdue?: boolean;
-  daysRemaining?: number | null;
-  
   // Metadata
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -287,29 +300,30 @@ export interface UpdateAssignmentInput {
  * Template structure for reusable assignments
  */
 export interface AssignmentTemplate {
-  _id: string;
+  id: string;
   title: string;
-  description: string;
+  description?: string;
   instructions: string;
-  instructor: {
-    _id: string;
+  instructorId?: string;
+  requirements: Record<string, any>;
+  writingStages: Record<string, any>;
+  learningObjectives: Record<string, any>;
+  aiSettings: Record<string, any>;
+  gradingCriteria?: Record<string, any>;
+  isPublic: boolean;
+  usageCount: number;
+  tags: string[];
+  status?: string; // For filtering/display
+  type?: string; // Assignment type
+  
+  // Relations when populated
+  instructor?: {
+    id: string;
     firstName: string;
     lastName: string;
     email: string;
   };
-  type: AssignmentType;
-  requirements: WritingRequirements;
-  collaboration: CollaborationSettings;
-  versionControl: VersionControlSettings;
-  learningObjectives: LearningObjective[];
-  writingStages: WritingStage[];
-  aiSettings: AISettings;
-  grading: GradingSettings;
-  status: 'draft' | 'published' | 'archived';
-  tags: string[];
-  isPublic: boolean;
-  usageCount: number;
-  deploymentCount?: number;
+  
   createdAt: string;
   updatedAt: string;
 }
@@ -334,6 +348,87 @@ export interface CreateAssignmentTemplateInput {
 }
 
 /**
+ * Course Assignment Interface
+ * Assignment as it appears in course contexts
+ */
+export interface CourseAssignment {
+  id: string;
+  templateId?: string;
+  courseId: string;
+  instructorId: string;
+  title: string;
+  instructions: string;
+  requirements: Record<string, any>;
+  writingStages: Record<string, any>;
+  learningObjectives: Record<string, any>;
+  aiSettings: Record<string, any>;
+  gradingCriteria?: Record<string, any>;
+  dueDate?: string;
+  stageDueDates?: Record<string, any>;
+  status: string;
+  type: string;
+  collaborationSettings: Record<string, any>;
+  versionControlSettings: Record<string, any>;
+  customInstructions?: string;
+  courseSpecificRequirements?: Record<string, any>;
+  allowLateSubmissions?: boolean;
+  
+  // Relations when populated
+  template?: {
+    id: string;
+    title: string;
+    description?: string;
+    learningObjectives: Record<string, any>;
+    writingStages: Record<string, any>;
+  };
+  course?: {
+    id: string;
+    title: string;
+  };
+  instructor?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Assignment Submission Interface
+ * Student submission for an assignment
+ */
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  authorId: string;
+  title?: string;
+  content?: string;
+  wordCount: number;
+  status: SubmissionStatus;
+  submittedAt?: string;
+  collaborationSettings: Record<string, any>;
+  majorMilestones: Record<string, any>;
+  analytics: Record<string, any>;
+  grade?: Record<string, any>;
+  aiInteractions: Record<string, any>;
+  
+  // Relations when populated
+  assignment?: Assignment;
+  author?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Assignment Filters Interface
  * Query parameters for filtering assignments
  */
@@ -342,7 +437,7 @@ export interface AssignmentFilters {
   instructorId?: string;
   status?: AssignmentStatus;
   type?: AssignmentType;
-  bloomsLevel?: BloomsLevel;
+  bloomsLevel?: BloomsTaxonomyLevel;
   category?: LearningObjectiveCategory;
   hasAI?: boolean;
   hasCollaboration?: boolean;
@@ -357,7 +452,7 @@ export interface AssignmentFilters {
 export interface TemplateFilters {
   status?: 'draft' | 'published' | 'archived';
   category?: LearningObjectiveCategory;
-  bloomsLevel?: BloomsLevel;
+  bloomsLevel?: BloomsTaxonomyLevel;
   tags?: string[];
   search?: string;
   type?: AssignmentType;

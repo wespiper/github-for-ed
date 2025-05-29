@@ -7,16 +7,13 @@ import {
   ValidationResult 
 } from './providers/AIProviderInterface';
 import { AIAssistanceRequest, AIEducationalAction, WritingStage } from '../AIBoundaryService';
-import { Assignment } from '../../models/Assignment';
+import { Assignment } from '@prisma/client';
+import prisma from '../../lib/prisma';
 
-// Define Assignment interface for type safety
-interface AssignmentType {
-  _id: string;
-  learningObjectives?: string[];
+// Define Assignment interface for type safety with Prisma types
+type AssignmentType = Pick<Assignment, 'id' | 'title' | 'instructions' | 'learningObjectives'> & {
   difficultyLevel?: 'beginner' | 'intermediate' | 'advanced';
-  title: string;
-  description: string;
-}
+};
 
 /**
  * Educational AI Service - Orchestrates AI providers for educational assistance
@@ -39,7 +36,9 @@ export class EducationalAIService {
       writingStage: this.mapToWritingStage(request.context.currentStage),
       contentSample: request.context.contentSample,
       specificQuestion: request.context.specificQuestion,
-      learningObjective: assignment.learningObjectives?.[0] || 'Develop critical thinking through writing',
+      learningObjective: Array.isArray(assignment.learningObjectives) && assignment.learningObjectives.length > 0
+        ? (assignment.learningObjectives as any)[0] 
+        : 'Develop critical thinking through writing',
       academicLevel: await this.inferAcademicLevel(request.studentId, assignment)
     };
 
@@ -161,15 +160,52 @@ export class EducationalAIService {
     reflectionsCompleted: number;
     educationalValue: number;
   }> {
-    // This would query actual AI interaction logs from database
-    // For now, return placeholder data
-    return {
-      totalInteractions: 0,
-      questionsGenerated: 0,
-      perspectivesExplored: 0,
-      reflectionsCompleted: 0,
-      educationalValue: 0
-    };
+    try {
+      // Query AI interaction logs from database
+      const interactions = await prisma.aIInteractionLog.findMany({
+        where: {
+          studentId,
+          createdAt: {
+            gte: timeframe.start,
+            lte: timeframe.end
+          }
+        }
+      });
+
+      const totalInteractions = interactions.length;
+      const questionsGenerated = interactions.reduce((sum: number, log: any) => 
+        sum + (log.questionsGenerated || 0), 0
+      );
+      const perspectivesExplored = interactions.filter(
+        (log: any) => log.assistanceType === 'perspective_generation'
+      ).length;
+      const reflectionsCompleted = interactions.filter(
+        (log: any) => log.reflectionCompleted
+      ).length;
+      
+      // Calculate educational value score (0-100)
+      const educationalValue = totalInteractions > 0 
+        ? Math.round((reflectionsCompleted / totalInteractions) * 100)
+        : 0;
+
+      return {
+        totalInteractions,
+        questionsGenerated,
+        perspectivesExplored,
+        reflectionsCompleted,
+        educationalValue
+      };
+    } catch (error) {
+      console.error('Failed to get educational stats:', error);
+      // Return fallback data
+      return {
+        totalInteractions: 0,
+        questionsGenerated: 0,
+        perspectivesExplored: 0,
+        reflectionsCompleted: 0,
+        educationalValue: 0
+      };
+    }
   }
 
   // Private helper methods
@@ -190,11 +226,48 @@ export class EducationalAIService {
   }
 
   private static async inferAcademicLevel(studentId: string, assignment: AssignmentType): Promise<'novice' | 'developing' | 'proficient' | 'advanced'> {
-    // In a real implementation, this would analyze student's past work
-    // For now, return a default based on assignment complexity
-    if (assignment.difficultyLevel === 'advanced') return 'proficient';
-    if (assignment.difficultyLevel === 'intermediate') return 'developing';
-    return 'novice';
+    try {
+      // Analyze student's past submissions and performance
+      const recentSubmissions = await prisma.assignmentSubmission.findMany({
+        where: {
+          authorId: studentId,
+          status: 'submitted',
+          createdAt: {
+            gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // Last 90 days
+          }
+        },
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (recentSubmissions.length === 0) {
+        // No submission history, base on assignment difficulty
+        if (assignment.difficultyLevel === 'advanced') return 'developing';
+        if (assignment.difficultyLevel === 'intermediate') return 'novice';
+        return 'novice';
+      }
+
+      // Calculate average word count and quality indicators
+      const avgWordCount = recentSubmissions.reduce((sum, sub) => sum + (sub.wordCount || 0), 0) / recentSubmissions.length;
+      const submissionsWithFeedback = recentSubmissions.filter(sub => 
+        sub.grade && typeof sub.grade === 'object' && (sub.grade as any).feedback
+      ).length;
+      
+      // Simple heuristic based on writing volume and engagement
+      if (avgWordCount > 1000 && submissionsWithFeedback >= recentSubmissions.length * 0.7) {
+        return 'proficient';
+      } else if (avgWordCount > 500 && submissionsWithFeedback >= recentSubmissions.length * 0.5) {
+        return 'developing';
+      } else {
+        return 'novice';
+      }
+    } catch (error) {
+      console.error('Failed to infer academic level:', error);
+      // Fallback to assignment-based inference
+      if (assignment.difficultyLevel === 'advanced') return 'developing';
+      if (assignment.difficultyLevel === 'intermediate') return 'novice';
+      return 'novice';
+    }
   }
 
   private static async validatePerspective(perspective: PerspectiveSuggestion): Promise<ValidationResult> {
@@ -206,15 +279,38 @@ export class EducationalAIService {
     response: EducationalQuestionSet, 
     validation: ValidationResult
   ): Promise<void> {
-    // In production, this would log to a dedicated collection for analytics
-    console.log('AI Interaction Log:', {
-      studentId: request.studentId,
-      assignmentId: request.assignmentId,
-      assistanceType: request.assistanceType,
-      questionsGenerated: response.questions.length,
-      educationallySound: validation.isEducationallySound,
-      timestamp: new Date()
-    });
+    try {
+      // Log to database for analytics and compliance tracking
+      await prisma.aIInteractionLog.create({
+        data: {
+          studentId: request.studentId,
+          assignmentId: request.assignmentId,
+          assistanceType: request.assistanceType,
+          questionsGenerated: response.questions.length,
+          educationallySound: validation.isEducationallySound,
+          writingStage: request.context.currentStage || 'unknown',
+          questionText: request.context.specificQuestion,
+          responseId: response.requestId,
+          reflectionCompleted: false, // Will be updated when student completes reflection
+          metadata: {
+            validation: validation,
+            educationalGoal: response.overallEducationalGoal,
+            nextSteps: response.nextStepSuggestions
+          } as any
+        }
+      });
+
+      console.log('AI Interaction logged:', {
+        studentId: request.studentId,
+        assignmentId: request.assignmentId,
+        assistanceType: request.assistanceType,
+        questionsGenerated: response.questions.length,
+        educationallySound: validation.isEducationallySound
+      });
+    } catch (error) {
+      console.error('Failed to log AI interaction:', error);
+      // Continue execution - logging failure shouldn't break user experience
+    }
   }
 
   private static getFallbackQuestions(context: EducationalContext): EducationalQuestionSet {
@@ -309,7 +405,7 @@ export class EducationalAIService {
     };
   }
 
-  private static getFallbackPerspectives(topic: string): PerspectiveSuggestion[] {
+  private static getFallbackPerspectives(_topic: string): PerspectiveSuggestion[] {
     return [
       {
         id: 'fallback-perspective-1',

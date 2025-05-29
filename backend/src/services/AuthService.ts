@@ -1,6 +1,14 @@
-import { User, IUser } from '../models/User';
+/**
+ * Auth Service - PostgreSQL/Prisma Version
+ * 
+ * Authentication and user management using Prisma ORM
+ */
+
+import bcrypt from 'bcrypt';
+import prisma from '../lib/prisma';
 import { generateToken } from '../utils/jwt';
 import { RegisterInput, LoginInput, AuthResponse, UpdateProfileInput } from '@shared/types';
+import { Prisma, User } from '@prisma/client';
 
 export class AuthService {
   /**
@@ -11,21 +19,27 @@ export class AuthService {
     this.validateRegistrationInput(data);
     
     // Check if user already exists
-    const existingUser = await User.findOne({ email: data.email.toLowerCase() });
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() }
+    });
+    
     if (existingUser) {
       throw new Error('User already exists with this email');
     }
     
-    // Create new user
-    const user = new User({
-      email: data.email.toLowerCase(),
-      password: data.password,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      role: data.role
-    });
+    // Hash password
+    const passwordHash = await bcrypt.hash(data.password, 10);
     
-    await user.save();
+    // Create new user
+    const user = await prisma.user.create({
+      data: {
+        email: data.email.toLowerCase(),
+        passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role
+      }
+    });
     
     // Generate token
     const token = generateToken(user);
@@ -48,13 +62,16 @@ export class AuthService {
     this.validateLoginInput(data);
     
     // Find user
-    const user = await User.findOne({ email: data.email.toLowerCase() });
+    const user = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() }
+    });
+    
     if (!user) {
       throw new Error('Invalid email or password');
     }
     
     // Check password
-    const isPasswordValid = await user.comparePassword(data.password);
+    const isPasswordValid = await bcrypt.compare(data.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new Error('Invalid email or password');
     }
@@ -76,7 +93,10 @@ export class AuthService {
    * Get user profile by ID
    */
   static async getUserProfile(userId: string): Promise<{ user: any }> {
-    const user = await User.findById(userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
     if (!user) {
       throw new Error('User not found');
     }
@@ -92,24 +112,26 @@ export class AuthService {
     // Validate update data
     this.validateProfileUpdateInput(data);
     
-    const updateData: Partial<IUser> = {};
+    const updateData: Prisma.UserUpdateInput = {};
     if (data.firstName) updateData.firstName = data.firstName;
     if (data.lastName) updateData.lastName = data.lastName;
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.profilePicture !== undefined) updateData.profilePicture = data.profilePicture;
     
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
-    
-    if (!user) {
-      throw new Error('User not found');
+    try {
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: updateData
+      });
+      
+      const userResponse = this.formatUserResponse(user);
+      return { user: userResponse };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new Error('User not found');
+      }
+      throw error;
     }
-    
-    const userResponse = this.formatUserResponse(user);
-    return { user: userResponse };
   }
   
   /**
@@ -119,48 +141,108 @@ export class AuthService {
     // Validate password requirements
     this.validatePassword(newPassword);
     
-    const user = await User.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
     if (!user) {
       throw new Error('User not found');
     }
     
     // Verify current password
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isCurrentPasswordValid) {
       throw new Error('Current password is incorrect');
     }
     
-    // Update password
-    user.password = newPassword;
-    await user.save();
+    // Hash new password and update
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash }
+    });
   }
   
   /**
    * Verify user email (for future email verification feature)
    */
   static async verifyUserEmail(userId: string): Promise<void> {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new Error('User not found');
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isVerified: true }
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new Error('User not found');
+      }
+      throw error;
     }
-    
-    user.isVerified = true;
-    await user.save();
   }
   
   /**
    * Get users by role (admin functionality)
    */
-  static async getUsersByRole(role: string, adminUserId: string): Promise<IUser[]> {
+  static async getUsersByRole(role: string, adminUserId: string): Promise<User[]> {
     // Verify admin access
-    const adminUser = await User.findById(adminUserId);
+    const adminUser = await prisma.user.findUnique({
+      where: { id: adminUserId }
+    });
+    
     if (!adminUser || adminUser.role !== 'admin') {
       throw new Error('Admin access required');
     }
     
-    return await User.find({ role })
-      .select('-password')
-      .sort({ createdAt: -1 });
+    return await prisma.user.findMany({
+      where: { role: role as any },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+  
+  /**
+   * Get user by email
+   */
+  static async getUserByEmail(email: string): Promise<User | null> {
+    return await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+  }
+  
+  /**
+   * Get multiple users by IDs
+   */
+  static async getUsersByIds(userIds: string[]): Promise<User[]> {
+    return await prisma.user.findMany({
+      where: {
+        id: { in: userIds }
+      }
+    });
+  }
+  
+  /**
+   * Search users by name or email
+   */
+  static async searchUsers(query: string, excludeUserId?: string): Promise<User[]> {
+    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
+    
+    return await prisma.user.findMany({
+      where: {
+        AND: [
+          excludeUserId ? { NOT: { id: excludeUserId } } : {},
+          {
+            OR: searchTerms.map(term => ({
+              OR: [
+                { email: { contains: term, mode: 'insensitive' } },
+                { firstName: { contains: term, mode: 'insensitive' } },
+                { lastName: { contains: term, mode: 'insensitive' } }
+              ]
+            }))
+          }
+        ]
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' }
+    });
   }
   
   // Private helper methods
@@ -226,9 +308,9 @@ export class AuthService {
     }
   }
   
-  private static formatUserResponse(user: IUser): any {
+  private static formatUserResponse(user: User): any {
     return {
-      id: user._id,
+      id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

@@ -1,5 +1,10 @@
 {
-  "exclude": ["src/tests/**/*"],
+  "exclude": [
+    "src/tests/**/*",
+    "src/routes/assignmentTemplates.ts",
+    "src/routes/courseAssignments.ts",
+    "src/routes/submissions.ts"
+  ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
 

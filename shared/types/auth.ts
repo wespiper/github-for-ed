@@ -1,5 +1,5 @@
 /**
- * Shared Authentication Types for GitHub for Education
+ * Shared Authentication Types for Scribe Tree
  * 
  * This file contains all authentication-related type definitions shared between
  * frontend and backend to ensure consistency and eliminate duplication.

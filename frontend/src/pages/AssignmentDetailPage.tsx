@@ -45,7 +45,7 @@ export const AssignmentDetailPage = () => {
             });
             
             // Navigate to the assignment workspace
-            window.location.href = `/writing/assignment/${assignmentId}/submission/${submission._id}`;
+            window.location.href = `/writing/assignment/${assignmentId}/submission/${submission.id}`;
         } catch (error) {
             console.error('Failed to create submission:', error);
             alert('Failed to start assignment. Please try again.');
@@ -125,7 +125,7 @@ export const AssignmentDetailPage = () => {
                         <div className="bg-white rounded-xl shadow-sm border border-ink-200 p-8">
                             <h2 className="text-xl font-semibold text-ink-900 mb-4">Learning Objectives</h2>
                             <div className="space-y-3">
-                                {assignment.template.learningObjectives.map((objective, index) => (
+                                {assignment.template.learningObjectives.map((objective: { description: string; category: string; bloomsLevel: string | number }, index: number) => (
                                     <div key={index} className="flex items-start space-x-3">
                                         <div className="w-6 h-6 bg-forest-100 text-forest-700 rounded-full flex items-center justify-center text-sm font-medium mt-0.5">
                                             {index + 1}
@@ -147,7 +147,7 @@ export const AssignmentDetailPage = () => {
                         <div className="bg-white rounded-xl shadow-sm border border-ink-200 p-8">
                             <h2 className="text-xl font-semibold text-ink-900 mb-4">Writing Process</h2>
                             <div className="space-y-4">
-                                {assignment.template.writingStages.map((stage, index) => (
+                                {assignment.template.writingStages.map((stage: { id: string; name: string; description: string; durationDays: number; allowAI: boolean; aiAssistanceLevel: string }, index: number) => (
                                     <div key={stage.id} className="flex items-start space-x-4">
                                         <div className="w-8 h-8 bg-scribe-100 text-scribe-700 rounded-full flex items-center justify-center text-sm font-medium">
                                             {index + 1}
@@ -215,7 +215,7 @@ export const AssignmentDetailPage = () => {
                             </div>
                         </div>
                         <Button variant="outline" size="sm" className="w-full mt-4" asChild>
-                            <Link to={`/courses/${assignment.course?._id}`}>
+                            <Link to={`/courses/${assignment.course?.id}`}>
                                 View Course
                             </Link>
                         </Button>

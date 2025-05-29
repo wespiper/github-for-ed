@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { IUser } from '../models/User';
+import { User } from '@prisma/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -10,11 +10,11 @@ export interface JWTPayload {
   role: 'student' | 'educator' | 'admin';
 }
 
-export const generateToken = (user: IUser): string => {
+export const generateToken = (user: User | { id: string; email: string; role: string }): string => {
   const payload: JWTPayload = {
-    userId: (user._id as any).toString(),
+    userId: user.id,
     email: user.email,
-    role: user.role
+    role: user.role as 'student' | 'educator' | 'admin'
   };
 
   return jwt.sign(payload, JWT_SECRET, {

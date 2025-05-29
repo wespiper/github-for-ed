@@ -1,0 +1,361 @@
+// This is your Prisma schema file for Scribe Tree
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model with role-based access control
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  role           UserRole
+  profilePicture String?   @map("profile_picture")
+  bio            String?
+  isVerified     Boolean   @default(false) @map("is_verified")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  coursesTaught         Course[]
+  enrollments           CourseEnrollment[]
+  assignmentTemplates   AssignmentTemplate[]
+  assignments           Assignment[]
+  submissions           AssignmentSubmission[]
+  submissionCollaborations SubmissionCollaborator[]
+  documents             Document[]
+  documentCollaborations DocumentCollaborator[]
+  documentVersions      DocumentVersion[]
+  writingSessions       WritingSession[]
+  comments              SubmissionComment[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsSent     Notification[] @relation("NotificationSender")
+  aiInteractionLogs     AIInteractionLog[]
+
+  @@map("users")
+  @@index([role])
+}
+
+enum UserRole {
+  student
+  educator
+  admin
+}
+
+// Course model for educational classes
+model Course {
+  id             String    @id @default(uuid())
+  title          String
+  description    String?
+  subject        String?
+  instructorId   String    @map("instructor_id")
+  instructor     User      @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  isPublic       Boolean   @default(false) @map("is_public")
+  maxStudents    Int       @default(30) @map("max_students")
+  startDate      DateTime? @map("start_date")
+  endDate        DateTime? @map("end_date")
+  settings       Json      @default("{}")
+  status         String    @default("planning")
+  isActive       Boolean   @default(true) @map("is_active")
+  enrollmentCode String?   @unique @map("enrollment_code")
+  tags           String[]
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  enrollments CourseEnrollment[]
+  assignments Assignment[]
+  documents   Document[]
+
+  @@map("courses")
+  @@index([instructorId])
+  @@index([isActive])
+}
+
+// Many-to-many relationship for course enrollment
+model CourseEnrollment {
+  id         String   @id @default(uuid())
+  courseId   String   @map("course_id")
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studentId  String   @map("student_id")
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+  status     String   @default("active")
+
+  @@unique([courseId, studentId])
+  @@map("course_enrollments")
+}
+
+// Reusable assignment templates
+model AssignmentTemplate {
+  id                 String   @id @default(uuid())
+  title              String
+  description        String?
+  instructions       String
+  requirements       Json     @default("{}")
+  writingStages      Json     @default("[]") @map("writing_stages")
+  learningObjectives Json     @default("[]") @map("learning_objectives")
+  aiSettings         Json     @default("{}") @map("ai_settings")
+  gradingCriteria    Json?    @map("grading_criteria")
+  instructorId       String?  @map("instructor_id")
+  instructor         User?    @relation(fields: [instructorId], references: [id], onDelete: SetNull)
+  isPublic           Boolean  @default(false) @map("is_public")
+  usageCount         Int      @default(0) @map("usage_count")
+  tags               String[]
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assignments Assignment[]
+
+  @@map("assignment_templates")
+  @@index([instructorId])
+  @@index([isPublic])
+}
+
+// Course-specific assignments
+model Assignment {
+  id                     String    @id @default(uuid())
+  templateId             String?   @map("template_id")
+  template               AssignmentTemplate? @relation(fields: [templateId], references: [id])
+  courseId               String    @map("course_id")
+  course                 Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId           String    @map("instructor_id")
+  instructor             User      @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  title                  String
+  instructions           String
+  requirements           Json
+  writingStages          Json      @map("writing_stages")
+  learningObjectives     Json      @map("learning_objectives")
+  aiSettings             Json      @map("ai_settings")
+  gradingCriteria        Json?     @map("grading_criteria")
+  dueDate                DateTime? @map("due_date")
+  stageDueDates          Json?     @map("stage_due_dates")
+  status                 String    @default("draft")
+  type                   String    @default("individual")
+  collaborationSettings  Json      @default("{}") @map("collaboration_settings")
+  versionControlSettings Json      @default("{}") @map("version_control_settings")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  submissions       AssignmentSubmission[]
+  documents         Document[]
+  aiInteractionLogs AIInteractionLog[]
+
+  @@unique([templateId, courseId])
+  @@map("assignments")
+  @@index([courseId])
+  @@index([instructorId])
+  @@index([dueDate])
+}
+
+// Student submissions for assignments
+model AssignmentSubmission {
+  id                    String    @id @default(uuid())
+  assignmentId          String    @map("assignment_id")
+  assignment            Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  authorId              String    @map("author_id")
+  author                User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  title                 String?
+  content               String?
+  wordCount             Int       @default(0) @map("word_count")
+  status                String    @default("not_started")
+  submittedAt           DateTime? @map("submitted_at")
+  collaborationSettings Json      @default("{}") @map("collaboration_settings")
+  majorMilestones       Json      @default("[]") @map("major_milestones")
+  analytics             Json      @default("{}")
+  grade                 Json?
+  aiInteractions        Json      @default("[]") @map("ai_interactions")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  collaborators SubmissionCollaborator[]
+  documents     Document[]
+  comments      SubmissionComment[]
+
+  @@unique([assignmentId, authorId])
+  @@map("assignment_submissions")
+  @@index([assignmentId])
+  @@index([authorId])
+}
+
+// Collaborators on submissions
+model SubmissionCollaborator {
+  submissionId String   @map("submission_id")
+  submission   AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String   @default("collaborator")
+  joinedAt     DateTime @default(now()) @map("joined_at")
+
+  @@id([submissionId, userId])
+  @@map("submission_collaborators")
+}
+
+// Documents for writing
+model Document {
+  id           String    @id @default(uuid())
+  title        String
+  content      String?
+  courseId     String?   @map("course_id")
+  course       Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  authorId     String    @map("author_id")
+  author       User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  assignmentId String?   @map("assignment_id")
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  submissionId String?   @map("submission_id")
+  submission   AssignmentSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  type         String    @default("assignment")
+  status       String    @default("draft")
+  settings     Json      @default("{}")
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  collaborators   DocumentCollaborator[]
+  versions        DocumentVersion[]
+  writingSessions WritingSession[]
+
+  @@map("documents")
+  @@index([courseId, authorId])
+  @@index([assignmentId])
+  @@index([submissionId])
+}
+
+// Document collaborators
+model DocumentCollaborator {
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission String   @default("edit")
+  joinedAt   DateTime @default(now()) @map("joined_at")
+
+  @@id([documentId, userId])
+  @@map("document_collaborators")
+}
+
+// Version control for documents
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    Int
+  title      String?
+  content    String?
+  authorId   String?  @map("author_id")
+  author     User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  changes    Json     @default("{}")
+  metadata   Json     @default("{}")
+  diff       Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([documentId, version])
+  @@map("document_versions")
+  @@index([documentId])
+}
+
+// Writing sessions for analytics
+model WritingSession {
+  id           String    @id @default(uuid())
+  documentId   String    @map("document_id")
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId       String?   @map("user_id")
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  startTime    DateTime  @map("start_time")
+  endTime      DateTime? @map("end_time")
+  duration     Int?      // in seconds
+  activity     Json      @default("{}")
+  snapshots    Json      @default("[]")
+  productivity Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("writing_sessions")
+  @@index([documentId])
+  @@index([userId])
+}
+
+// Comments on submissions
+model SubmissionComment {
+  id               String    @id @default(uuid())
+  submissionId     String    @map("submission_id")
+  submission       AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  authorId         String?   @map("author_id")
+  author           User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  parentId         String?   @map("parent_id")
+  parent           SubmissionComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          SubmissionComment[] @relation("CommentReplies")
+  content          String
+  type             String    @default("general")
+  highlightedText  String?   @map("highlighted_text")
+  position         Json?
+  isResolved       Boolean   @default(false) @map("is_resolved")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("submission_comments")
+  @@index([submissionId])
+}
+
+// Notification system
+model Notification {
+  id             String    @id @default(uuid())
+  recipientId    String    @map("recipient_id")
+  recipient      User      @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  senderId       String?   @map("sender_id")
+  sender         User?     @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+  type           String
+  category       String
+  priority       String    @default("normal")
+  title          String
+  message        String?
+  context        Json      @default("{}")
+  intervention   Json?
+  relatedMetrics Json?     @map("related_metrics")
+  status         String    @default("unread")
+  actionRequired Boolean   @default(false) @map("action_required")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  readAt         DateTime? @map("read_at")
+
+  @@map("notifications")
+  @@index([recipientId, status])
+  @@index([type])
+  @@index([category])
+  @@index([priority])
+}
+
+// AI Interaction Logs for educational analytics and compliance
+model AIInteractionLog {
+  id                   String   @id @default(uuid())
+  studentId            String   @map("student_id")
+  student              User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignmentId         String?  @map("assignment_id")
+  assignment           Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assistanceType       String   @map("assistance_type")
+  questionsGenerated   Int?     @map("questions_generated")
+  educationallySound   Boolean  @map("educationally_sound")
+  writingStage         String   @map("writing_stage")
+  questionText         String?  @map("question_text")
+  responseId           String   @map("response_id")
+  reflectionCompleted  Boolean  @default(false) @map("reflection_completed")
+  metadata             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("ai_interaction_logs")
+  @@index([studentId, createdAt])
+  @@index([assignmentId])
+  @@index([assistanceType])
+  @@index([educationallySound])
+}

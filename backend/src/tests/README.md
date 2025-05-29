@@ -1,4 +1,4 @@
-# Testing Setup for GitHub for Writers Backend
+# Testing Setup for Scribe Tree Backend
 
 ## Overview
 

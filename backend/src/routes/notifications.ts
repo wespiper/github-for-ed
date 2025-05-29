@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
-import { Types } from 'mongoose';
-import { Notification, INotification } from '../models/Notification';
+import prisma from '../lib/prisma';
 import { InterventionEngine, InterventionAlert } from '../services/InterventionEngine';
 import { authenticate, AuthenticatedRequest, requireRole } from '../middleware/auth';
 
@@ -21,27 +20,45 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response): 
       unreadOnly 
     } = req.query;
 
-    const filter: any = { recipient: userId };
+    const where: any = { recipientId: userId };
     
-    if (status) filter.status = status;
-    if (type) filter.type = type;
-    if (priority) filter.priority = priority;
-    if (category) filter.category = category;
-    if (unreadOnly === 'true') filter.readAt = { $exists: false };
+    if (status) where.status = status;
+    if (type) where.type = type;
+    if (priority) where.priority = priority;
+    if (category) where.category = category;
+    if (unreadOnly === 'true') where.readAt = null;
 
-    const notifications = await Notification.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit))
-      .populate('relatedMetrics.student', 'firstName lastName email')
-      .populate('context.course', 'title')
-      .populate('context.assignment', 'title');
-
-    const total = await Notification.countDocuments(filter);
-    const unreadCount = await Notification.countDocuments({
-      recipient: userId,
-      readAt: { $exists: false }
-    });
+    const [notifications, total, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: Number(limit),
+        skip: (Number(page) - 1) * Number(limit),
+        include: {
+          recipient: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          sender: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      }),
+      prisma.notification.count({ where }),
+      prisma.notification.count({
+        where: {
+          recipientId: userId,
+          readAt: null,
+        },
+      }),
+    ]);
 
     res.json({
       notifications,
@@ -65,16 +82,29 @@ router.patch('/:id/read', authenticate, async (req: AuthenticatedRequest, res: R
     const userId = req.userId!;
     const notificationId = req.params.id;
 
-    const notification = await Notification.findOneAndUpdate(
-      { _id: notificationId, recipient: userId },
-      { readAt: new Date() },
-      { new: true }
-    );
-
-    if (!notification) {
-      res.status(404).json({ error: 'Notification not found' });
-      return;
-    }
+    const notification = await prisma.notification.update({
+      where: { 
+        id: notificationId,
+        recipientId: userId,
+      },
+      data: { readAt: new Date() },
+      include: {
+        recipient: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        sender: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
 
     res.json({ 
       message: 'Notification marked as read',
@@ -91,10 +121,13 @@ router.patch('/read-all', authenticate, async (req: AuthenticatedRequest, res: R
   try {
     const userId = req.userId!;
 
-    await Notification.updateMany(
-      { recipient: userId, readAt: { $exists: false } },
-      { readAt: new Date() }
-    );
+    await prisma.notification.updateMany({
+      where: { 
+        recipientId: userId, 
+        readAt: null 
+      },
+      data: { readAt: new Date() }
+    });
 
     res.json({ message: 'All notifications marked as read' });
   } catch (error) {
@@ -109,15 +142,12 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Respo
     const userId = req.userId!;
     const notificationId = req.params.id;
 
-    const notification = await Notification.findOneAndDelete({
-      _id: notificationId,
-      recipient: userId
+    await prisma.notification.delete({
+      where: { 
+        id: notificationId,
+        recipientId: userId,
+      },
     });
-
-    if (!notification) {
-      res.status(404).json({ error: 'Notification not found' });
-      return;
-    }
 
     res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
@@ -138,25 +168,50 @@ router.patch('/:id/resolve', authenticate, requireRole(['educator']), async (req
       return;
     }
 
-    const notification = await Notification.findOneAndUpdate(
-      { 
-        _id: notificationId, 
-        recipient: userId,
-        category: 'educational_intervention'
+    // Get current intervention data and update it
+    const currentNotification = await prisma.notification.findFirst({
+      where: {
+        id: notificationId,
+        recipientId: userId,
+        category: 'educational_intervention',
       },
-      { 
-        'intervention.resolvedAt': new Date(),
-        'intervention.resolution': resolution,
-        'intervention.actionsTaken': actionsTaken,
-        status: 'resolved'
-      },
-      { new: true }
-    );
+    });
 
-    if (!notification) {
+    if (!currentNotification) {
       res.status(404).json({ error: 'Intervention notification not found' });
       return;
     }
+
+    const updatedIntervention = {
+      ...(currentNotification.intervention as any || {}),
+      resolvedAt: new Date().toISOString(),
+      resolution,
+      actionsTaken,
+    };
+
+    const notification = await prisma.notification.update({
+      where: { id: notificationId },
+      data: { 
+        intervention: updatedIntervention,
+        status: 'resolved'
+      },
+      include: {
+        recipient: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        sender: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
 
     res.json({ 
       message: 'Intervention marked as resolved',
@@ -175,7 +230,9 @@ router.post('/interventions/analyze/:studentId', authenticate, requireRole(['edu
     const { studentId } = req.params;
     const { courseId, timeframeDays = 7 } = req.body;
 
-    if (!Types.ObjectId.isValid(studentId)) {
+    // Basic UUID validation for PostgreSQL
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(studentId)) {
       res.status(400).json({ error: 'Invalid student ID' });
       return;
     }
@@ -187,7 +244,7 @@ router.post('/interventions/analyze/:studentId', authenticate, requireRole(['edu
     );
 
     // Create notifications for interventions
-    const notifications: INotification[] = [];
+    const notifications: any[] = [];
     for (const intervention of interventions) {
       const notification = await interventionEngine.createInterventionNotification(
         intervention, 
@@ -199,7 +256,7 @@ router.post('/interventions/analyze/:studentId', authenticate, requireRole(['edu
     res.json({
       message: `Found ${interventions.length} intervention alerts`,
       interventions,
-      notifications: notifications.map(n => n._id)
+      notifications: notifications.map(n => n.id)
     });
   } catch (error) {
     console.error('Intervention analysis error:', error);
@@ -213,7 +270,9 @@ router.post('/interventions/analyze-course/:courseId', authenticate, requireRole
     const instructorId = req.userId!;
     const { courseId } = req.params;
 
-    if (!Types.ObjectId.isValid(courseId)) {
+    // Basic UUID validation for PostgreSQL
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(courseId)) {
       res.status(400).json({ error: 'Invalid course ID' });
       return;
     }
@@ -221,7 +280,7 @@ router.post('/interventions/analyze-course/:courseId', authenticate, requireRole
     const interventions = await interventionEngine.runCourseInterventionAnalysis(courseId);
 
     // Create notifications for interventions
-    const notifications: INotification[] = [];
+    const notifications: any[] = [];
     for (const intervention of interventions) {
       const notification = await interventionEngine.createInterventionNotification(
         intervention, 
@@ -233,7 +292,7 @@ router.post('/interventions/analyze-course/:courseId', authenticate, requireRole
     res.json({
       message: `Analyzed course and found ${interventions.length} intervention alerts`,
       interventions,
-      notifications: notifications.map(n => n._id)
+      notifications: notifications.map(n => n.id)
     });
   } catch (error) {
     console.error('Course intervention analysis error:', error);
@@ -269,31 +328,39 @@ router.get('/stats', authenticate, async (req: AuthenticatedRequest, res: Respon
 
     const [total, unread, recent, byPriority, byCategory] = await Promise.all([
       // Total notifications
-      Notification.countDocuments({ recipient: userId }),
+      prisma.notification.count({ 
+        where: { recipientId: userId } 
+      }),
       
       // Unread notifications
-      Notification.countDocuments({ 
-        recipient: userId, 
-        readAt: { $exists: false } 
+      prisma.notification.count({ 
+        where: { 
+          recipientId: userId, 
+          readAt: null 
+        } 
       }),
       
       // Recent notifications
-      Notification.countDocuments({ 
-        recipient: userId, 
-        createdAt: { $gte: startDate } 
+      prisma.notification.count({ 
+        where: { 
+          recipientId: userId, 
+          createdAt: { gte: startDate } 
+        } 
       }),
       
       // By priority
-      Notification.aggregate([
-        { $match: { recipient: new Types.ObjectId(userId) } },
-        { $group: { _id: '$priority', count: { $sum: 1 } } }
-      ]),
+      prisma.notification.groupBy({
+        by: ['priority'],
+        where: { recipientId: userId },
+        _count: { priority: true }
+      }),
       
       // By category
-      Notification.aggregate([
-        { $match: { recipient: new Types.ObjectId(userId) } },
-        { $group: { _id: '$category', count: { $sum: 1 } } }
-      ])
+      prisma.notification.groupBy({
+        by: ['category'],
+        where: { recipientId: userId },
+        _count: { category: true }
+      })
     ]);
 
     res.json({
@@ -302,11 +369,11 @@ router.get('/stats', authenticate, async (req: AuthenticatedRequest, res: Respon
       recent,
       breakdown: {
         byPriority: byPriority.reduce((acc: any, item) => {
-          acc[item._id] = item.count;
+          acc[item.priority] = item._count.priority;
           return acc;
         }, {}),
         byCategory: byCategory.reduce((acc: any, item) => {
-          acc[item._id] = item.count;
+          acc[item.category] = item._count.category;
           return acc;
         }, {})
       }
@@ -324,12 +391,12 @@ router.post('/', authenticate, requireRole(['educator']), async (req: Authentica
     const {
       recipientId,
       type,
-      priority = 'medium',
+      priority = 'normal',
       title,
       message,
       category = 'general',
       actionRequired = false,
-      actionUrl
+      expiresAt
     } = req.body;
 
     if (!recipientId || !type || !title || !message) {
@@ -337,24 +404,43 @@ router.post('/', authenticate, requireRole(['educator']), async (req: Authentica
       return;
     }
 
-    if (!Types.ObjectId.isValid(recipientId)) {
+    // Basic UUID validation for PostgreSQL
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(recipientId)) {
       res.status(400).json({ error: 'Invalid recipient ID' });
       return;
     }
 
-    const notification = new Notification({
-      recipient: recipientId,
-      sender: senderId,
-      type,
-      priority,
-      title,
-      message,
-      category,
-      actionRequired,
-      actionUrl
+    const notification = await prisma.notification.create({
+      data: {
+        recipientId,
+        senderId,
+        type,
+        priority,
+        title,
+        message,
+        category,
+        actionRequired,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        context: {},
+      },
+      include: {
+        recipient: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        sender: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
     });
-
-    await notification.save();
 
     res.status(201).json({
       message: 'Notification created successfully',

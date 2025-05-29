@@ -208,11 +208,11 @@ export const NotificationDashboard = () => {
                                     </SelectItem>
                                     {courses?.map((course) => (
                                         <SelectItem
-                                            key={course._id}
-                                            value={course._id}
+                                            key={course.id}
+                                            value={course.id}
                                         >
                                             {course.title} (
-                                            {course.students.length} students)
+                                            {course.maxStudents} max students)
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

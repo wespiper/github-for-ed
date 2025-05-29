@@ -1,4 +1,3 @@
-import { useMyCourses } from "@/hooks/useCourses";
 import { CourseBrowsePage } from "./CourseBrowsePage";
 
 export const MyCoursesPage = () => {

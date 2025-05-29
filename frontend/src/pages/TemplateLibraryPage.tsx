@@ -80,13 +80,13 @@ export const TemplateLibraryPage = () => {
     };
 
     const renderTemplateCard = (template: AssignmentTemplate, isOwner: boolean = false) => (
-        <Card key={template._id} className="hover:shadow-md transition-shadow">
+        <Card key={template.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
                         <CardTitle className="text-lg mb-2 flex items-center gap-2">
                             {template.title}
-                            <Badge className={getStatusColor(template.status)}>
+                            <Badge className={getStatusColor(template.status || '')}>
                                 {template.status}
                             </Badge>
                             {template.isPublic && (
@@ -117,15 +117,18 @@ export const TemplateLibraryPage = () => {
             <CardContent>
                 <div className="space-y-3">
                     {/* Learning Objective Categories */}
-                    {template.learningObjectives.length > 0 && (
+                    {Array.isArray(template.learningObjectives) && template.learningObjectives.length > 0 && (
                         <div>
                             <p className="text-xs font-medium text-ink-700 mb-1">Learning Objectives:</p>
                             <div className="flex flex-wrap gap-1">
-                                {[...new Set(template.learningObjectives.map(obj => obj.category))].map(category => (
-                                    <Badge key={category} className={getCategoryColor(category)} variant="secondary">
-                                        {category}
-                                    </Badge>
-                                ))}
+                                {Array.isArray(template.learningObjectives) ? 
+                                    [...new Set((template.learningObjectives as Array<{category: string}>).map(obj => obj.category))].map((category) => (
+                                        <Badge key={category} className={getCategoryColor(category)} variant="secondary">
+                                            {category}
+                                        </Badge>
+                                    )) : 
+                                    <span className="text-xs text-ink-500">No objectives available</span>
+                                }
                             </div>
                         </div>
                     )}
@@ -148,7 +151,7 @@ export const TemplateLibraryPage = () => {
                     {/* Author and Date */}
                     <div className="flex items-center justify-between text-xs text-ink-500 pt-2 border-t">
                         <span>
-                            By {template.instructor.firstName} {template.instructor.lastName}
+                            By {template.instructor?.firstName} {template.instructor?.lastName}
                         </span>
                         <span>
                             <Clock className="w-3 h-3 inline mr-1" />
@@ -160,7 +163,7 @@ export const TemplateLibraryPage = () => {
                     <div className="flex items-center justify-between pt-2">
                         <div className="flex space-x-2">
                             <Button asChild size="sm" variant="outline">
-                                <Link to={`/templates/${template._id}`}>
+                                <Link to={`/templates/${template.id}`}>
                                     <Eye className="w-3 h-3 mr-1" />
                                     View
                                 </Link>
@@ -169,7 +172,7 @@ export const TemplateLibraryPage = () => {
                                 <Button 
                                     size="sm" 
                                     variant="outline"
-                                    onClick={() => handleCloneTemplate(template._id)}
+                                    onClick={() => handleCloneTemplate(template.id)}
                                     disabled={cloneTemplateMutation.isPending}
                                 >
                                     <Copy className="w-3 h-3 mr-1" />
@@ -179,12 +182,12 @@ export const TemplateLibraryPage = () => {
                             {isOwner && (
                                 <>
                                     <Button asChild size="sm">
-                                        <Link to={`/templates/${template._id}/deploy`}>
+                                        <Link to={`/templates/${template.id}/deploy`}>
                                             Deploy
                                         </Link>
                                     </Button>
                                     <Button asChild size="sm" variant="outline">
-                                        <Link to={`/templates/${template._id}/edit`}>
+                                        <Link to={`/templates/${template.id}/edit`}>
                                             Edit
                                         </Link>
                                     </Button>
@@ -198,7 +201,7 @@ export const TemplateLibraryPage = () => {
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        onClick={() => handleArchiveTemplate(template._id)}
+                                        onClick={() => handleArchiveTemplate(template.id)}
                                         disabled={archiveTemplateMutation.isPending}
                                     >
                                         <Archive className="w-3 h-3" />
@@ -207,7 +210,7 @@ export const TemplateLibraryPage = () => {
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => handleDeleteTemplate(template._id)}
+                                    onClick={() => handleDeleteTemplate(template.id)}
                                     disabled={deleteTemplateMutation.isPending}
                                     className="text-red-600 hover:text-red-700"
                                 >

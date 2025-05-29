@@ -35,7 +35,7 @@ export const EducatorDashboard = () => {
 
     // Get educator's courses
     const educatorCourses =
-        courses?.filter((course) => course.instructor._id === user?.id) || [];
+        courses?.filter((course) => course.instructor?.id === user?.id) || [];
 
     // Extract unique chapters from documents
     const chapters = documents
@@ -162,11 +162,11 @@ export const EducatorDashboard = () => {
                                 <SelectContent>
                                     {educatorCourses.map((course) => (
                                         <SelectItem
-                                            key={course._id}
-                                            value={course._id}
+                                            key={course.id}
+                                            value={course.id}
                                         >
                                             {course.title} (
-                                            {course.students.length} students)
+                                            {course.maxStudents} max students)
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

@@ -1,5 +1,5 @@
 /**
- * Shared Types Index for GitHub for Education
+ * Shared Types Index for Scribe Tree
  * 
  * Central export point for all shared type definitions to ensure
  * consistent imports across frontend and backend.

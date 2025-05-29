@@ -1,11 +1,20 @@
-# GitHub for Writers
+# Scribe Tree
 
 A writing education platform that uses version control concepts to teach and improve writing skills.
+
+## 📚 **Documentation**
+
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+- **Implementation Roadmaps**: Development phases and current priorities
+- **Educational Philosophy**: Bounded Enhancement for Learning principles  
+- **Testing Guides**: Setup procedures and workflow testing
+
+**Current Priority**: [Phase 5 - AI Enhancement Implementation](./docs/roadmaps/PHASE_5_AI_ENHANCEMENT_PLAN.md)
 
 ## Project Structure
 
 ```
-github-for-ed/
+scribe-tree/
 ├── frontend/          # React + TypeScript + Vite frontend
 ├── backend/           # Node.js + Express + TypeScript backend
 └── README.md          # Project documentation
@@ -38,7 +47,7 @@ github-for-ed/
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd github-for-ed
+cd scribe-tree
 ```
 
 2. Install frontend dependencies:

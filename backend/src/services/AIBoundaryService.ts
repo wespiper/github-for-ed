@@ -1,8 +1,5 @@
-import { Assignment } from '../models/Assignment';
-import { AssignmentSubmission } from '../models/AssignmentSubmission';
-import { WritingSession } from '../models/WritingSession';
-import { User } from '../models/User';
-import mongoose from 'mongoose';
+import prisma from '../lib/prisma';
+import { randomUUID } from 'crypto';
 import { EducationalAIService } from './ai/EducationalAIService';
 
 // Educational AI Actions - Focus on questions and prompts, never content generation
@@ -411,13 +408,25 @@ export class AIBoundaryService {
     this.validateRequest(request);
     
     // Get assignment and its AI settings
-    const assignment = await Assignment.findById(request.assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: request.assignmentId },
+      select: {
+        id: true,
+        title: true,
+        aiSettings: true,
+        writingStages: true,
+        status: true,
+        courseId: true,
+        instructorId: true,
+      },
+    });
     if (!assignment) {
       throw new Error('Assignment not found');
     }
     
     // Check if AI assistance is enabled for this assignment
-    if (!assignment.aiSettings?.enabled) {
+    const aiSettings = assignment.aiSettings as any;
+    if (!aiSettings?.enabled) {
       return this.createDenialResponse(
         'AI assistance is not enabled for this assignment',
         'Complete this work independently to develop critical thinking skills',
@@ -455,7 +464,7 @@ export class AIBoundaryService {
     
     // Check global boundary level
     const globalBoundary = this.evaluateGlobalBoundary(
-      assignment.aiSettings.globalBoundary,
+      aiSettings?.globalBoundary,
       request.assistanceType
     );
     
@@ -474,7 +483,7 @@ export class AIBoundaryService {
     await this.logAIInteraction(request, true);
     
     return {
-      requestId: new mongoose.Types.ObjectId().toString(),
+      requestId: randomUUID(),
       approved: true,
       assistanceProvided: assistance,
       reflectionPrompt: this.generateReflectionPrompt(request.assistanceType),
@@ -500,13 +509,21 @@ export class AIBoundaryService {
     this.validateObjectId(assignmentId);
     this.validateObjectId(instructorId);
     
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        id: true,
+        instructorId: true,
+        aiSettings: true,
+        writingStages: true,
+      }
+    });
     if (!assignment) {
       throw new Error('Assignment not found');
     }
     
     // Verify instructor ownership
-    if (assignment.instructor.toString() !== instructorId) {
+    if (assignment.instructorId !== instructorId) {
       throw new Error('Only the assignment instructor can configure AI boundaries');
     }
     
@@ -514,7 +531,7 @@ export class AIBoundaryService {
     this.validateBoundariesConfiguration(boundaries);
     
     // Update assignment with AI settings
-    assignment.aiSettings = {
+    const aiSettingsData = {
       enabled: boundaries.enabled,
       globalBoundary: boundaries.globalBoundary,
       allowedAssistanceTypes: boundaries.allowedAssistanceTypes,
@@ -523,7 +540,10 @@ export class AIBoundaryService {
       reflectionPrompts: boundaries.reflectionPrompts
     };
     
-    await assignment.save();
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { aiSettings: aiSettingsData as any }
+    });
   }
   
   /**
@@ -603,8 +623,11 @@ export class AIBoundaryService {
     this.validateObjectId(courseId);
     
     // Get all assignments in the course
-    const assignments = await Assignment.find({ course: courseId });
-    const assignmentIds = assignments.map(a => a._id);
+    const assignments = await prisma.assignment.findMany({
+      where: { courseId: courseId },
+      select: { id: true },
+    });
+    const assignmentIds = assignments.map(a => a.id);
     
     // Get AI usage across all assignments
     const allInteractions = [];
@@ -618,10 +641,22 @@ export class AIBoundaryService {
     }
     
     // Get writing sessions for comparison
-    const writingSessions = await WritingSession.find({
-      student: studentId,
-      assignment: { $in: assignmentIds },
-      startTime: { $gte: timeframe.start, $lte: timeframe.end }
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        userId: studentId,
+        document: {
+          assignmentId: { in: assignmentIds },
+        },
+        startTime: {
+          gte: timeframe.start,
+          lte: timeframe.end,
+        },
+      },
+      include: {
+        document: {
+          select: { assignmentId: true },
+        },
+      },
     });
     
     return this.analyzeDependencyPatterns(allInteractions, writingSessions);
@@ -657,9 +692,28 @@ export class AIBoundaryService {
     this.validateObjectId(courseId);
     
     // Verify instructor access
-    const assignments = await Assignment.find({ 
-      course: courseId, 
-      instructor: instructorId 
+    const assignments = await prisma.assignment.findMany({
+      where: { 
+        courseId: courseId, 
+        instructorId: instructorId 
+      },
+      select: {
+        id: true,
+        title: true,
+        aiSettings: true,
+        submissions: {
+          select: {
+            id: true,
+            authorId: true,
+            aiInteractions: true, // This should be the JSONB field
+            status: true,
+            submittedAt: true,
+            author: {
+              select: { id: true, firstName: true, lastName: true }
+            },
+          }
+        }
+      },
     });
     
     if (assignments.length === 0) {
@@ -680,20 +734,25 @@ export class AIBoundaryService {
   // Private helper methods
   
   private static validateRequest(request: AIAssistanceRequest): void {
-    if (!mongoose.Types.ObjectId.isValid(request.studentId)) {
+    if (!this.isValidUUID(request.studentId)) {
       throw new Error('Invalid student ID');
     }
-    if (!mongoose.Types.ObjectId.isValid(request.assignmentId)) {
+    if (!this.isValidUUID(request.assignmentId)) {
       throw new Error('Invalid assignment ID');
     }
     if (!request.context.contentSample || !request.context.specificQuestion) {
       throw new Error('Content sample and specific request are required');
     }
   }
+
+  private static isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  }
   
   private static validateObjectId(id: string): void {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error(`Invalid ObjectId: ${id}`);
+    if (!this.isValidUUID(id)) {
+      throw new Error(`Invalid UUID: ${id}`);
     }
   }
   
@@ -705,9 +764,16 @@ export class AIBoundaryService {
     }
     
     // Infer stage from submission status or other context
-    const submission = await AssignmentSubmission.findOne({
-      assignment: request.assignmentId,
-      student: request.studentId
+    const submission = await prisma.assignmentSubmission.findFirst({
+      where: {
+        assignmentId: request.assignmentId,
+        authorId: request.studentId
+      },
+      select: {
+        status: true,
+        wordCount: true,
+        submittedAt: true,
+      }
     });
     
     if (!submission) return null;
@@ -910,7 +976,7 @@ export class AIBoundaryService {
     alternatives: string[]
   ): AIAssistanceResponse {
     return {
-      requestId: new mongoose.Types.ObjectId().toString(),
+      requestId: randomUUID(),
       approved: false,
       educationalAlternatives: {
         independentActions: alternatives,
@@ -1034,9 +1100,17 @@ export class AIBoundaryService {
     interactions: any[]
   ): Promise<any> {
     // Get writing sessions to calculate independent vs assisted work time
-    const writingSessions = await WritingSession.find({
-      student: studentId,
-      assignment: assignmentId
+    const writingSessions = await prisma.writingSession.findMany({
+      where: {
+        userId: studentId,
+        document: {
+          assignmentId: assignmentId
+        }
+      },
+      select: {
+        duration: true,
+        activity: true,
+      }
     });
     
     const totalWritingTime = writingSessions.reduce((sum, session) => sum + (session.duration || 0), 0);

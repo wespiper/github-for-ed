@@ -149,8 +149,8 @@ export const CreateAssignmentModal = ({
                                 <SelectContent>
                                     {courses?.map((course) => (
                                         <SelectItem
-                                            key={course._id}
-                                            value={course._id}
+                                            key={course.id}
+                                            value={course.id}
                                         >
                                             {course.title}
                                         </SelectItem>

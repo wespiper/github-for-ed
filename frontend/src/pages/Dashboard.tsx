@@ -62,7 +62,7 @@ export const Dashboard = () => {
                                 {myCourses?.length ? (
                                     <>
                                         {myCourses.slice(0, 2).map((course, i) => (
-                                            <span key={course._id}>
+                                            <span key={course.id}>
                                                 {i > 0 && " & "}
                                                 <span className="text-forest-600 font-medium">
                                                     {course.title}

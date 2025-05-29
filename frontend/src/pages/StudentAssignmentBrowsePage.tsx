@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyCourses } from "@/hooks/useCourses";
 import { useMyCourseAssignments } from "@/hooks/useCourseAssignments";
-import { useUserSubmissions } from "@/hooks/useSubmissions";
-import { BookOpen, FileText, Clock, Search, Filter, CheckCircle, AlertCircle } from "lucide-react";
+import { useUserSubmissions, type ExtendedAssignmentSubmission } from "@/hooks/useSubmissions";
+import { type CourseAssignment } from "@shared/types";
+import { BookOpen, FileText, Clock, Search, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -22,12 +23,12 @@ export const StudentAssignmentBrowsePage = () => {
     if (!user) return null;
 
     // Create a map of assignment IDs to submissions for quick lookup
-    const submissionMap = new Map(submissions?.map(sub => [sub.assignment?._id, sub]) || []);
+    const submissionMap = new Map(submissions?.map(sub => [sub.assignmentId, sub]) || []);
 
     // Filter assignments based on search and status
     const filteredAssignments = assignments?.filter(assignment => {
-        const hasSubmission = submissionMap.has(assignment._id);
-        const submission = submissionMap.get(assignment._id);
+        const hasSubmission = submissionMap.has(assignment.id);
+        const submission = submissionMap.get(assignment.id);
         const isOverdue = assignment.dueDate && new Date(assignment.dueDate) < new Date();
         
         // Search filter
@@ -44,21 +45,21 @@ export const StudentAssignmentBrowsePage = () => {
             case 'available':
                 return !hasSubmission && !isOverdue;
             case 'in-progress':
-                return hasSubmission && submission?.status !== 'submitted';
+                return hasSubmission && (submission as ExtendedAssignmentSubmission)?.status !== 'submitted';
             case 'completed':
-                return hasSubmission && submission?.status === 'submitted';
+                return hasSubmission && (submission as ExtendedAssignmentSubmission)?.status === 'submitted';
             case 'overdue':
-                return isOverdue && (!hasSubmission || submission?.status !== 'submitted');
+                return isOverdue && (!hasSubmission || (submission as ExtendedAssignmentSubmission)?.status !== 'submitted');
             default:
                 return true;
         }
     }) || [];
 
-    const getAssignmentStatus = (assignment: any) => {
-        const submission = submissionMap.get(assignment._id);
+    const getAssignmentStatus = (assignment: CourseAssignment) => {
+        const submission = submissionMap.get(assignment.id) as ExtendedAssignmentSubmission | undefined;
         const isOverdue = assignment.dueDate && new Date(assignment.dueDate) < new Date();
         
-        if (submission?.status === 'submitted') {
+        if (submission && submission.status === 'submitted') {
             return { type: 'completed', label: 'Completed', icon: CheckCircle, color: 'text-branch-600 bg-branch-100' };
         } else if (submission && submission.status !== 'submitted') {
             return { type: 'in-progress', label: 'In Progress', icon: FileText, color: 'text-scribe-600 bg-scribe-100' };
@@ -71,10 +72,10 @@ export const StudentAssignmentBrowsePage = () => {
 
     const filterCounts = {
         all: assignments?.length || 0,
-        available: assignments?.filter(a => !submissionMap.has(a._id) && !(a.dueDate && new Date(a.dueDate) < new Date())).length || 0,
-        'in-progress': assignments?.filter(a => submissionMap.has(a._id) && submissionMap.get(a._id)?.status !== 'submitted').length || 0,
-        completed: assignments?.filter(a => submissionMap.has(a._id) && submissionMap.get(a._id)?.status === 'submitted').length || 0,
-        overdue: assignments?.filter(a => (a.dueDate && new Date(a.dueDate) < new Date()) && (!submissionMap.has(a._id) || submissionMap.get(a._id)?.status !== 'submitted')).length || 0,
+        available: assignments?.filter(a => !submissionMap.has(a.id) && !(a.dueDate && new Date(a.dueDate) < new Date())).length || 0,
+        'in-progress': assignments?.filter(a => submissionMap.has(a.id) && (submissionMap.get(a.id) as ExtendedAssignmentSubmission)?.status !== 'submitted').length || 0,
+        completed: assignments?.filter(a => submissionMap.has(a.id) && (submissionMap.get(a.id) as ExtendedAssignmentSubmission)?.status === 'submitted').length || 0,
+        overdue: assignments?.filter(a => (a.dueDate && new Date(a.dueDate) < new Date()) && (!submissionMap.has(a.id) || (submissionMap.get(a.id) as ExtendedAssignmentSubmission)?.status !== 'submitted')).length || 0,
     };
 
     return (
@@ -146,12 +147,12 @@ export const StudentAssignmentBrowsePage = () => {
                         </div>
                         {filteredAssignments.map((assignment) => {
                             const status = getAssignmentStatus(assignment);
-                            const submission = submissionMap.get(assignment._id);
+                            const submission = submissionMap.get(assignment.id);
                             const StatusIcon = status.icon;
                             
                             return (
                                 <div
-                                    key={assignment._id}
+                                    key={assignment.id}
                                     className="bg-white rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow p-6"
                                 >
                                     <div className="flex items-start justify-between">
@@ -163,7 +164,7 @@ export const StudentAssignmentBrowsePage = () => {
                                             <div className="flex-1">
                                                 <div className="flex items-center space-x-3 mb-2">
                                                     <h3 className="text-lg font-semibold text-ink-900">
-                                                        {assignment.template?.title || assignment.title}
+                                                        {assignment.template?.title}
                                                     </h3>
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
                                                         <StatusIcon className="h-3 w-3 mr-1" />
@@ -197,20 +198,20 @@ export const StudentAssignmentBrowsePage = () => {
                                         
                                         <div className="flex space-x-3 ml-4">
                                             <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/assignments/${assignment._id}`}>
+                                                <Link to={`/assignments/${assignment.id}`}>
                                                     View Details
                                                 </Link>
                                             </Button>
                                             
                                             {submission ? (
                                                 <Button size="sm" asChild>
-                                                    <Link to={`/writing/assignment/${assignment._id}/submission/${submission._id}`}>
+                                                    <Link to={`/writing/assignment/${assignment.id}/submission/${submission.id}`}>
                                                         Continue Writing
                                                     </Link>
                                                 </Button>
                                             ) : status.type !== 'overdue' && (
                                                 <Button size="sm" asChild>
-                                                    <Link to={`/assignments/${assignment._id}`}>
+                                                    <Link to={`/assignments/${assignment.id}`}>
                                                         Start Assignment
                                                     </Link>
                                                 </Button>
@@ -254,14 +255,14 @@ export const StudentAssignmentBrowsePage = () => {
                     <h2 className="text-lg font-semibold text-ink-900 mb-4">Enrolled Courses</h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {myCourses.map((course) => (
-                            <div key={course._id} className="border border-ink-200 rounded-lg p-4">
+                            <div key={course.id} className="border border-ink-200 rounded-lg p-4">
                                 <div className="flex items-center space-x-3 mb-2">
                                     <BookOpen className="h-5 w-5 text-forest-600" />
                                     <h3 className="font-medium text-ink-900">{course.title}</h3>
                                 </div>
                                 <p className="text-sm text-ink-600 mb-3">{course.instructor?.firstName} {course.instructor?.lastName}</p>
                                 <Button variant="outline" size="sm" className="w-full" asChild>
-                                    <Link to={`/courses/${course._id}/assignments`}>
+                                    <Link to={`/courses/${course.id}/assignments`}>
                                         View Course Assignments
                                     </Link>
                                 </Button>

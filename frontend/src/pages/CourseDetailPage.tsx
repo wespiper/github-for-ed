@@ -11,7 +11,7 @@ export const CourseDetailPage = () => {
     const { data: allCourses, isLoading: coursesLoading } = useCourses();
     const { data: assignments, isLoading: assignmentsLoading } = useCourseAssignments(courseId!, { status: 'published' });
 
-    const course = allCourses?.find(c => c._id === courseId);
+    const course = allCourses?.find(c => c.id === courseId);
 
     if (coursesLoading) {
         return (
@@ -36,8 +36,9 @@ export const CourseDetailPage = () => {
         );
     }
 
-    const isInstructor = course.instructor?._id === user?.id;
-    const isEnrolled = course.students?.some(student => student._id === user?.id);
+    const isInstructor = course.instructor?.id === user?.id;
+    // Note: Students are handled via enrollments, not direct course.students property
+    const isEnrolled = false; // TODO: Implement enrollment check via separate API
 
     return (
         <div className="container mx-auto py-8 px-4">
@@ -68,7 +69,7 @@ export const CourseDetailPage = () => {
                                 <div className="flex items-center space-x-6 text-sm text-ink-500">
                                     <div className="flex items-center space-x-2">
                                         <Users className="h-4 w-4" />
-                                        <span>{course.students?.length || 0} students enrolled</span>
+                                        <span>{course.maxStudents} max students</span>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <Calendar className="h-4 w-4" />
@@ -136,7 +137,7 @@ export const CourseDetailPage = () => {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {assignments.slice(0, 6).map((assignment) => (
                             <div
-                                key={assignment._id}
+                                key={assignment.id}
                                 className="border border-ink-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
                             >
                                 <div className="flex items-center space-x-3 mb-3">
@@ -153,7 +154,7 @@ export const CourseDetailPage = () => {
                                 )}
                                 
                                 <Button variant="outline" size="sm" asChild className="w-full">
-                                    <Link to={`/assignments/${assignment._id}`}>
+                                    <Link to={`/assignments/${assignment.id}`}>
                                         View Assignment
                                     </Link>
                                 </Button>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { type User } from '@/types/auth';
+import { type User } from '@shared/types';
 import { useAuthStore } from '@/stores/authStore';
 
 const adminApi = {

@@ -1,11 +1,99 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { type CollaborationSettings as BaseCollaborationSettings, type SubmissionStatus } from '@shared/types';
 
-// Types
-export interface AssignmentSubmission {
-  _id: string;
-  assignment: {
-    _id: string;
+// Extended collaboration settings with UI-specific properties
+interface ExtendedCollaborationSettings extends BaseCollaborationSettings {
+  isCollaborative?: boolean; // UI helper for quick collaborative check
+}
+
+// Submission-specific types
+interface SubmissionAnalytics {
+  timeSpent?: number; // in minutes
+  wordsAdded?: number;
+  wordsDeleted?: number;
+  revisionsCount?: number;
+  lastActiveAt?: string;
+  productivityMetrics?: {
+    averageWordsPerMinute?: number;
+    peakProductivityTime?: string;
+    sessionsCount?: number;
+  };
+}
+
+interface GradeData {
+  score?: number;
+  maxScore?: number;
+  percentage?: number;
+  letterGrade?: string;
+  rubricScores?: Array<{
+    criteriaId: string;
+    score: number;
+    maxScore: number;
+    feedback?: string;
+  }>;
+  overallFeedback?: string;
+  gradedAt?: string;
+  gradedBy?: string;
+}
+
+interface AIInteraction {
+  id: string;
+  type: 'grammar' | 'style' | 'structure' | 'research' | 'citations' | 'brainstorming' | 'outlining';
+  prompt: string;
+  response: string;
+  timestamp: string;
+  stage?: string; // writing stage when interaction occurred
+  approved?: boolean; // whether educator approved this interaction
+}
+
+// Extended submission interface for detailed views with additional UI fields
+export interface ExtendedAssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  authorId: string;
+  title?: string;
+  content?: string;
+  wordCount: number;
+  status: SubmissionStatus;
+  submittedAt?: string;
+  lastSavedAt?: string;
+  collaborationSettings: ExtendedCollaborationSettings;
+  majorMilestones?: {
+    version: number;
+    timestamp: string;
+    description: string;
+    wordCount: number;
+    author: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }[];
+  analytics: SubmissionAnalytics;
+  grade?: GradeData;
+  aiInteractions: AIInteraction[];
+  createdAt: string;
+  updatedAt: string;
+  
+  // UI-specific computed properties
+  estimatedReadingTime?: number;
+  comments?: Array<{
+    id: string;
+    content: string;
+    author: {
+      id: string;
+      firstName: string;
+      lastName: string;
+    };
+    createdAt: string;
+  }>;
+  currentVersion?: number;
+  
+  // Relations when populated
+  assignment?: {
+    id: string;
     title: string;
     dueDate?: string;
     requirements: Record<string, unknown>;
@@ -13,283 +101,182 @@ export interface AssignmentSubmission {
     instructor: string;
     course: string;
   };
-  author: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  collaborators: Array<{
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  }>;
-  title: string;
-  content: string;
-  wordCount: number;
-  characterCount: number;
-  status: 'draft' | 'in_progress' | 'submitted' | 'returned' | 'graded';
-  submittedAt?: string;
-  lastSavedAt: string;
-  collaboration: {
-    isCollaborative: boolean;
-    activeUsers: string[];
-    lastActiveAt: string;
-    conflictResolution: 'auto' | 'manual';
-  };
-  currentVersion: number;
-  majorMilestones: Array<{
-    version: number;
-    timestamp: string;
-    description: string;
-    wordCount: number;
-    author: { _id: string; firstName: string; lastName: string; email: string };
-  }>;
-  comments: Array<{
+  author?: {
     id: string;
-    author: {
-      firstName: string;
-      lastName: string;
-      email: string;
-    };
-    content: string;
-    position?: {
-      start: number;
-      end: number;
-    };
-    type: 'comment' | 'suggestion' | 'question' | 'approval';
-    resolved: boolean;
-    createdAt: string;
-    replies?: Array<{
-      author: { _id: string; firstName: string; lastName: string; email: string };
-      content: string;
-      createdAt: string;
-    }>;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  collaborators?: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    joinedAt: string;
   }>;
-  analytics: {
-    writingSessions: number;
-    totalWritingTime: number;
-    averageSessionLength: number;
-    writingPattern: Array<{
-      date: string;
-      wordsWritten: number;
-      timeSpent: number;
-      revisionsCount: number;
-    }>;
-    collaborationMetrics: {
-      contributorStats: Array<{
-        user: { _id: string; firstName: string; lastName: string; email: string };
-        wordsContributed: number;
-        editsCount: number;
-        commentsCount: number;
-      }>;
-      conflictsResolved: number;
-      realTimeMinutes: number;
-    };
-  };
-  grade?: {
-    score?: number;
-    maxScore?: number;
-    rubricScores: Array<{
-      criteria: string;
-      score: number;
-      maxScore: number;
-      feedback: string;
-    }>;
-    overallFeedback: string;
-    gradedBy: { _id: string; firstName: string; lastName: string; email: string } | null;
-    gradedAt: string;
-  };
-  aiInteractions: Array<{
-    sessionId: string;
-    type: 'grammar' | 'style' | 'structure' | 'research' | 'citations';
-    prompt: string;
-    response: string;
-    accepted: boolean;
-    reflection?: string;
-    timestamp: string;
-  }>;
-  estimatedReadingTime: number;
-  isActivelyCollaborating: boolean;
-  gradePercentage: number | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface UpdateSubmissionData {
-  content?: string;
-  title?: string;
-  saveType?: 'auto' | 'manual';
-  sessionDuration?: number;
-}
-
-export interface CreateCommentData {
-  content: string;
-  position?: {
-    start: number;
-    end: number;
-  };
-  type?: 'comment' | 'suggestion' | 'question' | 'approval';
-}
-
-// API functions
-const submissionsAPI = {
-  getUserSubmissions: async (filters?: { status?: string; assignment?: string }): Promise<AssignmentSubmission[]> => {
-    const params = new URLSearchParams();
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.assignment) params.append('assignment', filters.assignment);
-    
-    const response = await api.get(`/submissions/my-submissions?${params}`);
+const submissionsApi = {
+  getUserSubmissions: async (): Promise<ExtendedAssignmentSubmission[]> => {
+    const response = await api.get('/submissions/my-submissions');
     return response.data.data;
   },
 
-  getById: async (submissionId: string): Promise<AssignmentSubmission> => {
+  getSubmissionById: async (submissionId: string): Promise<ExtendedAssignmentSubmission> => {
     const response = await api.get(`/submissions/${submissionId}`);
-    return response.data.data;
+    return response.data;
   },
 
-  updateContent: async (submissionId: string, data: UpdateSubmissionData): Promise<{
-    submission: AssignmentSubmission;
-    versionCreated: boolean;
-    currentVersion: number;
-    diff: Record<string, unknown>;
-  }> => {
-    const response = await api.put(`/submissions/${submissionId}/content`, data);
-    return response.data.data;
+  getAssignmentSubmissions: async (assignmentId: string): Promise<ExtendedAssignmentSubmission[]> => {
+    const response = await api.get(`/assignments/${assignmentId}/submissions`);
+    return response.data;
   },
 
-  addComment: async (submissionId: string, data: CreateCommentData): Promise<AssignmentSubmission> => {
-    const response = await api.post(`/submissions/${submissionId}/comments`, data);
-    return response.data.data;
+  createSubmission: async (data: { 
+    assignmentId: string; 
+    title?: string; 
+    content?: string 
+  }): Promise<ExtendedAssignmentSubmission> => {
+    const response = await api.post('/submissions', data);
+    return response.data;
   },
 
-  replyToComment: async (submissionId: string, commentId: string, content: string): Promise<AssignmentSubmission> => {
-    const response = await api.post(`/submissions/${submissionId}/comments/${commentId}/reply`, { content });
-    return response.data.data;
+  updateSubmission: async ({ 
+    submissionId, 
+    ...data 
+  }: { 
+    submissionId: string;
+    title?: string;
+    content?: string;
+    status?: string;
+  }): Promise<ExtendedAssignmentSubmission> => {
+    const response = await api.put(`/submissions/${submissionId}`, data);
+    return response.data;
   },
 
-  resolveComment: async (submissionId: string, commentId: string): Promise<AssignmentSubmission> => {
-    const response = await api.patch(`/submissions/${submissionId}/comments/${commentId}/resolve`);
-    return response.data.data;
+  submitForGrading: async (submissionId: string): Promise<ExtendedAssignmentSubmission> => {
+    const response = await api.post(`/submissions/${submissionId}/submit`);
+    return response.data;
   },
 
-  addCollaborator: async (submissionId: string, collaboratorId: string): Promise<AssignmentSubmission> => {
-    const response = await api.post(`/submissions/${submissionId}/collaborators`, { collaboratorId });
-    return response.data.data;
-  },
-
-  submitForGrading: async (submissionId: string): Promise<AssignmentSubmission> => {
-    const response = await api.patch(`/submissions/${submissionId}/submit`);
-    return response.data.data;
-  },
-
-  getVersions: async (submissionId: string, limit?: number) => {
-    const params = limit ? `?limit=${limit}` : '';
-    const response = await api.get(`/submissions/${submissionId}/versions${params}`);
-    return response.data.data;
+  deleteSubmission: async (submissionId: string): Promise<void> => {
+    await api.delete(`/submissions/${submissionId}`);
   }
 };
 
-// Custom hooks
-export const useUserSubmissions = (filters?: { status?: string; assignment?: string }) => {
+// Hook for getting current user's submissions
+export const useUserSubmissions = () => {
   return useQuery({
-    queryKey: ['userSubmissions', filters],
-    queryFn: () => submissionsAPI.getUserSubmissions(filters),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: ['submissions', 'my-submissions'],
+    queryFn: submissionsApi.getUserSubmissions,
   });
 };
 
-export const useSubmission = (submissionId: string) => {
+// Hook for getting a specific submission by ID
+export const useSubmission = (submissionId?: string) => {
   return useQuery({
-    queryKey: ['submission', submissionId],
-    queryFn: () => submissionsAPI.getById(submissionId),
+    queryKey: ['submissions', submissionId],
+    queryFn: () => submissionsApi.getSubmissionById(submissionId!),
     enabled: !!submissionId,
-    staleTime: 30 * 1000, // 30 seconds for real-time collaboration
   });
 };
 
+// Hook for getting all submissions for a specific assignment
+export const useAssignmentSubmissions = (assignmentId?: string) => {
+  return useQuery({
+    queryKey: ['submissions', 'assignment', assignmentId],
+    queryFn: () => submissionsApi.getAssignmentSubmissions(assignmentId!),
+    enabled: !!assignmentId,
+  });
+};
+
+// Hook for creating a new submission
+export const useCreateSubmission = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: submissionsApi.createSubmission,
+    onSuccess: (newSubmission) => {
+      // Invalidate and refetch user submissions
+      queryClient.invalidateQueries({ queryKey: ['submissions', 'my-submissions'] });
+      // Invalidate assignment submissions
+      queryClient.invalidateQueries({ 
+        queryKey: ['submissions', 'assignment', newSubmission.assignmentId] 
+      });
+    },
+  });
+};
+
+// Hook for updating a submission
 export const useUpdateSubmission = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ submissionId, data }: { submissionId: string; data: UpdateSubmissionData }) =>
-      submissionsAPI.updateContent(submissionId, data),
-    onSuccess: (_, { submissionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-      queryClient.invalidateQueries({ queryKey: ['userSubmissions'] });
-    }
+    mutationFn: submissionsApi.updateSubmission,
+    onSuccess: (updatedSubmission) => {
+      // Update the specific submission in cache
+      queryClient.setQueryData(
+        ['submissions', updatedSubmission.id],
+        updatedSubmission
+      );
+      // Invalidate user submissions list
+      queryClient.invalidateQueries({ queryKey: ['submissions', 'my-submissions'] });
+      // Invalidate assignment submissions
+      queryClient.invalidateQueries({ 
+        queryKey: ['submissions', 'assignment', updatedSubmission.assignmentId] 
+      });
+    },
   });
 };
 
-export const useAddComment = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ submissionId, data }: { submissionId: string; data: CreateCommentData }) =>
-      submissionsAPI.addComment(submissionId, data),
-    onSuccess: (_, { submissionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-    }
-  });
-};
-
-export const useReplyToComment = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ submissionId, commentId, content }: { 
-      submissionId: string; 
-      commentId: string; 
-      content: string 
-    }) => submissionsAPI.replyToComment(submissionId, commentId, content),
-    onSuccess: (_, { submissionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-    }
-  });
-};
-
-export const useResolveComment = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ submissionId, commentId }: { submissionId: string; commentId: string }) =>
-      submissionsAPI.resolveComment(submissionId, commentId),
-    onSuccess: (_, { submissionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-    }
-  });
-};
-
-export const useAddCollaborator = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ submissionId, collaboratorId }: { submissionId: string; collaboratorId: string }) =>
-      submissionsAPI.addCollaborator(submissionId, collaboratorId),
-    onSuccess: (_, { submissionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-    }
-  });
-};
-
+// Hook for submitting for grading
 export const useSubmitForGrading = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: submissionsAPI.submitForGrading,
-    onSuccess: (_, submissionId) => {
-      queryClient.invalidateQueries({ queryKey: ['submission', submissionId] });
-      queryClient.invalidateQueries({ queryKey: ['userSubmissions'] });
-    }
+    mutationFn: submissionsApi.submitForGrading,
+    onSuccess: (updatedSubmission) => {
+      // Update the specific submission in cache
+      queryClient.setQueryData(
+        ['submissions', updatedSubmission.id],
+        updatedSubmission
+      );
+      // Invalidate user submissions list
+      queryClient.invalidateQueries({ queryKey: ['submissions', 'my-submissions'] });
+      // Invalidate assignment submissions
+      queryClient.invalidateQueries({ 
+        queryKey: ['submissions', 'assignment', updatedSubmission.assignmentId] 
+      });
+    },
   });
 };
 
-export const useSubmissionVersions = (submissionId: string, limit?: number) => {
+// Hook for deleting a submission
+export const useDeleteSubmission = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: submissionsApi.deleteSubmission,
+    onSuccess: (_, submissionId) => {
+      // Remove from cache
+      queryClient.removeQueries({ queryKey: ['submissions', submissionId] });
+      // Invalidate user submissions list
+      queryClient.invalidateQueries({ queryKey: ['submissions', 'my-submissions'] });
+      // Note: We can't easily invalidate assignment submissions without knowing the assignmentId
+      // This is a trade-off - the list will be refetched when needed
+    },
+  });
+};
+
+// Hook for getting submission versions (placeholder for now)
+export const useSubmissionVersions = (submissionId?: string) => {
   return useQuery({
-    queryKey: ['submissionVersions', submissionId, limit],
-    queryFn: () => submissionsAPI.getVersions(submissionId, limit),
+    queryKey: ['submissions', submissionId, 'versions'],
+    queryFn: async () => {
+      const response = await api.get(`/submissions/${submissionId}/versions`);
+      return response.data;
+    },
     enabled: !!submissionId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };

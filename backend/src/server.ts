@@ -1,14 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import prisma from './lib/prisma';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
 import documentRoutes from './routes/documents';
 import assignmentRoutes from './routes/assignments';
 import assignmentTemplateRoutes from './routes/assignmentTemplates';
-import courseAssignmentRoutes from './routes/courseAssignments';
+import courseAssignmentRoutes from './routes/courseAssignments';  
 import submissionRoutes from './routes/submissions';
 import notificationRoutes from './routes/notifications';
 import learningObjectivesRoutes from './routes/learningObjectives';
@@ -29,8 +29,20 @@ app.use(cors({
 
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ message: 'GitHub for Writers API is running!' });
+app.get('/api/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ 
+      message: 'Scribe Tree API is running!',
+      database: 'PostgreSQL connected'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Scribe Tree API is running!',
+      database: 'Database connection error',
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+    });
+  }
 });
 
 app.use('/api/auth', authRoutes);
@@ -45,32 +57,43 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/learning-objectives', learningObjectivesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-const connectDB = async () => {
+// Initialize Prisma connection
+const initializeDatabase = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/github-for-writers';
-    console.log('Connecting to MongoDB...');
-    
-    if (mongoURI.includes('<username>') || mongoURI.includes('<password>')) {
-      console.error('❌ Please update MONGODB_URI in .env file with your actual MongoDB connection string');
-      console.log('For local MongoDB: mongodb://localhost:27017/github-for-writers');
-      console.log('For MongoDB Atlas: Get your connection string from Atlas dashboard');
-      process.exit(1);
-    }
-    
-    await mongoose.connect(mongoURI);
-    console.log('✅ MongoDB connected successfully');
+    console.log('Connecting to PostgreSQL...');
+    await prisma.$connect();
+    console.log('✅ PostgreSQL connected successfully');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', (error as Error).message);
+    console.error('❌ PostgreSQL connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');
-    console.log('1. Start local MongoDB: brew services start mongodb-community');
-    console.log('2. Or use MongoDB Atlas cloud database');
-    console.log('3. Update MONGODB_URI in backend/.env file');
+    console.log('1. Ensure PostgreSQL is running: brew services start postgresql@15');
+    console.log('2. Check DATABASE_URL in backend/.env file');
+    console.log('3. Run migrations: npx prisma migrate dev');
     process.exit(1);
   }
 };
 
-connectDB();
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  await prisma.$disconnect();
+  process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+// Start server
+const startServer = async () => {
+  await initializeDatabase();
+  
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`📚 API available at http://localhost:${PORT}/api`);
+  });
+};
+
+startServer();

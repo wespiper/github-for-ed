@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+// PostgreSQL-based types (no mongoose dependency)
 
 /**
  * Learning Objective Interface
@@ -176,12 +176,12 @@ export type AIAssistanceType =
  * Full assignment document structure for the educational writing platform
  */
 export interface IAssignmentDocument {
-  _id: Types.ObjectId;
+  id: string; // UUID
   title: string;
   description: string;
   instructions: string;
-  course: Types.ObjectId;
-  instructor: Types.ObjectId;
+  courseId: string; // UUID
+  instructorId: string; // UUID
   
   // Assignment Configuration
   type: AssignmentType;

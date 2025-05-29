@@ -1,5 +1,5 @@
 /**
- * Shared Common Types for GitHub for Education
+ * Shared Common Types for Scribe Tree
  * 
  * This file contains common type definitions used across multiple domains
  * to ensure consistency and eliminate duplication.

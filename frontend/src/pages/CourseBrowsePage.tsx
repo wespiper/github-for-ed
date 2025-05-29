@@ -17,10 +17,10 @@ export const CourseBrowsePage = () => {
     if (!user) return null;
 
     // Filter courses based on search and enrollment status
-    const enrolledCourseIds = new Set(myCourses?.map(course => course._id) || []);
+    const enrolledCourseIds = new Set(myCourses?.map(course => course.id) || []);
     
     const availableCourses = allCourses?.filter(course => 
-        !enrolledCourseIds.has(course._id) &&
+        !enrolledCourseIds.has(course.id) &&
         (filterActive ? course.isActive !== false : true) &&
         (searchQuery ? 
             course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -79,7 +79,7 @@ export const CourseBrowsePage = () => {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {myEnrolledCourses.map((course) => (
                             <div
-                                key={course._id}
+                                key={course.id}
                                 className="bg-white p-6 rounded-xl shadow-sm border border-forest-200 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-center space-x-3 mb-3">
@@ -103,7 +103,7 @@ export const CourseBrowsePage = () => {
                                 <div className="flex items-center justify-between text-sm text-ink-500 mb-4">
                                     <div className="flex items-center space-x-1">
                                         <Users className="h-3 w-3" />
-                                        <span>{course.students?.length || 0} students</span>
+                                        <span>0 students</span>
                                     </div>
                                     <div className="flex items-center space-x-1">
                                         <Calendar className="h-3 w-3" />
@@ -119,7 +119,7 @@ export const CourseBrowsePage = () => {
                                         className="flex-1"
                                         size="sm"
                                     >
-                                        <Link to={`/courses/${course._id}`}>
+                                        <Link to={`/courses/${course.id}`}>
                                             View Course
                                         </Link>
                                     </Button>
@@ -128,7 +128,7 @@ export const CourseBrowsePage = () => {
                                         variant="outline"
                                         size="sm"
                                     >
-                                        <Link to={`/courses/${course._id}/assignments`}>
+                                        <Link to={`/courses/${course.id}/assignments`}>
                                             Assignments
                                         </Link>
                                     </Button>
@@ -161,7 +161,7 @@ export const CourseBrowsePage = () => {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {availableCourses.map((course) => (
                             <div
-                                key={course._id}
+                                key={course.id}
                                 className="bg-white p-6 rounded-xl shadow-sm border border-ink-200 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-center space-x-3 mb-3">
@@ -194,7 +194,7 @@ export const CourseBrowsePage = () => {
                                     <div className="flex items-center space-x-1">
                                         <Users className="h-3 w-3" />
                                         <span>
-                                            {course.students?.length || 0}
+                                            0
                                             {course.maxStudents ? `/${course.maxStudents}` : ''} students
                                         </span>
                                     </div>
@@ -233,7 +233,7 @@ export const CourseBrowsePage = () => {
                                         className="flex-1"
                                         size="sm"
                                     >
-                                        <Link to={`/courses/${course._id}`}>
+                                        <Link to={`/courses/${course.id}`}>
                                             View Details
                                         </Link>
                                     </Button>

@@ -147,7 +147,7 @@ export const useUpdateTemplate = () => {
       assignmentTemplatesAPI.update(templateId, data),
     onSuccess: (updatedTemplate) => {
       queryClient.invalidateQueries({ queryKey: ['assignment-templates'] });
-      queryClient.setQueryData(['assignment-templates', updatedTemplate._id], updatedTemplate);
+      queryClient.setQueryData(['assignment-templates', updatedTemplate.id], updatedTemplate);
     }
   });
 };
@@ -160,7 +160,7 @@ export const usePublishTemplate = () => {
     mutationFn: assignmentTemplatesAPI.publish,
     onSuccess: (publishedTemplate) => {
       queryClient.invalidateQueries({ queryKey: ['assignment-templates'] });
-      queryClient.setQueryData(['assignment-templates', publishedTemplate._id], publishedTemplate);
+      queryClient.setQueryData(['assignment-templates', publishedTemplate.id], publishedTemplate);
     }
   });
 };
@@ -173,7 +173,7 @@ export const useArchiveTemplate = () => {
     mutationFn: assignmentTemplatesAPI.archive,
     onSuccess: (archivedTemplate) => {
       queryClient.invalidateQueries({ queryKey: ['assignment-templates'] });
-      queryClient.setQueryData(['assignment-templates', archivedTemplate._id], archivedTemplate);
+      queryClient.setQueryData(['assignment-templates', archivedTemplate.id], archivedTemplate);
     }
   });
 };

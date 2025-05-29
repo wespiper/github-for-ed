@@ -1,20 +1,20 @@
 import { AssignmentService } from '../AssignmentService';
-import { Assignment } from '../../models/Assignment';
-import { Course } from '../../models/Course';
 import { CreateAssignmentInput } from '@shared/types';
 
-// Mock the models
-jest.mock('../../models/Assignment', () => ({
-  Assignment: jest.fn()
-}));
-jest.mock('../../models/Course', () => ({
-  Course: {
-    findById: jest.fn()
-  }
-}));
+// Mock Prisma
+const mockPrisma = {
+  assignment: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn()
+  },
+  course: {
+    findUnique: jest.fn()
+  },
+  $disconnect: jest.fn()
+};
 
-const { Assignment: MockedAssignment } = require('../../models/Assignment');
-const { Course: MockedCourse } = require('../../models/Course');
+jest.mock('../../lib/prisma', () => mockPrisma);
 
 describe('AssignmentService', () => {
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe('AssignmentService', () => {
       title: 'Test Assignment',
       description: 'Test Description',
       instructions: 'Test Instructions',
-      courseId: '507f1f77bcf86cd799439011',
+      courseId: '123e4567-e89b-12d3-a456-426614174000',
       type: 'individual',
       learningObjectives: [
         {
@@ -41,46 +41,51 @@ describe('AssignmentService', () => {
     };
 
     const mockCourse = {
-      _id: '507f1f77bcf86cd799439011',
-      instructor: '507f1f77bcf86cd799439012',
-      title: 'Test Course'
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      instructorId: '123e4567-e89b-12d3-a456-426614174001',
+      title: 'Test Course',
+      description: 'Test course description',
+      subject: 'English',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     const mockAssignment = {
-      _id: '507f1f77bcf86cd799439013',
+      id: '123e4567-e89b-12d3-a456-426614174002',
       ...validAssignmentData,
-      save: jest.fn().mockResolvedValue(true)
+      instructorId: '123e4567-e89b-12d3-a456-426614174001',
+      status: 'draft' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     it('should create assignment successfully with valid data', async () => {
       // Arrange
-      MockedCourse.findById.mockResolvedValue(mockCourse as any);
-      MockedAssignment.mockImplementation(() => mockAssignment as any);
-      MockedAssignment.findById = jest.fn().mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue(mockAssignment)
-        })
-      });
+      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
+      mockPrisma.assignment.create.mockResolvedValue(mockAssignment as any);
 
       // Act
       const result = await AssignmentService.createAssignment(
         validAssignmentData,
-        '507f1f77bcf86cd799439012'
+        '123e4567-e89b-12d3-a456-426614174001'
       );
 
       // Assert
-      expect(MockedCourse.findById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
-      expect(mockAssignment.save).toHaveBeenCalled();
+      expect(mockPrisma.course.findUnique).toHaveBeenCalledWith({
+        where: { id: '123e4567-e89b-12d3-a456-426614174000' }
+      });
+      expect(mockPrisma.assignment.create).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
 
     it('should throw error if course not found', async () => {
       // Arrange
-      MockedCourse.findById.mockResolvedValue(null);
+      mockPrisma.course.findUnique.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
-        AssignmentService.createAssignment(validAssignmentData, '507f1f77bcf86cd799439012')
+        AssignmentService.createAssignment(validAssignmentData, '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Course not found');
     });
 
@@ -88,13 +93,13 @@ describe('AssignmentService', () => {
       // Arrange
       const mockCourseWithDifferentInstructor = {
         ...mockCourse,
-        instructor: 'different_instructor_id'
+        instructorId: 'different_instructor_id'
       };
-      MockedCourse.findById.mockResolvedValue(mockCourseWithDifferentInstructor as any);
+      mockPrisma.course.findUnique.mockResolvedValue(mockCourseWithDifferentInstructor as any);
 
       // Act & Assert
       await expect(
-        AssignmentService.createAssignment(validAssignmentData, '507f1f77bcf86cd799439012')
+        AssignmentService.createAssignment(validAssignmentData, '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Only course instructors can create assignments');
     });
 
@@ -104,13 +109,13 @@ describe('AssignmentService', () => {
 
       // Act & Assert
       await expect(
-        AssignmentService.createAssignment(invalidData, '507f1f77bcf86cd799439012')
+        AssignmentService.createAssignment(invalidData, '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Assignment title is required');
     });
 
     it('should throw error if learning objectives weights do not sum to 100%', async () => {
       // Arrange
-      MockedCourse.findById.mockResolvedValue(mockCourse as any);
+      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
       const invalidData = {
         ...validAssignmentData,
         learningObjectives: [
@@ -127,13 +132,13 @@ describe('AssignmentService', () => {
 
       // Act & Assert
       await expect(
-        AssignmentService.createAssignment(invalidData, '507f1f77bcf86cd799439012')
+        AssignmentService.createAssignment(invalidData, '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Learning objectives weights must sum to 100%');
     });
 
     it('should throw error if writing stages have duplicate orders', async () => {
       // Arrange
-      MockedCourse.findById.mockResolvedValue(mockCourse as any);
+      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
       const invalidData = {
         ...validAssignmentData,
         writingStages: [
@@ -160,7 +165,7 @@ describe('AssignmentService', () => {
 
       // Act & Assert
       await expect(
-        AssignmentService.createAssignment(invalidData, '507f1f77bcf86cd799439012')
+        AssignmentService.createAssignment(invalidData, '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Writing stages must have unique order values');
     });
   });
@@ -253,8 +258,8 @@ describe('AssignmentService', () => {
 
   describe('publishAssignment', () => {
     const mockAssignment = {
-      _id: '507f1f77bcf86cd799439013',
-      instructor: '507f1f77bcf86cd799439012',
+      id: '123e4567-e89b-12d3-a456-426614174002',
+      instructorId: '123e4567-e89b-12d3-a456-426614174001',
       title: 'Test Assignment',
       description: 'Test Description',
       instructions: 'Test Instructions',
@@ -276,33 +281,38 @@ describe('AssignmentService', () => {
         reflectionPrompts: [],
         stageSpecificSettings: []
       },
-      status: 'draft',
-      save: jest.fn().mockResolvedValue(true)
+      status: 'draft' as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     it('should publish assignment successfully', async () => {
       // Arrange
-      MockedAssignment.findById.mockResolvedValue(mockAssignment as any);
+      const updatedAssignment = { ...mockAssignment, status: 'published' as const };
+      mockPrisma.assignment.findUnique.mockResolvedValue(mockAssignment as any);
+      mockPrisma.assignment.update.mockResolvedValue(updatedAssignment as any);
 
       // Act
       const result = await AssignmentService.publishAssignment(
-        '507f1f77bcf86cd799439013',
-        '507f1f77bcf86cd799439012'
+        '123e4567-e89b-12d3-a456-426614174002',
+        '123e4567-e89b-12d3-a456-426614174001'
       );
 
       // Assert
-      expect(mockAssignment.status).toBe('published');
-      expect(mockAssignment.save).toHaveBeenCalled();
+      expect(mockPrisma.assignment.update).toHaveBeenCalledWith({
+        where: { id: '123e4567-e89b-12d3-a456-426614174002' },
+        data: { status: 'published' }
+      });
       expect(result).toBeDefined();
     });
 
     it('should throw error if assignment not found', async () => {
       // Arrange
-      MockedAssignment.findById.mockResolvedValue(null);
+      mockPrisma.assignment.findUnique.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
-        AssignmentService.publishAssignment('invalid_id', '507f1f77bcf86cd799439012')
+        AssignmentService.publishAssignment('invalid_id', '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Assignment not found');
     });
 
@@ -310,13 +320,13 @@ describe('AssignmentService', () => {
       // Arrange
       const assignmentWithDifferentInstructor = {
         ...mockAssignment,
-        instructor: 'different_instructor_id'
+        instructorId: 'different_instructor_id'
       };
-      MockedAssignment.findById.mockResolvedValue(assignmentWithDifferentInstructor as any);
+      mockPrisma.assignment.findUnique.mockResolvedValue(assignmentWithDifferentInstructor as any);
 
       // Act & Assert
       await expect(
-        AssignmentService.publishAssignment('507f1f77bcf86cd799439013', '507f1f77bcf86cd799439012')
+        AssignmentService.publishAssignment('123e4567-e89b-12d3-a456-426614174002', '123e4567-e89b-12d3-a456-426614174001')
       ).rejects.toThrow('Only the assignment creator can modify it');
     });
   });

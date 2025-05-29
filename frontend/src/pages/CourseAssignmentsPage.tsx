@@ -24,7 +24,7 @@ export const CourseAssignmentsPage = () => {
             ) : assignments && assignments.length > 0 ? (
                 <div className="grid gap-6">
                     {assignments.map((assignment) => (
-                        <div key={assignment._id} className="bg-white rounded-xl shadow-sm border border-ink-200 p-6">
+                        <div key={assignment.id} className="bg-white rounded-xl shadow-sm border border-ink-200 p-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-4">
                                     <FileText className="h-6 w-6 text-scribe-600" />
@@ -40,7 +40,7 @@ export const CourseAssignmentsPage = () => {
                                     </div>
                                 </div>
                                 <Button asChild>
-                                    <Link to={`/assignments/${assignment._id}`}>
+                                    <Link to={`/assignments/${assignment.id}`}>
                                         View Assignment
                                     </Link>
                                 </Button>

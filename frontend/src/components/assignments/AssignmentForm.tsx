@@ -316,7 +316,7 @@ export function AssignmentForm() {
                 <SelectItem value="" disabled>Loading courses...</SelectItem>
               ) : courses?.length ? (
                 courses.map((course) => (
-                  <SelectItem key={course._id} value={course._id}>
+                  <SelectItem key={course.id} value={course.id}>
                     {course.title}
                   </SelectItem>
                 ))

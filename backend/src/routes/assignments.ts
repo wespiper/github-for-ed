@@ -1,11 +1,9 @@
 import { Router, Response } from 'express';
-import { Assignment, IAssignment } from '../models/Assignment';
-import { AssignmentSubmission, IAssignmentSubmission } from '../models/AssignmentSubmission';
-import { Course } from '../models/Course';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
-import { Types } from 'mongoose';
 import { CreateAssignmentInput, UpdateAssignmentInput, AssignmentFilters } from '@shared/types';
 import { AssignmentService } from '../services';
+import prisma from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -63,14 +61,27 @@ router.get('/my-assignments', authenticate, requireRole(['educator', 'admin']), 
     const userId = req.userId!;
     const { status, course } = req.query;
 
-    const filter: any = { instructor: userId };
+    const filter: any = { instructorId: userId };
     if (status) filter.status = status;
-    if (course) filter.course = course;
+    if (course) filter.courseId = course;
 
-    const assignments = await Assignment.find(filter)
-      .populate('course', 'title')
-      .populate('submissionCount')
-      .sort({ createdAt: -1 });
+    const assignments = await prisma.assignment.findMany({
+      where: filter,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.json({
       message: 'Assignments retrieved successfully',
@@ -88,10 +99,35 @@ router.get('/:assignmentId', authenticate, async (req: AuthenticatedRequest, res
     const { assignmentId } = req.params;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title students')
-      .populate('submissionCount');
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            enrollments: {
+              select: {
+                studentId: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      }
+    });
 
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
@@ -99,9 +135,8 @@ router.get('/:assignmentId', authenticate, async (req: AuthenticatedRequest, res
     }
 
     // Check access permissions
-    const course = assignment.course as any;
-    const isInstructor = (assignment.instructor as any)._id.toString() === userId;
-    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
+    const isInstructor = assignment.instructor.id === userId;
+    const isStudent = assignment.course.enrollments.some(enrollment => enrollment.studentId === userId);
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isStudent && !isAdmin) {
@@ -130,40 +165,9 @@ router.put('/:assignmentId', authenticate, requireRole(['educator', 'admin']), a
   try {
     const { assignmentId } = req.params;
     const userId = req.userId!;
+    const updateData: UpdateAssignmentInput = req.body;
 
-    const assignment = await Assignment.findById(assignmentId);
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
-    }
-
-    // Check permissions
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isInstructor && !isAdmin) {
-      res.status(403).json({ error: 'Only the assignment creator can update it' });
-      return;
-    }
-
-    // Update fields
-    const allowedUpdates = [
-      'title', 'description', 'instructions', 'type', 'dueDate', 'allowLateSubmissions',
-      'maxCollaborators', 'requirements', 'collaboration', 'versionControl', 
-      'learningObjectives', 'writingStages', 'aiSettings', 'status', 'grading'
-    ];
-
-    allowedUpdates.forEach(field => {
-      if (req.body[field] !== undefined) {
-        (assignment as any)[field] = req.body[field];
-      }
-    });
-
-    await assignment.save();
-
-    const updatedAssignment = await Assignment.findById(assignmentId)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title');
+    const updatedAssignment = await AssignmentService.updateAssignment(assignmentId, updateData, userId);
 
     res.json({
       message: 'Assignment updated successfully',
@@ -171,7 +175,10 @@ router.put('/:assignmentId', authenticate, requireRole(['educator', 'admin']), a
     });
   } catch (error) {
     console.error('Error updating assignment:', error);
-    res.status(500).json({ error: 'Failed to update assignment' });
+    const message = error instanceof Error ? error.message : 'Failed to update assignment';
+    const statusCode = message.includes('not found') ? 404 : 
+                      message.includes('Only') ? 403 : 500;
+    res.status(statusCode).json({ error: message });
   }
 });
 
@@ -182,8 +189,20 @@ router.post('/:assignmentId/submit', authenticate, async (req: AuthenticatedRequ
     const { title, isCollaborative } = req.body;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId)
-      .populate('course', 'students');
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        course: {
+          include: {
+            enrollments: {
+              where: {
+                studentId: userId
+              }
+            }
+          }
+        }
+      }
+    });
 
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
@@ -197,8 +216,7 @@ router.post('/:assignmentId/submit', authenticate, async (req: AuthenticatedRequ
     }
 
     // Check if user is enrolled in the course
-    const course = assignment.course as any;
-    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
+    const isStudent = assignment.course.enrollments.length > 0;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isStudent && !isAdmin) {
@@ -207,48 +225,62 @@ router.post('/:assignmentId/submit', authenticate, async (req: AuthenticatedRequ
     }
 
     // Check if submission already exists
-    let submission = await AssignmentSubmission.findOne({
-      assignment: assignmentId,
-      author: userId
+    let submission = await prisma.assignmentSubmission.findFirst({
+      where: {
+        assignmentId,
+        authorId: userId
+      }
     });
 
     if (!submission) {
       // Create new submission
-      submission = new AssignmentSubmission({
-        assignment: assignmentId,
-        author: userId,
-        title: title || `${assignment.title} - Submission`,
-        collaboration: {
-          isCollaborative: isCollaborative || assignment.type === 'collaborative',
-          activeUsers: [userId],
-          lastActiveAt: new Date(),
-          conflictResolution: 'auto'
-        },
-        analytics: {
-          writingSessions: 0,
-          totalWritingTime: 0,
-          averageSessionLength: 0,
-          writingPattern: [],
-          collaborationMetrics: {
-            contributorStats: [{
-              user: new Types.ObjectId(userId),
-              wordsContributed: 0,
-              editsCount: 0,
-              commentsCount: 0
-            }],
-            conflictsResolved: 0,
-            realTimeMinutes: 0
+      submission = await prisma.assignmentSubmission.create({
+        data: {
+          assignmentId,
+          authorId: userId,
+          status: 'draft',
+          wordCount: 0,
+          analytics: {
+            writingSessions: 0,
+            totalWritingTime: 0,
+            averageSessionLength: 0,
+            writingPattern: [],
+            collaborationMetrics: {
+              contributorStats: [{
+                user: userId,
+                wordsContributed: 0,
+                editsCount: 0,
+                commentsCount: 0
+              }],
+              conflictsResolved: 0,
+              realTimeMinutes: 0
+            }
           }
         }
       });
-
-      await submission.save();
     }
 
-    const populatedSubmission = await AssignmentSubmission.findById(submission._id)
-      .populate('assignment', 'title dueDate requirements collaboration')
-      .populate('author', 'firstName lastName email')
-      .populate('collaborators', 'firstName lastName email');
+    const populatedSubmission = await prisma.assignmentSubmission.findUnique({
+      where: { id: submission.id },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            dueDate: true,
+            requirements: true
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
 
     res.status(201).json({
       message: 'Assignment submission ready',
@@ -267,14 +299,17 @@ router.get('/:assignmentId/submissions', authenticate, requireRole(['educator', 
     const { status } = req.query;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId }
+    });
+    
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
 
     // Check permissions
-    const isInstructor = assignment.instructor.toString() === userId;
+    const isInstructor = assignment.instructorId === userId;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -282,13 +317,23 @@ router.get('/:assignmentId/submissions', authenticate, requireRole(['educator', 
       return;
     }
 
-    const filter: any = { assignment: assignmentId };
+    const filter: any = { assignmentId };
     if (status) filter.status = status;
 
-    const submissions = await AssignmentSubmission.find(filter)
-      .populate('author', 'firstName lastName email')
-      .populate('collaborators', 'firstName lastName email')
-      .sort({ lastSavedAt: -1 });
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: filter,
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
 
     res.json({
       message: 'Assignment submissions retrieved successfully',
@@ -306,24 +351,7 @@ router.patch('/:assignmentId/publish', authenticate, requireRole(['educator', 'a
     const { assignmentId } = req.params;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId);
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
-    }
-
-    // Check permissions
-    const isInstructor = assignment.instructor.toString() === userId;
-    const isAdmin = req.user!.role === 'admin';
-
-    if (!isInstructor && !isAdmin) {
-      res.status(403).json({ error: 'Only the assignment creator can publish it' });
-      return;
-    }
-
-    assignment.status = 'published';
-    assignment.publishedAt = new Date();
-    await assignment.save();
+    const assignment = await AssignmentService.publishAssignment(assignmentId, userId);
 
     res.json({
       message: 'Assignment published successfully',
@@ -331,7 +359,10 @@ router.patch('/:assignmentId/publish', authenticate, requireRole(['educator', 'a
     });
   } catch (error) {
     console.error('Error publishing assignment:', error);
-    res.status(500).json({ error: 'Failed to publish assignment' });
+    const message = error instanceof Error ? error.message : 'Failed to publish assignment';
+    const statusCode = message.includes('not found') ? 404 : 
+                      message.includes('Only') ? 403 : 500;
+    res.status(statusCode).json({ error: message });
   }
 });
 
@@ -341,14 +372,17 @@ router.delete('/:assignmentId', authenticate, requireRole(['educator', 'admin'])
     const { assignmentId } = req.params;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId }
+    });
+    
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
 
     // Check permissions
-    const isInstructor = assignment.instructor.toString() === userId;
+    const isInstructor = assignment.instructorId === userId;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -356,8 +390,10 @@ router.delete('/:assignmentId', authenticate, requireRole(['educator', 'admin'])
       return;
     }
 
-    assignment.status = 'archived';
-    await assignment.save();
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { status: 'archived' }
+    });
 
     res.json({
       message: 'Assignment archived successfully'
@@ -379,13 +415,16 @@ router.get('/by-objective/:category', authenticate, requireRole(['educator', 'ad
 
     // If courseId provided, verify access
     if (courseId) {
-      const course = await Course.findById(courseId);
+      const course = await prisma.course.findUnique({
+        where: { id: courseId as string }
+      });
+      
       if (!course) {
         res.status(404).json({ error: 'Course not found' });
         return;
       }
 
-      const isInstructor = course.instructor.toString() === userId;
+      const isInstructor = course.instructorId === userId;
       const isAdmin = req.user!.role === 'admin';
 
       if (!isInstructor && !isAdmin) {
@@ -394,10 +433,31 @@ router.get('/by-objective/:category', authenticate, requireRole(['educator', 'ad
       }
     }
 
-    const assignments = await (Assignment as any).findByLearningObjectiveCategory(
-      category, 
-      courseId as string
-    );
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        ...(courseId && { courseId: courseId as string }),
+        learningObjectives: {
+          path: ['$[*].category'],
+          array_contains: category
+        }
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
 
     res.json({
       message: `Assignments with ${category} learning objectives retrieved successfully`,
@@ -424,13 +484,16 @@ router.get('/by-blooms/:level', authenticate, requireRole(['educator', 'admin'])
 
     // If courseId provided, verify access
     if (courseId) {
-      const course = await Course.findById(courseId);
+      const course = await prisma.course.findUnique({
+        where: { id: courseId as string }
+      });
+      
       if (!course) {
         res.status(404).json({ error: 'Course not found' });
         return;
       }
 
-      const isInstructor = course.instructor.toString() === userId;
+      const isInstructor = course.instructorId === userId;
       const isAdmin = req.user!.role === 'admin';
 
       if (!isInstructor && !isAdmin) {
@@ -439,10 +502,31 @@ router.get('/by-blooms/:level', authenticate, requireRole(['educator', 'admin'])
       }
     }
 
-    const assignments = await (Assignment as any).findByBloomsLevel(
-      bloomsLevel, 
-      courseId as string
-    );
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        ...(courseId && { courseId: courseId as string }),
+        learningObjectives: {
+          path: ['$[*].bloomsLevel'],
+          array_contains: bloomsLevel
+        }
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
 
     res.json({
       message: `Assignments with Bloom's level ${bloomsLevel} retrieved successfully`,
@@ -462,13 +546,16 @@ router.get('/multi-stage', authenticate, requireRole(['educator', 'admin']), asy
 
     // If courseId provided, verify access
     if (courseId) {
-      const course = await Course.findById(courseId);
+      const course = await prisma.course.findUnique({
+        where: { id: courseId as string }
+      });
+      
       if (!course) {
         res.status(404).json({ error: 'Course not found' });
         return;
       }
 
-      const isInstructor = course.instructor.toString() === userId;
+      const isInstructor = course.instructorId === userId;
       const isAdmin = req.user!.role === 'admin';
 
       if (!isInstructor && !isAdmin) {
@@ -477,7 +564,30 @@ router.get('/multi-stage', authenticate, requireRole(['educator', 'admin']), asy
       }
     }
 
-    const assignments = await (Assignment as any).findMultiStageAssignments(courseId as string);
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        ...(courseId && { courseId: courseId as string }),
+        writingStages: {
+          not: Prisma.JsonNull
+        }
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
 
     res.json({
       message: 'Multi-stage assignments retrieved successfully',
@@ -497,13 +607,16 @@ router.get('/with-ai', authenticate, requireRole(['educator', 'admin']), async (
 
     // If courseId provided, verify access
     if (courseId) {
-      const course = await Course.findById(courseId);
+      const course = await prisma.course.findUnique({
+        where: { id: courseId as string }
+      });
+      
       if (!course) {
         res.status(404).json({ error: 'Course not found' });
         return;
       }
 
-      const isInstructor = course.instructor.toString() === userId;
+      const isInstructor = course.instructorId === userId;
       const isAdmin = req.user!.role === 'admin';
 
       if (!isInstructor && !isAdmin) {
@@ -512,7 +625,31 @@ router.get('/with-ai', authenticate, requireRole(['educator', 'admin']), async (
       }
     }
 
-    const assignments = await (Assignment as any).findWithAIEnabled(courseId as string);
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        ...(courseId && { courseId: courseId as string }),
+        aiSettings: {
+          path: ['enabled'],
+          equals: true
+        }
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
 
     res.json({
       message: 'AI-enabled assignments retrieved successfully',
@@ -531,20 +668,26 @@ router.post('/:assignmentId/clone', authenticate, requireRole(['educator', 'admi
     const { title, courseId, adjustments } = req.body;
     const userId = req.userId!;
 
-    const originalAssignment = await Assignment.findById(assignmentId);
+    const originalAssignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId }
+    });
+    
     if (!originalAssignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
 
     // Verify course access for target course
-    const targetCourse = await Course.findById(courseId);
+    const targetCourse = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
+    
     if (!targetCourse) {
       res.status(404).json({ error: 'Target course not found' });
       return;
     }
 
-    const isInstructor = targetCourse.instructor.toString() === userId;
+    const isInstructor = targetCourse.instructorId === userId;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -553,29 +696,38 @@ router.post('/:assignmentId/clone', authenticate, requireRole(['educator', 'admi
     }
 
     // Clone assignment
-    const clonedData = originalAssignment.toObject();
-    const { _id, createdAt, updatedAt, publishedAt, ...dataToClone } = clonedData;
+    const { id, createdAt, updatedAt, ...dataToClone } = originalAssignment;
     
-    dataToClone.title = title || `${originalAssignment.title} (Copy)`;
-    dataToClone.course = new Types.ObjectId(courseId);
-    dataToClone.instructor = new Types.ObjectId(userId);
-    dataToClone.status = 'draft';
-
-    // Apply any adjustments
-    if (adjustments) {
-      Object.assign(dataToClone, adjustments);
-    }
-
-    const clonedAssignment = new Assignment(dataToClone);
-    await clonedAssignment.save();
-
-    const populatedClone = await Assignment.findById(clonedAssignment._id)
-      .populate('instructor', 'firstName lastName email')
-      .populate('course', 'title');
+    const clonedAssignment = await prisma.assignment.create({
+      data: {
+        ...dataToClone,
+        title: title || `${originalAssignment.title} (Copy)`,
+        courseId,
+        instructorId: userId,
+        status: 'draft',
+        ...(adjustments || {})
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
+      }
+    });
 
     res.status(201).json({
       message: 'Assignment cloned successfully',
-      data: populatedClone
+      data: clonedAssignment
     });
   } catch (error) {
     console.error('Error cloning assignment:', error);
@@ -589,13 +741,16 @@ router.post('/:assignmentId/validate', authenticate, requireRole(['educator', 'a
     const { assignmentId } = req.params;
     const userId = req.userId!;
 
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId }
+    });
+    
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
       return;
     }
 
-    const isInstructor = assignment.instructor.toString() === userId;
+    const isInstructor = assignment.instructorId === userId;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isAdmin) {
@@ -613,26 +768,25 @@ router.post('/:assignmentId/validate', authenticate, requireRole(['educator', 'a
     if (!assignment.title?.trim()) {
       validationResults.errors.push('Title is required');
     }
-    if (!assignment.description?.trim()) {
-      validationResults.errors.push('Description is required');
-    }
     if (!assignment.instructions?.trim()) {
       validationResults.errors.push('Instructions are required');
     }
 
     // Validate learning objectives
-    if (!assignment.learningObjectives || assignment.learningObjectives.length === 0) {
+    const learningObjectives = assignment.learningObjectives as any[];
+    if (!learningObjectives || learningObjectives.length === 0) {
       validationResults.warnings.push('No learning objectives defined');
     } else {
-      const totalWeight = assignment.learningObjectives.reduce((sum, obj) => sum + obj.weight, 0);
+      const totalWeight = learningObjectives.reduce((sum, obj) => sum + (obj.weight || 0), 0);
       if (totalWeight !== 100) {
         validationResults.errors.push('Learning objectives weights must sum to 100%');
       }
     }
 
     // Validate writing stages
-    if (assignment.writingStages && assignment.writingStages.length > 0) {
-      const orders = assignment.writingStages.map(stage => stage.order);
+    const writingStages = assignment.writingStages as any[];
+    if (writingStages && writingStages.length > 0) {
+      const orders = writingStages.map(stage => stage.order);
       const uniqueOrders = new Set(orders);
       if (orders.length !== uniqueOrders.size) {
         validationResults.errors.push('Writing stages must have unique order values');
@@ -640,9 +794,10 @@ router.post('/:assignmentId/validate', authenticate, requireRole(['educator', 'a
     }
 
     // Validate AI settings
-    if (assignment.aiSettings.enabled && assignment.aiSettings.stageSpecificSettings) {
-      const stageIds = new Set(assignment.writingStages?.map(stage => stage.id) || []);
-      for (const setting of assignment.aiSettings.stageSpecificSettings) {
+    const aiSettings = assignment.aiSettings as any;
+    if (aiSettings?.enabled && aiSettings?.stageSpecificSettings) {
+      const stageIds = new Set(writingStages?.map(stage => stage.id) || []);
+      for (const setting of aiSettings.stageSpecificSettings) {
         if (!stageIds.has(setting.stageId)) {
           validationResults.errors.push(`AI setting references invalid stage ID: ${setting.stageId}`);
         }

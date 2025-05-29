@@ -1,5 +1,5 @@
 import express, { Response } from 'express';
-import { User } from '../models/User';
+import prisma from '../lib/prisma';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
@@ -21,7 +21,19 @@ router.post('/switch-role', authenticate, requireRole(['admin']), async (req: Au
     }
 
     // Find the user to switch
-    const user = await User.findById(userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -34,19 +46,33 @@ router.post('/switch-role', authenticate, requireRole(['admin']), async (req: Au
     }
 
     // Update the role
-    user.role = newRole as 'student' | 'educator';
-    await user.save();
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole as 'student' | 'educator' },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        profilePicture: true,
+        bio: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     const userResponse = {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      profilePicture: user.profilePicture,
-      bio: user.bio,
-      isVerified: user.isVerified,
-      createdAt: user.createdAt
+      id: updatedUser.id,
+      email: updatedUser.email,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      role: updatedUser.role,
+      profilePicture: updatedUser.profilePicture,
+      bio: updatedUser.bio,
+      isVerified: updatedUser.isVerified,
+      createdAt: updatedUser.createdAt
     };
 
     res.json({
@@ -75,11 +101,22 @@ router.post('/toggle-my-role', authenticate, async (req: AuthenticatedRequest, r
     const newRole = currentUser.role === 'student' ? 'educator' : 'student';
 
     // Update the role
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { role: newRole },
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        profilePicture: true,
+        bio: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -87,7 +124,7 @@ router.post('/toggle-my-role', authenticate, async (req: AuthenticatedRequest, r
     }
 
     const userResponse = {
-      id: user._id,
+      id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -111,10 +148,24 @@ router.post('/toggle-my-role', authenticate, async (req: AuthenticatedRequest, r
 // Get all users (admin only)
 router.get('/users', authenticate, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        profilePicture: true,
+        bio: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     const usersResponse = users.map(user => ({
-      id: user._id,
+      id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

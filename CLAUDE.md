@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-GitHub for Writers is a monorepo containing a React frontend and Node.js backend for teaching writing using version control concepts.
+Scribe Tree is a monorepo containing a React frontend and Node.js backend for teaching writing using version control concepts.
 
 **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + ShadCN UI
-**Backend**: Node.js + Express + TypeScript + MongoDB + Mongoose
+**Backend**: Node.js + Express + TypeScript + PostgreSQL + Prisma
 **Structure**: Separate `/frontend` and `/backend` directories with independent package.json files
 
 ## Development Commands
@@ -26,7 +26,7 @@ npm run preview # Preview production build
 
 ```bash
 cd backend
-npm run dev     # Nodemon with ts-node hot reload on http://localhost:5000
+npm run dev     # Nodemon with ts-node hot reload on http://localhost:5001
 npm run build   # TypeScript compilation to ./dist
 npm run start   # Production server from compiled JS
 ```
@@ -35,8 +35,9 @@ npm run start   # Production server from compiled JS
 
 1. Install dependencies in both directories: `npm install`
 2. Copy `backend/.env.example` to `backend/.env`
-3. Ensure MongoDB is running (local or provide MONGODB_URI)
-4. Run both frontend and backend concurrently for development
+3. Ensure PostgreSQL is running (local or provide DATABASE_URL)
+4. Run Prisma migrations: `npx prisma migrate dev`
+5. Run both frontend and backend concurrently for development
 
 ## Key Configuration
 
@@ -59,9 +60,27 @@ npm run start   # Production server from compiled JS
 
 ### Database Connection
 
--   MongoDB with Mongoose ODM
--   Connection string via `MONGODB_URI` environment variable
--   Automatic connection retry and error handling in `backend/src/server.ts`
+-   PostgreSQL with Prisma ORM
+-   Connection string via `DATABASE_URL` environment variable
+-   Automatic schema synchronization with `prisma db push`
+-   Generated types for compile-time safety
+-   Connection retry and error handling in `backend/src/server.ts`
+
+### Database Migration Standards
+
+-   **Test Preservation**: Update existing test logic rather than rewriting maintains coverage during migration
+-   **Type Safety First**: Use Prisma-generated types for compile-time validation and error prevention
+-   **API Contract Validation**: Ensure frontend expectations match backend reality after migrations
+-   **Role-Based Data Access**: Design queries that support multi-role visibility (admin vs. user patterns)
+-   **Migration Completeness**: Complete API endpoint inventory prevents gaps during database changes
+
+### API Design Standards
+
+-   **Standard Response Format**: `{ success: boolean, data: T, message?: string }` across all endpoints
+-   **Error Handling**: Standardized error responses with development details when appropriate
+-   **Role-Based Endpoints**: Implement admin vs. user access patterns consistently
+-   **Type Safety**: Use Prisma-generated types for request/response validation
+-   **Documentation**: Maintain comprehensive API contract documentation
 
 ## Development Standards
 
@@ -125,9 +144,9 @@ npm test              # Run all tests once
 npm run test:watch    # Watch mode for development
 npm run test:coverage # Generate coverage report
 
-# Backend testing (Jest + MongoDB Memory Server)
+# Backend testing (Jest + Prisma)
 cd backend
-npm test              # Run all tests with MongoDB memory server
+npm test              # Run all tests with Prisma mocking
 npm run test:watch    # Watch mode for development
 npm run test:coverage # Generate coverage report
 ```
@@ -376,19 +395,23 @@ Ask: "Does this help educators understand student writing development?"
 
 -   Express RESTful API server
 -   Environment-based configuration with dotenv
--   MongoDB document database with Mongoose schemas
+-   PostgreSQL relational database with Prisma ORM
 -   TypeScript compilation for production deployment
+-   Role-based access control for educational features
+-   AI interaction logging for educational compliance
 
 ### Current State
 
-This is a foundational setup with:
+This is a fully functional educational writing platform with:
 
--   ✅ Complete development environment
+-   ✅ Complete development environment with PostgreSQL + Prisma
 -   ✅ Build tooling and CI/CD pipeline
--   ✅ Basic Express server with health endpoint
--   ❌ No custom components or features yet implemented
--   ❌ No database models or API routes beyond health check
--   ❌ Frontend is still default Vite template
+-   ✅ Comprehensive API with educational features
+-   ✅ Educational AI assistant with bounded enhancement philosophy
+-   ✅ Multi-role access control (students, educators, administrators)
+-   ✅ Writing process tracking and analytics
+-   ✅ Assignment and submission management systems
+-   ✅ Collaborative writing and version control features
 
 ## Testing Examples
 
@@ -479,13 +502,14 @@ describe("WritingEditor", () => {
 GitHub Actions workflow runs on push/PR to main/develop:
 
 -   **Frontend**: Install deps, lint, type check, build
--   **Backend**: Install deps, lint, type check, build, test with MongoDB service
+-   **Backend**: Install deps, lint, type check, build, test with Prisma
 -   Both jobs run Node.js 18 with npm ci for dependency installation
 
 ## Important Files
 
 -   `frontend/components.json` - ShadCN UI configuration
--   `backend/src/server.ts` - Express app and MongoDB connection
+-   `backend/src/server.ts` - Express app and PostgreSQL connection
+-   `backend/prisma/schema.prisma` - Database schema and relationships
 -   `frontend/vite.config.ts` - Build configuration and path aliases
 -   `.github/workflows/ci.yml` - Automated testing and deployment
 -   Both `tsconfig.json` files for TypeScript compilation settings

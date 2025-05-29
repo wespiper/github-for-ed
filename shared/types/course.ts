@@ -1,5 +1,5 @@
 /**
- * Shared Course Types for GitHub for Education
+ * Shared Course Types for Scribe Tree
  * 
  * This file contains all course-related type definitions shared between
  * frontend and backend to ensure consistency and eliminate duplication.
@@ -12,29 +12,27 @@ import { type User } from './auth';
  * Complete course structure
  */
 export interface Course {
-  _id: string;
+  id: string;
   title: string;
-  description: string;
-  subject: string;
-  instructor: User | string; // Populated or ObjectId
-  students: (User | string)[]; // Populated or ObjectId array
+  description?: string;
+  subject?: string;
+  instructorId: string;
+  instructor?: User; // Populated when needed
   
   // Course Configuration
   isPublic: boolean;
-  maxStudents?: number;
+  isActive: boolean;
+  maxStudents: number;
   startDate?: string; // ISO date string
   endDate?: string; // ISO date string
+  enrollmentCode?: string;
+  tags: string[];
   
   // Course Settings
-  settings: {
-    allowSelfEnrollment: boolean;
-    requireApprovalToJoin: boolean;
-    allowStudentDiscussions: boolean;
-    gradingScale: 'points' | 'percentage' | 'letter';
-  };
+  settings: Record<string, any>;
   
   // Status
-  status: 'draft' | 'published' | 'archived';
+  status: string;
   
   // Metadata
   createdAt: string;
@@ -84,13 +82,13 @@ export interface UpdateCourseInput {
  * Course Enrollment Interface
  */
 export interface CourseEnrollment {
-  _id: string;
-  course: Course | string;
-  student: User | string;
+  id: string;
+  courseId: string;
+  course?: Course;
+  studentId: string;
+  student?: User;
   enrolledAt: string;
-  status: 'pending' | 'enrolled' | 'completed' | 'withdrawn';
-  grade?: number;
-  finalGrade?: string;
+  status: string;
 }
 
 /**

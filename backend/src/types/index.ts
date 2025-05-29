@@ -1,5 +1,5 @@
 /**
- * Central type definitions for the GitHub for Writers backend
+ * Central type definitions for the Scribe Tree backend
  * 
  * This file exports all type interfaces used throughout the application
  * for assignments, learning objectives, writing stages, and educational workflows.

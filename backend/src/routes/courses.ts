@@ -1,8 +1,7 @@
 import express, { Response } from 'express';
-import { Course, ICourse } from '../models/Course';
-import { User } from '../models/User';
-import { Assignment } from '../models/Assignment';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth';
+import { CourseService } from '../services/CourseService';
+import prisma from '../lib/prisma';
 
 const router = express.Router();
 
@@ -19,27 +18,33 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response): 
     const userId = req.userId!;
     const userRole = req.user!.role;
     
-    let courses: ICourse[];
+    let courses: any[];
     
     if (userRole === 'educator') {
-      // Educators see their own courses
-      courses = await Course.find({ instructor: userId })
-        .populate('students', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await CourseService.getInstructorCourses(userId);
     } else if (userRole === 'student') {
-      // Students see courses they're enrolled in
-      courses = await Course.find({ 
-        students: userId,
-        isActive: true 
-      })
-        .populate('instructor', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await CourseService.getStudentCourses(userId);
     } else if (userRole === 'admin') {
       // Admins see all courses
-      courses = await Course.find()
-        .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await prisma.course.findMany({
+        include: {
+          instructor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              enrollments: true,
+              assignments: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     } else {
       courses = [];
     }
@@ -61,27 +66,32 @@ router.get('/my-courses', authenticate, async (req: AuthenticatedRequest, res: R
     const userId = req.userId!;
     const userRole = req.user!.role;
     
-    let courses: ICourse[];
+    let courses: any[];
     
     if (userRole === 'educator') {
-      // Educators see their own courses
-      courses = await Course.find({ instructor: userId })
-        .populate('students', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await CourseService.getInstructorCourses(userId);
     } else if (userRole === 'student') {
-      // Students see courses they're enrolled in
-      courses = await Course.find({ 
-        students: userId,
-        isActive: true 
-      })
-        .populate('instructor', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await CourseService.getStudentCourses(userId);
     } else if (userRole === 'admin') {
-      // Admins see all courses
-      courses = await Course.find()
-        .populate('instructor', 'firstName lastName email')
-        .populate('students', 'firstName lastName email')
-        .sort({ createdAt: -1 });
+      courses = await prisma.course.findMany({
+        include: {
+          instructor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              enrollments: true,
+              assignments: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     } else {
       courses = [];
     }
@@ -101,13 +111,7 @@ router.get('/my-courses', authenticate, async (req: AuthenticatedRequest, res: R
 router.get('/enrolled', authenticate, requireRole(['student']), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const studentId = req.userId!;
-    
-    const courses = await Course.find({ 
-      students: studentId,
-      isActive: true 
-    })
-      .populate('instructor', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+    const courses = await CourseService.getStudentCourses(studentId);
 
     res.json({ courses });
   } catch (error) {
@@ -139,16 +143,14 @@ router.post('/', authenticate, requireRole(['educator']), async (req: Authentica
     }
 
     // Create course
-    const course = new Course({
+    const course = await CourseService.createCourse({
       title: title.trim(),
       description: description.trim(),
-      instructor: instructorId,
-      maxStudents,
-      tags: tags?.map(tag => tag.trim().toLowerCase()) || []
+      instructorId,
+      maxStudents: maxStudents || 30,
+      tags: tags?.map(tag => tag.trim().toLowerCase()) || [],
+      isPublic: true,
     });
-
-    await course.save();
-    await course.populate('instructor', 'firstName lastName email');
 
     res.status(201).json({
       message: 'Course created successfully',
@@ -166,20 +168,15 @@ router.get('/:courseId', authenticate, async (req: AuthenticatedRequest, res: Re
     const { courseId } = req.params;
     const userId = req.userId!;
 
-    const course = await Course.findById(courseId)
-      .populate('instructor', 'firstName lastName email')
-      .populate('students', 'firstName lastName email');
-
-    if (!course) {
-      res.status(404).json({ error: 'Course not found' });
-      return;
-    }
+    const course = await CourseService.getCourseById(courseId, true);
 
     // Check authorization
-    const isInstructor = course.instructor._id.toString() === userId;
-    const isEnrolledStudent = course.students.some(student => student._id.toString() === userId);
+    const isInstructor = course.instructor.id === userId;
+    const isEnrolledStudent = course.enrollments ? 
+      course.enrollments.some(enrollment => enrollment.studentId === userId) : false;
+    const isAdmin = req.user!.role === 'admin';
 
-    if (!isInstructor && !isEnrolledStudent) {
+    if (!isInstructor && !isEnrolledStudent && !isAdmin) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -187,7 +184,11 @@ router.get('/:courseId', authenticate, async (req: AuthenticatedRequest, res: Re
     res.json({ course });
   } catch (error) {
     console.error('Get course error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    if (error instanceof Error && error.message === 'Course not found') {
+      res.status(404).json({ error: 'Course not found' });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
@@ -198,32 +199,51 @@ router.put('/:courseId', authenticate, requireRole(['educator']), async (req: Au
     const { title, description, maxStudents, tags, isActive } = req.body;
     const instructorId = req.userId!;
 
-    const course = await Course.findById(courseId);
+    const course = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
 
     if (!course) {
       res.status(404).json({ error: 'Course not found' });
       return;
     }
 
-    if (course.instructor.toString() !== instructorId) {
+    if (course.instructorId !== instructorId) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
 
     // Update fields
-    if (title !== undefined) course.title = title.trim();
-    if (description !== undefined) course.description = description.trim();
-    if (maxStudents !== undefined) course.maxStudents = maxStudents;
-    if (tags !== undefined) course.tags = tags.map((tag: string) => tag.trim().toLowerCase());
-    if (isActive !== undefined) course.isActive = isActive;
-
-    await course.save();
-    await course.populate('instructor', 'firstName lastName email');
-    await course.populate('students', 'firstName lastName email');
+    const updatedCourse = await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        ...(title !== undefined && { title: title.trim() }),
+        ...(description !== undefined && { description: description.trim() }),
+        ...(maxStudents !== undefined && { maxStudents }),
+        ...(tags !== undefined && { tags: tags.map((tag: string) => tag.trim().toLowerCase()) }),
+        ...(isActive !== undefined && { isActive }),
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        },
+        _count: {
+          select: {
+            enrollments: true,
+            assignments: true,
+          }
+        }
+      }
+    });
 
     res.json({
       message: 'Course updated successfully',
-      course
+      course: updatedCourse
     });
   } catch (error) {
     console.error('Update course error:', error);
@@ -242,9 +262,26 @@ router.post('/enroll', authenticate, requireRole(['student']), async (req: Authe
       return;
     }
 
-    const course = await Course.findOne({ 
-      enrollmentCode: enrollmentCode.toUpperCase(),
-      isActive: true 
+    const course = await prisma.course.findUnique({ 
+      where: { 
+        enrollmentCode: enrollmentCode.toUpperCase(),
+        isActive: true 
+      },
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        },
+        _count: {
+          select: {
+            enrollments: true
+          }
+        }
+      }
     });
 
     if (!course) {
@@ -252,34 +289,37 @@ router.post('/enroll', authenticate, requireRole(['student']), async (req: Authe
       return;
     }
 
-    // Check if student is already enrolled
-    if (course.students.includes(studentId as any)) {
-      res.status(400).json({ error: 'Already enrolled in this course' });
-      return;
-    }
+    // Use CourseService to handle enrollment logic
+    try {
+      const enrollment = await CourseService.enrollStudent({
+        courseId: course.id,
+        studentId
+      });
 
-    // Check enrollment limit
-    if (course.maxStudents && course.students.length >= course.maxStudents) {
-      res.status(400).json({ error: 'Course is at maximum capacity' });
-      return;
-    }
-
-    // Enroll student
-    course.students.push(studentId as any);
-    await course.save();
-    await course.populate('instructor', 'firstName lastName email');
-
-    res.json({
-      message: 'Successfully enrolled in course',
-      course: {
-        _id: course._id,
-        title: course.title,
-        description: course.description,
-        instructor: course.instructor,
-        enrollmentCode: course.enrollmentCode,
-        tags: course.tags
+      res.json({
+        message: 'Successfully enrolled in course',
+        course: {
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          instructor: course.instructor,
+          enrollmentCode: course.enrollmentCode,
+          tags: course.tags
+        }
+      });
+    } catch (enrollError) {
+      if (enrollError instanceof Error) {
+        if (enrollError.message.includes('already enrolled')) {
+          res.status(400).json({ error: 'Already enrolled in this course' });
+        } else if (enrollError.message.includes('full')) {
+          res.status(400).json({ error: 'Course is at maximum capacity' });
+        } else {
+          res.status(400).json({ error: enrollError.message });
+        }
+      } else {
+        throw enrollError;
       }
-    });
+    }
   } catch (error) {
     console.error('Enroll course error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -292,23 +332,30 @@ router.post('/:courseId/unenroll', authenticate, requireRole(['student']), async
     const { courseId } = req.params;
     const studentId = req.userId!;
 
-    const course = await Course.findById(courseId);
+    // Check if enrollment exists
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: {
+        courseId_studentId: {
+          courseId,
+          studentId
+        }
+      }
+    });
 
-    if (!course) {
-      res.status(404).json({ error: 'Course not found' });
-      return;
-    }
-
-    // Check if student is enrolled
-    const studentIndex = course.students.indexOf(studentId as any);
-    if (studentIndex === -1) {
+    if (!enrollment) {
       res.status(400).json({ error: 'Not enrolled in this course' });
       return;
     }
 
-    // Remove student
-    course.students.splice(studentIndex, 1);
-    await course.save();
+    // Delete enrollment
+    await prisma.courseEnrollment.delete({
+      where: {
+        courseId_studentId: {
+          courseId,
+          studentId
+        }
+      }
+    });
 
     res.json({ message: 'Successfully unenrolled from course' });
   } catch (error) {
@@ -325,15 +372,26 @@ router.get('/:courseId/assignments', authenticate, async (req: AuthenticatedRequ
     const userId = req.userId!;
 
     // Verify course exists
-    const course = await Course.findById(courseId);
+    const course = await prisma.course.findUnique({
+      where: { id: courseId }
+    });
+    
     if (!course) {
       res.status(404).json({ error: 'Course not found' });
       return;
     }
 
     // Check access permissions
-    const isInstructor = course.instructor.toString() === userId;
-    const isStudent = course.students.some((studentId: any) => studentId.toString() === userId);
+    const isInstructor = course.instructorId === userId;
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: {
+        courseId_studentId: {
+          courseId,
+          studentId: userId
+        }
+      }
+    });
+    const isStudent = !!enrollment;
     const isAdmin = req.user!.role === 'admin';
 
     if (!isInstructor && !isStudent && !isAdmin) {
@@ -342,7 +400,7 @@ router.get('/:courseId/assignments', authenticate, async (req: AuthenticatedRequ
     }
 
     // Build filter for assignments
-    const filter: any = { course: courseId };
+    const filter: any = { courseId };
     if (status && typeof status === 'string') filter.status = status;
     if (type && typeof type === 'string') filter.type = type;
 
@@ -351,17 +409,32 @@ router.get('/:courseId/assignments', authenticate, async (req: AuthenticatedRequ
       filter.status = 'published';
     }
 
-    const assignments = await Assignment.find(filter)
-      .populate('instructor', 'firstName lastName email')
-      .populate('submissionCount')
-      .sort({ createdAt: -1 });
+    const assignments = await prisma.assignment.findMany({
+      where: filter,
+      include: {
+        instructor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        },
+        _count: {
+          select: {
+            submissions: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.json({
       success: true,
       message: 'Course assignments retrieved successfully',
       data: {
         course: {
-          _id: course._id,
+          id: course.id,
           title: course.title,
           description: course.description
         },
