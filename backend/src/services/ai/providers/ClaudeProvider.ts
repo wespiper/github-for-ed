@@ -11,6 +11,7 @@ import {
   TokenUsage
 } from './AIProviderInterface';
 import { AIEducationalAction } from '../../AIBoundaryService';
+import { StudentLearningProfile, StudentLearningProfileService } from '../StudentLearningProfileService';
 
 export class ClaudeProvider implements AIProvider {
   public readonly name = 'claude';
@@ -45,11 +46,31 @@ export class ClaudeProvider implements AIProvider {
 
   async generateEducationalQuestions(context: EducationalContext): Promise<EducationalQuestionSet> {
     this.initialize();
-    const prompt = this.buildEducationalPrompt(context);
+    
+    // Fetch student profile for adaptive question generation
+    let studentProfile: StudentLearningProfile | null = null;
+    if (context.studentId) {
+      try {
+        studentProfile = await StudentLearningProfileService.buildProfile(context.studentId);
+      } catch (error) {
+        console.warn('Could not fetch student profile:', error);
+        // Continue without profile - use default questioning approach
+      }
+    }
+    
+    const prompt = this.buildEducationalPrompt(context, studentProfile);
     
     try {
       const response = await this.callClaude(prompt);
       const parsedResponse = await this.parseEducationalResponse(response.content, context.writingStage);
+      
+      // Adapt questions based on profile
+      if (studentProfile) {
+        parsedResponse.questions = this.adaptQuestionsToProfile(
+          parsedResponse.questions, 
+          studentProfile
+        );
+      }
       
       return {
         requestId: uuidv4(),
@@ -175,8 +196,9 @@ Respond with JSON format:
     };
   }
 
-  private buildEducationalPrompt(context: EducationalContext): string {
+  private buildEducationalPrompt(context: EducationalContext, profile?: StudentLearningProfile | null): string {
     const stageGuidance = this.getStageSpecificGuidance(context.writingStage);
+    const profileGuidance = profile ? this.getProfileSpecificGuidance(profile) : '';
     
     return `You are an educational AI assistant for a writing platform. Your role is to ask thoughtful questions that help students think deeper about their writing, NOT to provide answers or write content for them.
 
@@ -191,6 +213,8 @@ STUDENT'S CURRENT WRITING:
 
 STAGE-SPECIFIC GUIDANCE:
 ${stageGuidance}
+
+${profileGuidance}
 
 CRITICAL EDUCATIONAL RULES:
 1. Ask questions, NEVER provide answers
@@ -349,5 +373,122 @@ For editing, focus on:
         resourceSuggestions: ['Academic sources with different viewpoints', 'Primary sources from various stakeholders']
       }];
     }
+  }
+
+  /**
+   * Generate profile-specific guidance for prompt
+   */
+  private getProfileSpecificGuidance(profile: StudentLearningProfile): string {
+    const sections: string[] = [];
+    
+    // Add cognitive preferences
+    sections.push(`STUDENT PROFILE INSIGHTS:`);
+    sections.push(`- Question Complexity Preference: ${profile.preferences.questionComplexity}`);
+    sections.push(`- Average Reflection Depth: ${profile.preferences.averageReflectionDepth}/100`);
+    sections.push(`- Best Responds To: ${profile.preferences.bestRespondsTo.join(', ') || 'standard questions'}`);
+    
+    // Add current state considerations
+    sections.push(`\nCURRENT COGNITIVE STATE:`);
+    sections.push(`- Cognitive Load: ${profile.currentState.cognitiveLoad}`);
+    sections.push(`- Emotional State: ${profile.currentState.emotionalState}`);
+    
+    if (profile.currentState.strugglingDuration > 10) {
+      sections.push(`- Currently struggling for ${profile.currentState.strugglingDuration} minutes`);
+    }
+    
+    if (profile.currentState.recentBreakthrough) {
+      sections.push(`- Recently had a breakthrough - build on this momentum`);
+    }
+    
+    // Add strength-based guidance
+    const topStrengths = Object.entries(profile.strengths)
+      .filter(([_, score]) => score > 70)
+      .map(([skill, _]) => skill);
+    
+    if (topStrengths.length > 0) {
+      sections.push(`\nSTUDENT STRENGTHS TO LEVERAGE:`);
+      sections.push(`- ${topStrengths.join(', ')}`);
+    }
+    
+    // Add specific guidance based on profile
+    sections.push(`\nADAPTATION REQUIREMENTS:`);
+    
+    if (profile.preferences.questionComplexity === 'concrete') {
+      sections.push(`- Use concrete examples and specific scenarios`);
+      sections.push(`- Avoid overly abstract or theoretical questions`);
+    } else if (profile.preferences.questionComplexity === 'abstract') {
+      sections.push(`- Engage with theoretical concepts and abstract thinking`);
+      sections.push(`- Challenge with complex analytical questions`);
+    }
+    
+    if (profile.currentState.cognitiveLoad === 'overload') {
+      sections.push(`- Simplify questions and reduce cognitive demands`);
+      sections.push(`- Focus on one concept at a time`);
+    } else if (profile.currentState.cognitiveLoad === 'low') {
+      sections.push(`- Increase question complexity to maintain engagement`);
+      sections.push(`- Introduce challenging perspectives`);
+    }
+    
+    if (profile.currentState.emotionalState === 'frustrated') {
+      sections.push(`- Provide encouraging and supportive questions`);
+      sections.push(`- Break down complex ideas into manageable steps`);
+    } else if (profile.currentState.emotionalState === 'confident') {
+      sections.push(`- Challenge with deeper analytical questions`);
+      sections.push(`- Encourage exploration of nuanced perspectives`);
+    }
+    
+    if (profile.independenceMetrics.trend === 'decreasing') {
+      sections.push(`- Questions should guide toward independent thinking`);
+      sections.push(`- Avoid providing too much structure`);
+    }
+    
+    return sections.join('\n');
+  }
+
+  /**
+   * Adapt questions based on student profile
+   */
+  private adaptQuestionsToProfile(
+    questions: EducationalQuestion[], 
+    profile: StudentLearningProfile
+  ): EducationalQuestion[] {
+    return questions.map(question => {
+      const adapted = { ...question };
+      
+      // Adjust complexity based on profile
+      if (profile.preferences.questionComplexity === 'concrete' && 
+          (question.type === 'challenging' || question.type === 'perspective')) {
+        // Add concrete examples to abstract questions
+        adapted.followUpPrompts = [
+          `Can you think of a specific example?`,
+          `How does this relate to your personal experience?`,
+          ...adapted.followUpPrompts
+        ];
+      }
+      
+      // Adjust based on cognitive load
+      if (profile.currentState.cognitiveLoad === 'overload') {
+        // Simplify question if needed
+        adapted.educationalRationale = `${adapted.educationalRationale} (Simplified for current cognitive state)`;
+        // Remove complex follow-ups
+        adapted.followUpPrompts = adapted.followUpPrompts.slice(0, 1);
+      }
+      
+      // Add encouragement if frustrated
+      if (profile.currentState.emotionalState === 'frustrated') {
+        adapted.question = `${adapted.question} (Take your time with this - there's no wrong answer)`;
+      }
+      
+      // Leverage strengths
+      if (profile.strengths.metacognition > 80 && question.type === 'reflection') {
+        adapted.followUpPrompts.push('How does recognizing this pattern help you improve your writing process?');
+      }
+      
+      if (profile.strengths.evidenceAnalysis > 80 && question.type === 'expanding') {
+        adapted.followUpPrompts.push('What evidence would strengthen this point?');
+      }
+      
+      return adapted;
+    });
   }
 }

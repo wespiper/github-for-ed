@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { randomUUID } from 'crypto';
 import { EducationalAIService } from './ai/EducationalAIService';
+import { ReflectionAnalysisService } from './ai/ReflectionAnalysisService';
 
 // Educational AI Actions - Focus on questions and prompts, never content generation
 export type AIEducationalAction = 
@@ -319,13 +320,81 @@ export class AIBoundaryService {
   
   /**
    * Evaluate whether AI assistance should be provided for a specific request
-   * TEMPORARY IMPLEMENTATION: Returns educational guidance for testing
+   * Now integrated with ReflectionAnalysisService for progressive access
    */
   static async evaluateAssistanceRequest(
     request: AIAssistanceRequest
   ): Promise<AIAssistanceResponse> {
-    // For now, return a mock educational response that matches frontend expectations
-    return this.createEducationalResponse(request);
+    try {
+      // Get student's reflection history to determine access level
+      const reflectionHistory = await ReflectionAnalysisService.getStudentReflectionHistory(
+        request.studentId, 
+        request.assignmentId
+      );
+
+      // Check if student has been gaming the system
+      if (reflectionHistory.averageQuality < 30 && reflectionHistory.totalReflections > 3) {
+        return this.createDenialResponse(
+          'Your recent reflections need more depth and authenticity',
+          'Quality reflections help you learn from AI interactions. Take time to think deeply about how the guidance affects your writing.',
+          [
+            'Review the reflection prompts carefully',
+            'Share specific examples from your writing',
+            'Explain your actual thought process'
+          ]
+        );
+      }
+
+      // Use the original method logic for now, with enhanced reflection requirements
+      const response = await this.createEducationalResponseWithReflectionRequirements(request, reflectionHistory);
+      
+      return response;
+    } catch (error) {
+      console.error('Error in evaluateAssistanceRequest:', error);
+      // Fallback to basic response on error
+      return this.createEducationalResponse(request);
+    }
+  }
+
+  /**
+   * Create educational response with adaptive reflection requirements
+   */
+  private static async createEducationalResponseWithReflectionRequirements(
+    request: AIAssistanceRequest,
+    reflectionHistory: any
+  ): Promise<AIAssistanceResponse> {
+    // Get base educational response
+    const questions = this.generateStageQuestions(request.assistanceType, request.context);
+    
+    // Calculate reflection requirements based on history
+    const reflectionReqs = await ReflectionAnalysisService.calculateRequirements(
+      request.studentId,
+      questions
+    );
+    
+    return {
+      requestId: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      approved: true,
+      educationalGuidance: {
+        type: 'question',
+        action: request.assistanceType,
+        content: questions,
+        educationalRationale: "These questions help you think deeper about your writing choices and develop critical thinking skills.",
+        expectedOutcome: "You should discover new perspectives and approaches to strengthen your argument.",
+        reflectionPrompt: "How did these questions change your thinking about your topic?"
+      },
+      contributionTracking: {
+        mustBeAttributed: true,
+        visibleToEducator: true,
+        impactsAssessment: false
+      },
+      mandatoryReflection: {
+        required: true,
+        minimumLength: reflectionReqs.minimumLength,
+        qualityThreshold: reflectionReqs.qualityThreshold,
+        prompts: reflectionReqs.prompts
+      }
+    };
   }
 
   /**

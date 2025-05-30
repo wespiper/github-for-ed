@@ -50,8 +50,11 @@
       "Bash(/opt/homebrew/opt/postgresql@15/bin/psql -U scribe_tree_user -d scribe_tree -c \"\\dt\")",
       "Bash(npm run migrate:*)",
       "Bash(/opt/homebrew/opt/postgresql@15/bin/psql:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(git remote set-url:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": false
 }

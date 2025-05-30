@@ -1,20 +1,25 @@
-import { AuthService } from '../AuthService';
 import { generateToken } from '../../utils/jwt';
 import { RegisterInput, LoginInput, UpdateProfileInput } from '@shared/types';
 
-// Mock Prisma
-const mockPrisma = {
-  user: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    findFirst: jest.fn(),
-    update: jest.fn()
-  },
-  $disconnect: jest.fn()
-};
+// Mock Prisma before importing AuthService
+jest.mock('../../lib/prisma', () => ({
+  __esModule: true,
+  default: {
+    user: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn()
+    },
+    $disconnect: jest.fn()
+  }
+}));
 
-jest.mock('../../lib/prisma', () => mockPrisma);
 jest.mock('../../utils/jwt');
+
+// Import AuthService after mocks are set up
+import { AuthService } from '../AuthService';
+import prisma from '../../lib/prisma';
 
 const mockGenerateToken = generateToken as jest.MockedFunction<typeof generateToken>;
 
@@ -46,16 +51,16 @@ describe('AuthService', () => {
 
     it('should register user successfully with valid data', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(null); // No existing user
-      mockPrisma.user.create.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null); // No existing user
+      (prisma.user.create as jest.Mock).mockResolvedValue(mockUser as any);
       mockGenerateToken.mockReturnValue('mock_token');
 
       // Act
       const result = await AuthService.registerUser(validRegistrationData);
 
       // Assert
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-      expect(mockPrisma.user.create).toHaveBeenCalled();
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(prisma.user.create).toHaveBeenCalled();
       expect(mockGenerateToken).toHaveBeenCalledWith(expect.objectContaining({ email: 'test@example.com' }));
       expect(result.message).toBe('User registered successfully');
       expect(result.token).toBe('mock_token');
@@ -64,7 +69,7 @@ describe('AuthService', () => {
 
     it('should throw error if user already exists', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
 
       // Act & Assert
       await expect(
@@ -143,7 +148,7 @@ describe('AuthService', () => {
 
     it('should authenticate user successfully with valid credentials', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
       // Mock bcrypt.compare for password verification
       const bcrypt = require('bcryptjs');
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
@@ -153,7 +158,7 @@ describe('AuthService', () => {
       const result = await AuthService.authenticateUser(validLoginData);
 
       // Assert
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
       expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedPassword');
       expect(mockGenerateToken).toHaveBeenCalledWith(mockUser);
       expect(result.message).toBe('Login successful');
@@ -163,7 +168,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -173,7 +178,7 @@ describe('AuthService', () => {
 
     it('should throw error if password is incorrect', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
       const bcrypt = require('bcryptjs');
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
 
@@ -208,13 +213,13 @@ describe('AuthService', () => {
 
     it('should return user profile successfully', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
 
       // Act
       const result = await AuthService.getUserProfile('123e4567-e89b-12d3-a456-426614174000');
 
       // Assert
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: '123e4567-e89b-12d3-a456-426614174000' },
         select: expect.objectContaining({
           id: true,
@@ -231,7 +236,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -261,13 +266,13 @@ describe('AuthService', () => {
 
     it('should update user profile successfully', async () => {
       // Arrange
-      mockPrisma.user.update.mockResolvedValue(mockUser as any);
+      (prisma.user.update as jest.Mock).mockResolvedValue(mockUser as any);
 
       // Act
       const result = await AuthService.updateUserProfile('123e4567-e89b-12d3-a456-426614174000', updateData);
 
       // Assert
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: '123e4567-e89b-12d3-a456-426614174000' },
         data: { firstName: 'Jane', lastName: 'Smith', bio: 'Updated bio' },
         select: expect.objectContaining({
@@ -284,7 +289,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      mockPrisma.user.update.mockResolvedValue(null);
+      (prisma.user.update as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -323,11 +328,11 @@ describe('AuthService', () => {
 
     it('should change password successfully', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
       const bcrypt = require('bcryptjs');
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('newHashedPassword');
-      mockPrisma.user.update.mockResolvedValue({ ...mockUser, passwordHash: 'newHashedPassword' } as any);
+      (prisma.user.update as jest.Mock).mockResolvedValue({ ...mockUser, passwordHash: 'newHashedPassword' } as any);
 
       // Act
       await AuthService.changePassword('123e4567-e89b-12d3-a456-426614174000', 'oldpassword', 'newpassword123');
@@ -335,7 +340,7 @@ describe('AuthService', () => {
       // Assert
       expect(bcrypt.compare).toHaveBeenCalledWith('oldpassword', 'hashedPassword');
       expect(bcrypt.hash).toHaveBeenCalledWith('newpassword123', 10);
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: '123e4567-e89b-12d3-a456-426614174000' },
         data: { passwordHash: 'newHashedPassword' }
       });
@@ -343,7 +348,7 @@ describe('AuthService', () => {
 
     it('should throw error if current password is incorrect', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser as any);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser as any);
       const bcrypt = require('bcryptjs');
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
 
@@ -362,7 +367,7 @@ describe('AuthService', () => {
 
     it('should throw error if user not found', async () => {
       // Arrange
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(

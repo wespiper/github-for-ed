@@ -192,8 +192,70 @@ router.get('/at-risk-students/:courseId',
         minimumCompletionRate: minimumCompletionRate ? parseFloat(minimumCompletionRate as string) : undefined
       };
       
-      // TODO: Implement at-risk student identification
-      const atRiskStudents: any[] = [];
+      // Generate course analytics to get intervention recommendations
+      const courseAnalytics = await LearningAnalyticsService.generateCourseAnalytics(
+        courseId,
+        req.userId!,
+        {
+          start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+          end: new Date()
+        }
+      );
+      
+      // Filter intervention recommendations based on criteria
+      let atRiskStudents = courseAnalytics.interventionRecommendations;
+      
+      // Apply additional filtering based on provided criteria
+      if (criteria.minimumEngagement !== undefined || 
+          criteria.maxDaysSinceActivity !== undefined || 
+          criteria.minimumCompletionRate !== undefined) {
+        
+        // Get detailed student analytics for filtering
+        const studentAnalyticsPromises = atRiskStudents.map(async (student) => {
+          const analytics = await LearningAnalyticsService.generateStudentWritingAnalytics(
+            student.studentId,
+            courseId
+          );
+          return {
+            ...student,
+            analytics
+          };
+        });
+        
+        const studentsWithAnalytics = await Promise.all(studentAnalyticsPromises);
+        
+        atRiskStudents = studentsWithAnalytics.filter(student => {
+          const { analytics } = student;
+          
+          // Check minimum engagement
+          if (criteria.minimumEngagement !== undefined) {
+            const avgEngagement = analytics.overallMetrics.totalWritingTime / 
+              Math.max(analytics.overallMetrics.totalAssignments, 1);
+            if (avgEngagement >= criteria.minimumEngagement) return false;
+          }
+          
+          // Check days since last activity
+          if (criteria.maxDaysSinceActivity !== undefined) {
+            const lastActivity = analytics.progressMetrics
+              .map(m => m.lastActivity)
+              .sort((a, b) => b.getTime() - a.getTime())[0];
+            
+            if (lastActivity) {
+              const daysSinceActivity = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24);
+              if (daysSinceActivity <= criteria.maxDaysSinceActivity) return false;
+            }
+          }
+          
+          // Check completion rate
+          if (criteria.minimumCompletionRate !== undefined) {
+            const completionRate = analytics.overallMetrics.completedAssignments / 
+              Math.max(analytics.overallMetrics.totalAssignments, 1);
+            if (completionRate >= criteria.minimumCompletionRate) return false;
+          }
+          
+          return true;
+        }).map(({ analytics, ...student }) => student); // Remove analytics from response
+      }
       
       res.json({
         message: 'At-risk students identified successfully',

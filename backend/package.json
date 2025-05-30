@@ -30,6 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.16.0",
     "mongoose": "^8.15.0",
+    "natural": "^8.0.1",
     "prisma": "^6.8.2",
     "uuid": "^11.1.0"
   },
@@ -40,6 +41,7 @@
     "@types/express": "^5.0.2",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.9",
+    "@types/natural": "^5.1.5",
     "@types/node": "^22.15.21",
     "@types/uuid": "^10.0.0",
     "jest": "^29.7.0",

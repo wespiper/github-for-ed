@@ -39,6 +39,8 @@ model User {
   notificationsReceived Notification[] @relation("NotificationRecipient")
   notificationsSent     Notification[] @relation("NotificationSender")
   aiInteractionLogs     AIInteractionLog[]
+  reflectionAnalyses    ReflectionAnalysis[]
+  studentProfile        StudentProfile?
 
   @@map("users")
   @@index([role])
@@ -150,6 +152,7 @@ model Assignment {
   submissions       AssignmentSubmission[]
   documents         Document[]
   aiInteractionLogs AIInteractionLog[]
+  reflectionAnalyses ReflectionAnalysis[]
 
   @@unique([templateId, courseId])
   @@map("assignments")
@@ -338,24 +341,138 @@ model Notification {
 
 // AI Interaction Logs for educational analytics and compliance
 model AIInteractionLog {
-  id                   String   @id @default(uuid())
-  studentId            String   @map("student_id")
-  student              User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  assignmentId         String?  @map("assignment_id")
-  assignment           Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
-  assistanceType       String   @map("assistance_type")
-  questionsGenerated   Int?     @map("questions_generated")
-  educationallySound   Boolean  @map("educationally_sound")
-  writingStage         String   @map("writing_stage")
-  questionText         String?  @map("question_text")
-  responseId           String   @map("response_id")
-  reflectionCompleted  Boolean  @default(false) @map("reflection_completed")
-  metadata             Json     @default("{}")
-  createdAt            DateTime @default(now()) @map("created_at")
+  id                      String   @id @default(uuid())
+  studentId               String   @map("student_id")
+  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignmentId            String?  @map("assignment_id")
+  assignment              Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assistanceType          String   @map("assistance_type")
+  questionsGenerated      Int?     @map("questions_generated")
+  educationallySound      Boolean  @map("educationally_sound")
+  writingStage            String   @map("writing_stage")
+  questionText            String?  @map("question_text")
+  responseId              String   @map("response_id")
+  reflectionCompleted     Boolean  @default(false) @map("reflection_completed")
+  reflectionQualityScore  Int?     @map("reflection_quality_score")
+  reflectionSubmittedAt   DateTime? @map("reflection_submitted_at")
+  metadata                Json     @default("{}")
+  createdAt               DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  reflectionAnalyses      ReflectionAnalysis[]
 
   @@map("ai_interaction_logs")
   @@index([studentId, createdAt])
   @@index([assignmentId])
   @@index([assistanceType])
   @@index([educationallySound])
+}
+
+// Reflection Analysis for tracking quality and progressive access
+model ReflectionAnalysis {
+  id                      String   @id @default(uuid())
+  studentId               String   @map("student_id")
+  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignmentId            String   @map("assignment_id")
+  assignment              Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  aiInteractionId         String   @map("ai_interaction_id")
+  aiInteraction           AIInteractionLog @relation(fields: [aiInteractionId], references: [id], onDelete: Cascade)
+  reflectionText          String   @map("reflection_text")
+  
+  // Depth scores
+  depthScore              Int      @map("depth_score")
+  reasoningChains         Int      @map("reasoning_chains")
+  abstractionLevel        Int      @map("abstraction_level")
+  evidenceOfThinking      Json     @default("[]") @map("evidence_of_thinking")
+  
+  // Self-awareness scores
+  selfAwarenessScore      Int      @map("self_awareness_score")
+  recognizesGaps          Boolean  @default(false) @map("recognizes_gaps")
+  questionsAssumptions    Boolean  @default(false) @map("questions_assumptions")
+  identifiesLearningProcess Boolean @default(false) @map("identifies_learning_process")
+  articulatesStruggle     Boolean  @default(false) @map("articulates_struggle")
+  
+  // Critical thinking scores
+  criticalThinkingScore   Int      @map("critical_thinking_score")
+  challengesAIPrompts     Boolean  @default(false) @map("challenges_ai_prompts")
+  offersAlternatives      Boolean  @default(false) @map("offers_alternatives")
+  evaluatesPerspectives   Boolean  @default(false) @map("evaluates_perspectives")
+  synthesizesIdeas        Boolean  @default(false) @map("synthesizes_ideas")
+  
+  // Growth mindset scores
+  growthMindsetScore      Int      @map("growth_mindset_score")
+  focusOnLearning         Boolean  @default(false) @map("focus_on_learning")
+  embracesChallenge       Boolean  @default(false) @map("embraces_challenge")
+  seeksImprovement        Boolean  @default(false) @map("seeks_improvement")
+  
+  // Overall assessment
+  overallQualityScore     Int      @map("overall_quality_score")
+  authenticityScore       Int      @map("authenticity_score")
+  progressiveAccessLevel  String   @map("progressive_access_level") // restricted, basic, standard, enhanced
+  recommendations         Json     @default("[]")
+  
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("reflection_analyses")
+  @@index([studentId])
+  @@index([assignmentId])
+  @@index([createdAt])
+  @@index([overallQualityScore])
+  @@index([progressiveAccessLevel])
+}
+
+// Student Learning Profile for adaptive AI
+model StudentProfile {
+  id                      String   @id @default(uuid())
+  studentId               String   @unique @map("student_id")
+  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Preferences
+  questionComplexity      String   @default("mixed") @map("question_complexity") // concrete, mixed, abstract
+  preferredLearningStyle  String   @default("mixed") @map("preferred_learning_style") // visual, verbal, kinesthetic, mixed
+  averageReflectionDepth  Int      @default(0) @map("average_reflection_depth")
+  bestRespondsTo          Json     @default("[]") @map("best_responds_to")
+  strugglesWith           Json     @default("[]") @map("struggles_with")
+  
+  // Strengths (0-100 scores)
+  evidenceAnalysis        Int      @default(50) @map("evidence_analysis")
+  perspectiveTaking       Int      @default(50) @map("perspective_taking")
+  logicalReasoning        Int      @default(50) @map("logical_reasoning")
+  creativeThinking        Int      @default(50) @map("creative_thinking")
+  organizationalSkills    Int      @default(50) @map("organizational_skills")
+  metacognition           Int      @default(50)
+  
+  // Current state
+  currentCognitiveLoad    String   @default("optimal") @map("current_cognitive_load") // low, optimal, high, overload
+  emotionalState          String   @default("neutral") @map("emotional_state") // frustrated, neutral, engaged, confident
+  currentFocus            String?  @map("current_focus")
+  recentBreakthrough      Boolean  @default(false) @map("recent_breakthrough")
+  strugglingDuration      Int      @default(0) @map("struggling_duration") // minutes
+  lastSuccessfulInteraction DateTime? @map("last_successful_interaction")
+  lastActivityTime        DateTime? @map("last_activity_time")
+  
+  // Independence metrics
+  aiRequestFrequency      Float    @default(0) @map("ai_request_frequency") // requests per hour
+  independentWorkStreak   Int      @default(0) @map("independent_work_streak") // minutes
+  qualityWithoutAI        Int      @default(0) @map("quality_without_ai") // 0-100
+  independenceTrend       String   @default("stable") @map("independence_trend") // increasing, stable, decreasing
+  lastMilestone           String?  @map("last_milestone")
+  
+  // Learning patterns
+  bestTimeOfDay           String   @default("afternoon") @map("best_time_of_day") // morning, afternoon, evening, night
+  averageSessionLength    Int      @default(30) @map("average_session_length") // minutes
+  breakFrequency          Float    @default(2) @map("break_frequency") // breaks per hour
+  productivityPattern     String   @default("steady") @map("productivity_pattern") // steady, burst, gradual
+  
+  // Session metrics
+  sessionMetrics          Json     @default("{}") @map("session_metrics")
+  
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("student_profiles")
+  @@index([currentCognitiveLoad])
+  @@index([independenceTrend])
+  @@index([emotionalState])
 }

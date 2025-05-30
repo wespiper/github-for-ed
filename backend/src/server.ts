@@ -13,6 +13,7 @@ import submissionRoutes from './routes/submissions';
 import notificationRoutes from './routes/notifications';
 import learningObjectivesRoutes from './routes/learningObjectives';
 import analyticsRoutes from './routes/analytics';
+import reflectionRoutes from './routes/reflections';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.use('/api/submissions', submissionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/learning-objectives', learningObjectivesRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/reflections', reflectionRoutes);
 
 // Initialize Prisma connection
 const initializeDatabase = async () => {

@@ -1,20 +1,24 @@
-import { AssignmentService } from '../AssignmentService';
 import { CreateAssignmentInput } from '@shared/types';
 
-// Mock Prisma
-const mockPrisma = {
-  assignment: {
-    create: jest.fn(),
-    findUnique: jest.fn(),
-    update: jest.fn()
-  },
-  course: {
-    findUnique: jest.fn()
-  },
-  $disconnect: jest.fn()
-};
+// Mock Prisma before importing AssignmentService
+jest.mock('../../lib/prisma', () => ({
+  __esModule: true,
+  default: {
+    assignment: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn()
+    },
+    course: {
+      findUnique: jest.fn()
+    },
+    $disconnect: jest.fn()
+  }
+}));
 
-jest.mock('../../lib/prisma', () => mockPrisma);
+// Import AssignmentService after mocks are set up
+import { AssignmentService } from '../AssignmentService';
+import prisma from '../../lib/prisma';
 
 describe('AssignmentService', () => {
   beforeEach(() => {
@@ -62,8 +66,8 @@ describe('AssignmentService', () => {
 
     it('should create assignment successfully with valid data', async () => {
       // Arrange
-      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
-      mockPrisma.assignment.create.mockResolvedValue(mockAssignment as any);
+      (prisma.course.findUnique as jest.Mock).mockResolvedValue(mockCourse as any);
+      (prisma.assignment.create as jest.Mock).mockResolvedValue(mockAssignment as any);
 
       // Act
       const result = await AssignmentService.createAssignment(
@@ -72,16 +76,16 @@ describe('AssignmentService', () => {
       );
 
       // Assert
-      expect(mockPrisma.course.findUnique).toHaveBeenCalledWith({
+      expect(prisma.course.findUnique).toHaveBeenCalledWith({
         where: { id: '123e4567-e89b-12d3-a456-426614174000' }
       });
-      expect(mockPrisma.assignment.create).toHaveBeenCalled();
+      expect(prisma.assignment.create).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
 
     it('should throw error if course not found', async () => {
       // Arrange
-      mockPrisma.course.findUnique.mockResolvedValue(null);
+      (prisma.course.findUnique as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -95,7 +99,7 @@ describe('AssignmentService', () => {
         ...mockCourse,
         instructorId: 'different_instructor_id'
       };
-      mockPrisma.course.findUnique.mockResolvedValue(mockCourseWithDifferentInstructor as any);
+      (prisma.course.findUnique as jest.Mock).mockResolvedValue(mockCourseWithDifferentInstructor as any);
 
       // Act & Assert
       await expect(
@@ -115,7 +119,7 @@ describe('AssignmentService', () => {
 
     it('should throw error if learning objectives weights do not sum to 100%', async () => {
       // Arrange
-      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
+      (prisma.course.findUnique as jest.Mock).mockResolvedValue(mockCourse as any);
       const invalidData = {
         ...validAssignmentData,
         learningObjectives: [
@@ -138,7 +142,7 @@ describe('AssignmentService', () => {
 
     it('should throw error if writing stages have duplicate orders', async () => {
       // Arrange
-      mockPrisma.course.findUnique.mockResolvedValue(mockCourse as any);
+      (prisma.course.findUnique as jest.Mock).mockResolvedValue(mockCourse as any);
       const invalidData = {
         ...validAssignmentData,
         writingStages: [
@@ -289,8 +293,8 @@ describe('AssignmentService', () => {
     it('should publish assignment successfully', async () => {
       // Arrange
       const updatedAssignment = { ...mockAssignment, status: 'published' as const };
-      mockPrisma.assignment.findUnique.mockResolvedValue(mockAssignment as any);
-      mockPrisma.assignment.update.mockResolvedValue(updatedAssignment as any);
+      (prisma.assignment.findUnique as jest.Mock).mockResolvedValue(mockAssignment as any);
+      (prisma.assignment.update as jest.Mock).mockResolvedValue(updatedAssignment as any);
 
       // Act
       const result = await AssignmentService.publishAssignment(
@@ -299,7 +303,7 @@ describe('AssignmentService', () => {
       );
 
       // Assert
-      expect(mockPrisma.assignment.update).toHaveBeenCalledWith({
+      expect(prisma.assignment.update).toHaveBeenCalledWith({
         where: { id: '123e4567-e89b-12d3-a456-426614174002' },
         data: { status: 'published' }
       });
@@ -308,7 +312,7 @@ describe('AssignmentService', () => {
 
     it('should throw error if assignment not found', async () => {
       // Arrange
-      mockPrisma.assignment.findUnique.mockResolvedValue(null);
+      (prisma.assignment.findUnique as jest.Mock).mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -322,7 +326,7 @@ describe('AssignmentService', () => {
         ...mockAssignment,
         instructorId: 'different_instructor_id'
       };
-      mockPrisma.assignment.findUnique.mockResolvedValue(assignmentWithDifferentInstructor as any);
+      (prisma.assignment.findUnique as jest.Mock).mockResolvedValue(assignmentWithDifferentInstructor as any);
 
       // Act & Assert
       await expect(
