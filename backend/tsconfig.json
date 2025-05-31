@@ -3,7 +3,10 @@
     "src/tests/**/*",
     "src/routes/assignmentTemplates.ts",
     "src/routes/courseAssignments.ts",
-    "src/routes/submissions.ts"
+    "src/routes/submissions.ts",
+    "src/routes/boundaryIntelligence.ts",
+    "src/services/ai/MCPValidationService.ts",
+    "src/services/NotificationService.ts"
   ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */

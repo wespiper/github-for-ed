@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import prisma from './lib/prisma';
+import { startFastifyServer } from './fastify/app';
+import { trafficRouter, addRoutingHeaders } from './middleware/router';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
@@ -19,7 +21,8 @@ import boundaryIntelligenceRoutes from './routes/boundaryIntelligence';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const EXPRESS_PORT = process.env.PORT || 5001;
+const FASTIFY_PORT = process.env.FASTIFY_PORT || 3001;
 
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
@@ -30,6 +33,13 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Add routing headers to all responses
+app.use(addRoutingHeaders);
+
+// Apply traffic routing to migrated endpoints
+app.use('/api/auth', trafficRouter);
+app.use('/api/ai', trafficRouter);
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -90,14 +100,25 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start server
-const startServer = async () => {
+// Start servers
+const startServers = async () => {
   await initializeDatabase();
   
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📚 API available at http://localhost:${PORT}/api`);
+  // Start Express server
+  app.listen(EXPRESS_PORT, () => {
+    console.log(`✅ Express server running on port ${EXPRESS_PORT}`);
+    console.log(`📚 Express API available at http://localhost:${EXPRESS_PORT}/api`);
   });
+
+  // Start Fastify server
+  try {
+    await startFastifyServer(FASTIFY_PORT as number);
+    console.log(`⚡ Fastify server running on port ${FASTIFY_PORT}`);
+    console.log(`🚀 Fastify API available at http://localhost:${FASTIFY_PORT}/api`);
+  } catch (error) {
+    console.error('❌ Failed to start Fastify server:', error);
+    process.exit(1);
+  }
 };
 
-startServer();
+startServers();
