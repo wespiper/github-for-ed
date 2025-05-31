@@ -52,7 +52,9 @@
       "Bash(/opt/homebrew/opt/postgresql@15/bin/psql:*)",
       "Bash(true)",
       "Bash(git remote set-url:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(NODE_ENV=test npm test -- --testPathPattern=\"BoundaryIntelligence\" --verbose --maxWorkers=1)",
+      "Bash(NODE_ENV=test npm test -- --testPathPattern=\"BoundaryIntelligence\" --verbose --maxWorkers=1 --testTimeout=30000)"
     ],
     "deny": []
   },

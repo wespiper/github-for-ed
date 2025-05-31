@@ -1,5 +1,6 @@
 import prisma from '../../lib/prisma';
 import { AIInteractionLog, ReflectionAnalysis } from '@prisma/client';
+import { CacheService, CacheKeys, CacheTTL } from '../CacheService';
 
 export interface StudentLearningProfile {
   studentId: string;
@@ -65,6 +66,13 @@ export class StudentLearningProfileService {
    * Build comprehensive profile from multiple data sources
    */
   static async buildProfile(studentId: string): Promise<StudentLearningProfile> {
+    // Check cache first
+    const cacheKey = CacheKeys.studentProfile(studentId);
+    const cached = CacheService.get<StudentLearningProfile>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Aggregate data from multiple sources
     const [interactions, reflections, sessions, submissions] = await Promise.all([
       prisma.aIInteractionLog.findMany({
@@ -99,7 +107,7 @@ export class StudentLearningProfileService {
       })
     ]);
     
-    return {
+    const profile = {
       studentId,
       preferences: await this.analyzePreferences(interactions, reflections),
       strengths: await this.assessStrengths(submissions, reflections),
@@ -107,6 +115,11 @@ export class StudentLearningProfileService {
       independenceMetrics: await this.calculateIndependence(sessions, interactions),
       learningPatterns: await this.analyzeLearningPatterns(sessions, interactions)
     };
+
+    // Cache the profile
+    CacheService.set(cacheKey, profile, CacheTTL.studentProfile);
+
+    return profile;
   }
 
   /**

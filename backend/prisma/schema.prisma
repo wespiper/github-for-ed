@@ -138,6 +138,7 @@ model Assignment {
   writingStages          Json      @map("writing_stages")
   learningObjectives     Json      @map("learning_objectives")
   aiSettings             Json      @map("ai_settings")
+  aiBoundarySettings     Json      @default("{}") @map("ai_boundary_settings")
   gradingCriteria        Json?     @map("grading_criteria")
   dueDate                DateTime? @map("due_date")
   stageDueDates          Json?     @map("stage_due_dates")
@@ -153,6 +154,8 @@ model Assignment {
   documents         Document[]
   aiInteractionLogs AIInteractionLog[]
   reflectionAnalyses ReflectionAnalysis[]
+  boundaryRecommendations BoundaryRecommendation[]
+  boundaryProposals BoundaryProposal[]
 
   @@unique([templateId, courseId])
   @@map("assignments")
@@ -475,4 +478,69 @@ model StudentProfile {
   @@index([currentCognitiveLoad])
   @@index([independenceTrend])
   @@index([emotionalState])
+}
+
+// Boundary recommendation model
+model BoundaryRecommendation {
+  id                 String    @id @default(cuid())
+  assignmentId       String    @map("assignment_id")
+  assignment         Assignment @relation(fields: [assignmentId], references: [id])
+  recommendationType String    @map("recommendation_type") // class_wide, individual, temporal
+  recommendation     Json      // Full recommendation object
+  evidence           Json      // Supporting data
+  status             String    @default("pending") // pending, implemented, rejected
+  implementedAt      DateTime? @map("implemented_at")
+  implementedBy      String?   @map("implemented_by")
+  educatorNotes      String?   @map("educator_notes")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("boundary_recommendations")
+  @@index([assignmentId])
+  @@index([status])
+}
+
+// Boundary proposal model
+model BoundaryProposal {
+  id               String    @id @default(cuid())
+  assignmentId     String    @map("assignment_id")
+  assignment       Assignment @relation(fields: [assignmentId], references: [id])
+  type             String    // reduce_access, increase_support, modify_complexity, temporal_shift
+  reason           String
+  specificChange   String    @map("specific_change")
+  affectedStudents String[]  @map("affected_students") // Array of student IDs
+  expectedOutcome  String    @map("expected_outcome")
+  evidence         Json
+  status           String    @default("pending") // pending, approved, rejected, implemented
+  approvedBy       String?   @map("approved_by")
+  approvedAt       DateTime? @map("approved_at")
+  educatorNotes    String?   @map("educator_notes")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  adjustmentLogs   BoundaryAdjustmentLog[]
+
+  @@map("boundary_proposals")
+  @@index([assignmentId])
+  @@index([status])
+  @@index([type])
+}
+
+// Boundary adjustment log model
+model BoundaryAdjustmentLog {
+  id            String   @id @default(cuid())
+  assignmentId  String   @map("assignment_id")
+  proposalId    String?  @map("proposal_id")
+  proposal      BoundaryProposal? @relation(fields: [proposalId], references: [id])
+  previousValue Json     @map("previous_value")
+  newValue      Json     @map("new_value")
+  reason        String
+  implementedBy String   @map("implemented_by")
+  impactMetrics Json?    @map("impact_metrics") // Tracked after implementation
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("boundary_adjustment_logs")
+  @@index([assignmentId])
+  @@index([proposalId])
 }

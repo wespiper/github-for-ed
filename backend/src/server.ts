@@ -14,6 +14,7 @@ import notificationRoutes from './routes/notifications';
 import learningObjectivesRoutes from './routes/learningObjectives';
 import analyticsRoutes from './routes/analytics';
 import reflectionRoutes from './routes/reflections';
+import boundaryIntelligenceRoutes from './routes/boundaryIntelligence';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/learning-objectives', learningObjectivesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reflections', reflectionRoutes);
+app.use('/api/boundaries', boundaryIntelligenceRoutes);
 
 // Initialize Prisma connection
 const initializeDatabase = async () => {
