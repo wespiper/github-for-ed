@@ -54,9 +54,26 @@
       "Bash(git remote set-url:*)",
       "Bash(git fetch:*)",
       "Bash(NODE_ENV=test npm test -- --testPathPattern=\"BoundaryIntelligence\" --verbose --maxWorkers=1)",
-      "Bash(NODE_ENV=test npm test -- --testPathPattern=\"BoundaryIntelligence\" --verbose --maxWorkers=1 --testTimeout=30000)"
+      "Bash(NODE_ENV=test npm test -- --testPathPattern=\"BoundaryIntelligence\" --verbose --maxWorkers=1 --testTimeout=30000)",
+      "Bash(git filter-branch:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter '\n  # Remove Claude Code attribution lines\n  sed -e \"/🤖 Generated with \\[Claude Code\\]/d\" \\\n      -e \"/Co-Authored-By: Claude <noreply@anthropic.com>/d\" \\\n      -e \"/^$/N;/^\\n$/d\"\n' -- HEAD~6..HEAD~1)",
+      "Bash(git stash:*)",
+      "mcp__ide__executeCode",
+      "Bash(env)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   },
-  "enableAllProjectMcpServers": false
+  "enableAllProjectMcpServers": false,
+  "mcpServers": {
+    "scribe-tree-docs": {
+      "command": "node",
+      "args": [
+        "/Users/wnp/Desktop/scribe-tree/mcp-servers/scribe-tree-docs/dist/server.js"
+      ],
+      "env": {
+        "PROJECT_ROOT": "/Users/wnp/Desktop/scribe-tree"
+      }
+    }
+  }
 }

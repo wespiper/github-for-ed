@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Quick operational reference for Claude Code. For detailed documentation, use the MCP server:
+`search_documents({"query": "your topic"})`
 
 ## Architecture Overview
 
@@ -31,7 +32,7 @@ npm run build   # TypeScript compilation to ./dist
 npm run start   # Production server from compiled JS
 ```
 
-### Setup Requirements
+## Setup Requirements
 
 1. Install dependencies in both directories: `npm install`
 2. Copy `backend/.env.example` to `backend/.env`
@@ -42,486 +43,71 @@ npm run start   # Production server from compiled JS
 ## Key Configuration
 
 ### Path Aliases
-
--   Frontend uses `@/*` mapping to `./src/*` (configured in tsconfig.json and vite.config.ts)
--   Import components as `@/components/ui/button` instead of relative paths
+- Frontend uses `@/*` mapping to `./src/*` (configured in tsconfig.json and vite.config.ts)
+- Import components as `@/components/ui/button` instead of relative paths
 
 ### ShadCN UI Setup
-
--   Pre-configured with "New York" style variant
--   Add components: `npx shadcn@latest add [component-name]`
--   Components installed to `frontend/src/components/ui/`
-
-### TypeScript Configuration
-
--   **Frontend**: Modern ESNext modules, React JSX, strict mode
--   **Backend**: CommonJS compilation, output to `./dist`, strict mode
--   Both use path mapping and have separate tsconfig files
+- Pre-configured with "New York" style variant
+- Add components: `npx shadcn@latest add [component-name]`
+- Components installed to `frontend/src/components/ui/`
 
 ### Database Connection
+- PostgreSQL with Prisma ORM
+- Connection string via `DATABASE_URL` environment variable
+- Automatic schema synchronization with `prisma db push`
 
--   PostgreSQL with Prisma ORM
--   Connection string via `DATABASE_URL` environment variable
--   Automatic schema synchronization with `prisma db push`
--   Generated types for compile-time safety
--   Connection retry and error handling in `backend/src/server.ts`
+## Using the Documentation MCP Server
 
-### Database Migration Standards
+The project has comprehensive documentation available through the MCP server tools:
 
--   **Test Preservation**: Update existing test logic rather than rewriting maintains coverage during migration
--   **Type Safety First**: Use Prisma-generated types for compile-time validation and error prevention
--   **API Contract Validation**: Ensure frontend expectations match backend reality after migrations
--   **Role-Based Data Access**: Design queries that support multi-role visibility (admin vs. user patterns)
--   **Migration Completeness**: Complete API endpoint inventory prevents gaps during database changes
-
-### API Design Standards
-
--   **Standard Response Format**: `{ success: boolean, data: T, message?: string }` across all endpoints
--   **Error Handling**: Standardized error responses with development details when appropriate
--   **Role-Based Endpoints**: Implement admin vs. user access patterns consistently
--   **Type Safety**: Use Prisma-generated types for request/response validation
--   **Documentation**: Maintain comprehensive API contract documentation
-
-## Development Standards
-
-### Code Quality Principles
-
--   **Readability First**: Write code that is easily understandable by humans reading it
--   **Scalable Architecture**: Prioritize code that can grow with the application
--   **Self-Documenting**: Minimize line-level comments; let code speak for itself
--   **Design Intent**: Use high-level documentation to explain architectural decisions
-
-### Development Workflow
-
-#### Feature Development Process
-
-1. **Understand Requirements**: Review GitHub issue, ask clarifying questions
-2. **AI Compliance Check**: If AI-related, review `.claude/docs/ai-philosophy.md` for educational alignment
-3. **Plan Implementation**: Identify components, APIs, and tests needed
-4. **Write Tests First**: Create failing tests that define expected behavior
-5. **Implement Backend**: API routes, database models, business logic
-6. **Implement Frontend**: Components, hooks, integration with backend
-7. **Integration Testing**: Test complete user workflows end-to-end
-8. **Manual Testing**: Verify in browser/interface
-9. **Complete Task Reflection**: Use `/reflect` command to document insights
-
-#### Code Quality Gates
-
--   All tests must pass before code is considered complete
--   ESLint warnings should be addressed (errors block completion)
--   TypeScript compilation must succeed without errors
--   Manual testing confirms feature works as expected
--   Performance is acceptable for expected usage patterns
-
-### Error Handling Requirements
-
--   **API Endpoints**: Return appropriate HTTP status codes and error messages
--   **Frontend Components**: Use error boundaries and graceful degradation
--   **Database Operations**: Handle connection errors and validation failures
--   **User Feedback**: Provide clear, actionable error messages to users
-
-### File Organization
-
--   **Backend**: Models → Routes → Controllers → Middleware → Utils
--   **Frontend**: Components → Hooks → Utils → Types → Constants
--   **Shared**: Types and interfaces should be clearly defined and shared between frontend/backend when appropriate
-
-## Testing Requirements
-
-### When to Write Tests
-
--   **Always**: New API endpoints, database models, utility functions
--   **Integration Tests**: Complete user workflows (signup → course creation → assignment)
--   **Unit Tests**: Individual component methods, data transformations, validation logic
--   **Before Deployment**: All new features must include appropriate test coverage
-
-### Testing Commands
-
-```bash
-# Frontend testing (Vitest + React Testing Library)
-cd frontend
-npm test              # Run all tests once
-npm run test:watch    # Watch mode for development
-npm run test:coverage # Generate coverage report
-
-# Backend testing (Jest + Prisma)
-cd backend
-npm test              # Run all tests with Prisma mocking
-npm run test:watch    # Watch mode for development
-npm run test:coverage # Generate coverage report
+### Search Documentation
+```javascript
+search_documents({"query": "testing philosophy"})
+search_documents({"query": "AI", "category": "ai-philosophy"})
+search_documents({"query": "architecture", "type": "guide"})
 ```
 
-### Testing Setup
-
-**Frontend Testing Stack**:
-- **Vitest**: Fast test runner with TypeScript support
-- **React Testing Library**: Component testing focused on user behavior
-- **@testing-library/jest-dom**: Additional DOM matchers
-- **@testing-library/user-event**: User interaction simulation
-- **jsdom**: DOM environment for tests
-
-**Test Configuration**:
-- `vitest.config.ts`: Test environment configuration with path aliases
-- `src/test/setup.ts`: Global test setup with DOM mocks
-- Test files: `*.test.tsx` for components, `*.test.ts` for utilities
-
-### Testing Standards
-
--   **Minimum 80% code coverage** for new features
--   **Test file naming**: `ComponentName.test.tsx` or `functionName.test.ts`
--   **Test organization**: Group tests by feature/component, not by test type
--   **Mock external dependencies**: APIs, file system, third-party services
--   **Integration tests use realistic data** that mirrors production scenarios
-
-### Testing Philosophy
-
--   **Test-Driven Development**: Write tests before implementing new features
--   **Unit Testing Focus**:
-    -   Test specific method behavior and edge cases
-    -   Verify parameter variations and error conditions
-    -   Stub external dependencies (APIs, databases, file system)
--   **Integration Testing Approach**:
-    -   Mock only external boundaries (third-party services)
-    -   Create realistic data scenarios that mirror production
-    -   Test complete application flows from input to output
-    -   Verify end state after operations complete
-
-### Required Test Types by Component
-
-```typescript
-// Example test requirements
-interface TestRequirements {
-    apiRoutes: ["unit", "integration"];
-    reactComponents: ["unit", "integration"];
-    databaseModels: ["unit"];
-    utilities: ["unit"];
-    userWorkflows: ["integration"];
-}
+### Read Specific Documents
+```javascript
+read_document({"path": "docs/guides/TESTING_GUIDE.md"})
+read_document({"path": "docs/philosophy/scribe-tree-ai-philosophy-white-paper.md"})
 ```
 
-## Task Completion Protocol
+### Get Project Context
+```javascript
+get_project_context({"includeRecentActivity": true})
+```
 
-### Definition of Done Checklist
+### Common Documentation Searches
+- **Testing**: `search_documents({"query": "testing", "type": "guide"})`
+- **AI Philosophy**: `search_documents({"query": "bounded enhancement", "category": "ai-philosophy"})`
+- **Architecture**: `search_documents({"query": "architecture patterns"})`
+- **Development Workflow**: `search_documents({"query": "development workflow"})`
+- **Implementation**: `search_documents({"query": "implementation guidelines"})`
 
-Before marking any task complete, ensure:
-
--   [ ] **Code implemented** and follows project standards
--   [ ] **Tests written** and passing (see Testing Requirements)
--   [ ] **Documentation updated** if public APIs changed
--   [ ] **Manual testing completed** for user-facing features
--   [ ] **Performance verified** for database queries and UI interactions
--   [ ] **Accessibility checked** for new UI components
--   [ ] **Task reflection completed** using `/reflect` command
-
-### Post-Task Reflection Protocol
-
-After completing each significant task, use the `/reflect` command to:
-
-1. **Document Technical Decisions**: Architecture choices and rationale
-2. **Capture Project Insights**: Understanding gained about user workflows and system integration
-3. **Record Challenges & Solutions**: Problems encountered and how they were solved
-4. **Identify Future Opportunities**: Refactoring, features, or process improvements
-5. **Assess Educational Alignment**: How the work serves our writing education mission
-
-Reflections are automatically saved to `.claude/reflections/YYYY-MM-DD-feature-name.md` for future reference.
-
-## Learning & Reflection System
-
-### Continuous Learning Process
-
-This project uses a structured learning system to accumulate knowledge and improve development over time.
-
-### Post-Task Reflection
-
-After completing significant tasks, use: `/reflect`
-
-This command guides you through documenting:
-
--   **Technical decisions and rationale**
--   **Project insights gained about user workflows and system architecture**
--   **Challenges encountered and solutions implemented**
--   **Educational platform alignment and value delivered**
--   **Future improvement opportunities identified**
-
-### Learning Integration
-
-Periodically (monthly or after major features), use: `/learn`
-
-This command:
-
--   **Reviews recent reflections** to identify patterns and insights
--   **Extracts key learnings** about technical approaches and user needs
--   **Updates accumulated knowledge** about the project and development processes
--   **Recommends improvements** to standards, processes, or architecture
--   **Synthesizes insights** specific to our educational writing platform mission
-
-### Reflection Storage & Access
-
--   **Individual reflections**: `.claude/reflections/YYYY-MM-DD-feature-name.md`
--   **Accumulated insights**: `.claude/insights/accumulated-learnings.md`
--   **Automatic context loading**: Relevant reflections are imported when working on related features
--   **Pattern recognition**: System identifies recurring challenges and successful approaches
-
-### Learning Benefits
-
-This system enables:
-
--   **Improved decision making** based on accumulated experience
--   **Faster development** by reusing proven approaches
--   **Risk reduction** by learning from past challenges
--   **Quality improvement** through identified best practices
--   **Mission alignment** by deepening understanding of educational goals
-
-## Project Vision
-
-### Core Mission
+## Project Mission
 
 Transform writing education by making the writing process visible and collaborative with responsible AI integration.
 
-### Key Principles
+**Key Decision**: "Does this help educators understand student writing development?"
 
--   **Process over Product**: Value writing journey, not just final drafts
--   **Educational First**: Every feature serves learning outcomes
--   **Invisible Design**: Complex functionality through intuitive interfaces
--   **Bounded AI**: Enhancement that builds critical thinking, doesn't replace it
+## Quick Reference Paths
 
-### Decision Framework
-
-Ask: "Does this help educators understand student writing development?"
-
-### What We Are NOT Building
-
--   A generic Learning Management System (LMS)
--   A productivity tool focused on administrative efficiency
--   A content delivery platform for lessons/chapters
--   An AI writing generator that does work for students
--   A traditional plagiarism detection system
-
-### What We ARE Building
-
--   Writing process visualization tools that show student development over time
--   Collaborative editing environments where educators can observe and guide writing
--   Assignment systems focused on writing skills and learning objectives
--   Analytics that inform pedagogical decisions about writing instruction
--   AI assistance that is bounded, transparent, and educational
-
-## AI Development Guidelines
-
-### **IMPORTANT: AI Philosophy Compliance**
-
-**Before implementing ANY AI-related features**, developers MUST review our comprehensive AI philosophy:
-
-📋 **Required Reading**: `.claude/docs/ai-philosophy.md`
-
-**Core AI Principles** (detailed in philosophy document):
-- **Educational Focus**: AI enhances thinking, never replaces it
-- **Questions Only**: AI asks questions and provides prompts, never generates content
-- **Mandatory Reflection**: Every AI interaction requires student thinking explanation
-- **Complete Transparency**: All AI contributions visible to students and educators
-- **Progressive Independence**: AI access decreases as student skills develop
-
-**Decision Framework**: Every AI feature must answer "Does this build student thinking or just make work easier?"
-
-**Implementation Requirements**:
-- Stage-specific educational boundaries (brainstorming ≠ editing)
-- Reflection quality assessment and progressive access
-- Complete attribution and transparency systems
-- Educator pedagogical control over AI boundaries
-
-## Core User Workflows
-
-### Primary User Stories
-
-#### Educator Experience
-
-1. **Course Creation**: Create writing-focused courses with clear learning objectives and skill progression
-2. **Assignment Design**: Build assignments that scaffold the writing process with appropriate AI boundaries
-3. **Process Monitoring**: Observe student writing development in real-time across all assignments
-4. **Targeted Feedback**: Provide contextual feedback at appropriate stages of the writing process
-5. **Learning Analytics**: Use writing journey data to improve instruction and identify intervention needs
-
-#### Student Experience
-
-1. **Assignment Engagement**: Receive clear writing assignments with scaffolded process stages
-2. **Writing Development**: Work through guided writing processes with version control tracking
-3. **Feedback Integration**: Receive and respond to educator feedback throughout the writing journey
-4. **AI Assistance**: Access bounded AI help that enhances learning without replacing critical thinking
-5. **Growth Visualization**: See concrete evidence of writing skill development over time
-
-## Implementation Guidelines
-
-### User Experience Principles
-
-1. **Invisible Complexity**: "Good design is invisible - when done right, users don't notice it because everything feels natural, intuitive, and easy to use"
-2. **Progressive Disclosure**: Show essential features first, reveal advanced options as needed
-3. **Educational Context**: Every interface should clearly serve writing instruction
-4. **Process Visibility**: Make the invisible writing process explicit and meaningful
-5. **Professional Polish**: Interface quality that justifies institutional adoption
-
-### UI/UX Standards
-
--   **No modal dialogs** for complex course/assignment creation workflows
--   **Full-page experiences** for important educational configuration
--   **Writing-specific terminology** throughout (not generic "content" or "lessons")
--   **Visual hierarchy** that guides users through complex decisions
--   **Contextual help** that explains educational concepts and best practices
-
-### Technical Architecture Decisions
-
--   **Assignment-centric data model** (not lesson/chapter focused)
--   **Real-time collaboration** capabilities built into core architecture
--   **Version control** optimized for writing development visibility
--   **Analytics focused** on educational insights, not productivity metrics
--   **Extensible AI integration** points without current implementation
-
-### Quality Standards
-
--   **Educational value first**: Every feature must serve learning outcomes
--   **Professional polish**: Interface quality that competes with modern educational tools
--   **Intuitive workflows**: Non-technical users should feel confident and capable
--   **Responsive design**: Works well on educator and student devices
--   **Performance optimization**: Real-time features work smoothly under load
-
-## Architecture Patterns
-
-### Frontend Architecture
-
--   Component-driven React SPA
--   Utility-first styling with Tailwind CSS
--   ShadCN UI for consistent component library
--   Vite for fast development and optimized builds
-
-### Backend Architecture
-
--   Express RESTful API server
--   Environment-based configuration with dotenv
--   PostgreSQL relational database with Prisma ORM
--   TypeScript compilation for production deployment
--   Role-based access control for educational features
--   AI interaction logging for educational compliance
-
-### Current State
-
-This is a fully functional educational writing platform with:
-
--   ✅ Complete development environment with PostgreSQL + Prisma
--   ✅ Build tooling and CI/CD pipeline
--   ✅ Comprehensive API with educational features
--   ✅ Educational AI assistant with bounded enhancement philosophy
--   ✅ Multi-role access control (students, educators, administrators)
--   ✅ Writing process tracking and analytics
--   ✅ Assignment and submission management systems
--   ✅ Collaborative writing and version control features
-
-## Testing Examples
-
-### Unit Test Example
-
-```typescript
-// frontend/src/utils/wordCount.test.ts
-import { calculateWordCount, calculateReadingTime } from "./wordCount";
-
-describe("wordCount utilities", () => {
-    test("calculates word count correctly", () => {
-        expect(calculateWordCount("Hello world")).toBe(2);
-        expect(calculateWordCount("")).toBe(0);
-        expect(calculateWordCount("   ")).toBe(0);
-    });
-
-    test("calculates reading time", () => {
-        const text = "word ".repeat(200); // 200 words
-        expect(calculateReadingTime(text)).toBe(1); // ~1 minute
-    });
-});
-```
-
-### Integration Test Example
-
-```typescript
-// backend/src/routes/assignments.test.ts
-describe("Assignment API", () => {
-    test("creates assignment with version control setup", async () => {
-        const response = await request(app).post("/api/assignments").send({
-            title: "Persuasive Essay",
-            courseId: testCourseId,
-            instructions: "Write about climate change...",
-        });
-
-        expect(response.status).toBe(201);
-        expect(response.body.versionControlEnabled).toBe(true);
-    });
-});
-```
-
-### React Component Test Example
-
-```typescript
-// frontend/src/components/WritingEditor.test.tsx
-import { render, screen, fireEvent } from "@testing-library/react";
-import { WritingEditor } from "./WritingEditor";
-
-describe("WritingEditor", () => {
-    test("saves version when content changes significantly", async () => {
-        const mockSaveVersion = jest.fn();
-        render(<WritingEditor onSaveVersion={mockSaveVersion} />);
-
-        const editor = screen.getByRole("textbox");
-        fireEvent.input(editor, {
-            target: { textContent: "Significant content change..." },
-        });
-
-        // Wait for debounced save
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        expect(mockSaveVersion).toHaveBeenCalledWith({
-            content: expect.stringContaining("Significant content"),
-            wordCount: expect.any(Number),
-        });
-    });
-});
-```
-
-## Brand Guidelines
-
-### Design Philosophy
-
--   **Thoughtful Growth**: Every interface element should suggest intentional development
--   **Word-Focused**: Language and typography are central to visual design
--   **Branching Metaphors**: Version control and collaboration visualized through organic growth
--   **Professional Warmth**: Sophisticated enough for institutions, approachable for students
-
-### Interface Personality
-
--   **Celebrate Process**: Highlight writing development, not just completion
--   **Encourage Branching**: Make trying new approaches feel natural and safe
--   **Honor Words**: Treat student writing with respect and care
--   **Build Community**: Individual growth within collaborative context
-
-## CI/CD Pipeline
-
-GitHub Actions workflow runs on push/PR to main/develop:
-
--   **Frontend**: Install deps, lint, type check, build
--   **Backend**: Install deps, lint, type check, build, test with Prisma
--   Both jobs run Node.js 18 with npm ci for dependency installation
-
-## Important Files
-
--   `frontend/components.json` - ShadCN UI configuration
--   `backend/src/server.ts` - Express app and PostgreSQL connection
--   `backend/prisma/schema.prisma` - Database schema and relationships
--   `frontend/vite.config.ts` - Build configuration and path aliases
--   `.github/workflows/ci.yml` - Automated testing and deployment
--   Both `tsconfig.json` files for TypeScript compilation settings
+- **AI Philosophy**: `.claude/docs/ai-philosophy.md`
+- **Testing Guide**: `docs/guides/TESTING_GUIDE.md`
+- **Architecture**: `docs/guides/ARCHITECTURE_GUIDE.md`
+- **Development Workflow**: `docs/guides/DEVELOPMENT_WORKFLOW_GUIDE.md`
+- **Implementation Guidelines**: `docs/guides/IMPLEMENTATION_GUIDELINES.md`
+- **Brand Guidelines**: `docs/guides/BRAND_DESIGN_GUIDELINES.md`
 
 ## Git Commit Guidelines
 
 ### Commit Message Standards
 
--   **Author Attribution**: ALL commits should reflect the repository owner as the sole author
--   **No AI Attribution**: NEVER include Claude Code or AI assistant attribution in commit messages
--   **Clear Descriptions**: Write descriptive commit messages that explain the changes made
--   **Professional Tone**: Use professional language appropriate for a public repository
+- **Author Attribution**: ALL commits should reflect the repository owner as the sole author
+- **No AI Attribution**: NEVER include Claude Code or AI assistant attribution in commit messages
+- **Clear Descriptions**: Write descriptive commit messages that explain the changes made
+- **Professional Tone**: Use professional language appropriate for a public repository
 
 ### Prohibited Attribution Patterns
 
@@ -533,14 +119,24 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 The repository owner is the sole author and contributor to this codebase.
 
-## Success Metrics
+## Current State
 
-Every feature should answer: "Does this help writers understand how their words and ideas branch into better writing?"
+This is a fully functional educational writing platform with:
 
-Success is measured by:
+- ✅ Complete development environment with PostgreSQL + Prisma
+- ✅ Build tooling and CI/CD pipeline
+- ✅ Comprehensive API with educational features
+- ✅ Educational AI assistant with bounded enhancement philosophy
+- ✅ Multi-role access control (students, educators, administrators)
+- ✅ Writing process tracking and analytics
+- ✅ Assignment and submission management systems
+- ✅ Collaborative writing and version control features
 
--   **Educational Impact**: Features that demonstrably improve writing instruction
--   **User Adoption**: Educators and students find the platform intuitive and valuable
--   **Process Visibility**: Writing development becomes transparent and actionable
--   **Collaborative Growth**: Real-time interaction enhances learning outcomes
--   **Responsible AI**: Bounded assistance builds critical thinking skills
+## Important Files
+
+- `frontend/components.json` - ShadCN UI configuration
+- `backend/src/server.ts` - Express app and PostgreSQL connection
+- `backend/prisma/schema.prisma` - Database schema and relationships
+- `frontend/vite.config.ts` - Build configuration and path aliases
+- `.github/workflows/ci.yml` - Automated testing and deployment
+- Both `tsconfig.json` files for TypeScript compilation settings

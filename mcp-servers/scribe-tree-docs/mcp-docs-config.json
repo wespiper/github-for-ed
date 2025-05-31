@@ -1,0 +1,11 @@
+{
+  "projectRoot": "/Users/wnp/Desktop/scribe-tree",
+  "docsDirectory": "docs",
+  "claudeDirectory": ".claude",
+  "cacheDirectory": ".cache",
+  "maxIndexSize": 10000,
+  "fileWatcherEnabled": true,
+  "indexingEnabled": true,
+  "allowedExtensions": [".md", ".txt", ".json"],
+  "excludedPaths": ["node_modules", ".git", "dist"]
+}

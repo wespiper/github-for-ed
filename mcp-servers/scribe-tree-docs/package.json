@@ -1,0 +1,40 @@
+{
+  "name": "scribe-tree-docs",
+  "version": "1.0.0",
+  "description": "MCP server for intelligent Scribe Tree documentation management and project context tracking",
+  "main": "dist/server.js",
+  "bin": {
+    "scribe-tree-docs": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server.ts",
+    "start": "node dist/server.js",
+    "watch": "nodemon --exec ts-node src/server.ts",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
+    "test": "echo \"Tests not yet implemented\" && exit 0"
+  },
+  "keywords": [
+    "mcp",
+    "documentation",
+    "project-management",
+    "search",
+    "context-tracking",
+    "scribe-tree"
+  ],
+  "author": "Scribe Tree Project",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "chokidar": "^4.0.3",
+    "zod": "^3.25.42"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
