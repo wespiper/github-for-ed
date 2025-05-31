@@ -514,6 +514,25 @@ GitHub Actions workflow runs on push/PR to main/develop:
 -   `.github/workflows/ci.yml` - Automated testing and deployment
 -   Both `tsconfig.json` files for TypeScript compilation settings
 
+## Git Commit Guidelines
+
+### Commit Message Standards
+
+-   **Author Attribution**: ALL commits should reflect the repository owner as the sole author
+-   **No AI Attribution**: NEVER include Claude Code or AI assistant attribution in commit messages
+-   **Clear Descriptions**: Write descriptive commit messages that explain the changes made
+-   **Professional Tone**: Use professional language appropriate for a public repository
+
+### Prohibited Attribution Patterns
+
+DO NOT include any of the following in commit messages:
+```
+🤖 Generated with [Claude Code](https://claude.ai/code)
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+The repository owner is the sole author and contributor to this codebase.
+
 ## Success Metrics
 
 Every feature should answer: "Does this help writers understand how their words and ideas branch into better writing?"
