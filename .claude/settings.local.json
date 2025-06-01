@@ -75,7 +75,8 @@
       "Bash(/Users/wnp/opt/anaconda3/bin/rg \"attachServices\" src/)",
       "Bash(/Users/wnp/opt/anaconda3/bin/rg -n \"TS2345.*never\" --type ts)",
       "Bash(/Users/wnp/opt/anaconda3/bin/rg -A 30 \"findNeedingInterventionInsights\" src/repositories/prisma/PrismaAssignmentRepository.ts)",
-      "Bash(/Users/wnp/opt/anaconda3/bin/rg -B 10 -A 30 \"submissions.*author.*id.*firstName.*lastName\" src/repositories/prisma/PrismaAssignmentRepository.ts)"
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -B 10 -A 30 \"submissions.*author.*id.*firstName.*lastName\" src/repositories/prisma/PrismaAssignmentRepository.ts)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   },
