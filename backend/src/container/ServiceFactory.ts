@@ -13,9 +13,16 @@ import {
   WritingSessionRepository,
   DocumentRepository,
   StudentProfileRepository,
-  AssignmentRepository
+  AssignmentRepository,
+  LearningAnalyticsRepository,
+  InterventionRepository
 } from '../repositories/interfaces';
 import { PrismaWritingSessionRepository } from '../repositories/WritingSessionRepository';
+
+// Mock repositories for development
+import { MockDocumentRepository } from '../repositories/__mocks__/DocumentRepository.mock';
+import { MockLearningAnalyticsRepository } from '../repositories/__mocks__/LearningAnalyticsRepository.mock';
+import { MockInterventionRepository } from '../repositories/__mocks__/InterventionRepository.mock';
 
 /**
  * Service container interface
@@ -28,9 +35,11 @@ export interface ServiceContainer {
   
   // Repositories
   writingSessionRepository: WritingSessionRepository;
-  documentRepository?: DocumentRepository;
+  documentRepository: DocumentRepository;
   studentProfileRepository?: StudentProfileRepository;
   assignmentRepository?: AssignmentRepository;
+  learningAnalyticsRepository: LearningAnalyticsRepository;
+  interventionRepository: InterventionRepository;
 }
 
 /**
@@ -63,6 +72,9 @@ export class ServiceFactory {
 
     // Initialize repositories
     this.container.writingSessionRepository = new PrismaWritingSessionRepository();
+    this.container.documentRepository = new MockDocumentRepository(); // Using mock for now
+    this.container.learningAnalyticsRepository = new MockLearningAnalyticsRepository(); // Using mock for now
+    this.container.interventionRepository = new MockInterventionRepository(); // Using mock for now
     
     // Connect to external services
     if (defaultCacheConfig.type === 'redis') {
@@ -114,6 +126,36 @@ export class ServiceFactory {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.writingSessionRepository;
+  }
+
+  /**
+   * Get document repository
+   */
+  getDocumentRepository(): DocumentRepository {
+    if (!this.container.documentRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.documentRepository;
+  }
+
+  /**
+   * Get learning analytics repository
+   */
+  getLearningAnalyticsRepository(): LearningAnalyticsRepository {
+    if (!this.container.learningAnalyticsRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.learningAnalyticsRepository;
+  }
+
+  /**
+   * Get intervention repository
+   */
+  getInterventionRepository(): InterventionRepository {
+    if (!this.container.interventionRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.interventionRepository;
   }
 
   // Note: Reflection repositories not implemented yet

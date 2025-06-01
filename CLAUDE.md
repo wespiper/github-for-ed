@@ -13,11 +13,11 @@ Scribe Tree is a monorepo containing a React frontend and Node.js backend for te
 
 ### Event-Driven Architecture
 - **ServiceFactory**: Dependency injection container managing all services
-- **EventBus**: Educational domain events for service communication  
-- **Repository Pattern**: Complete data access abstraction
-- **Cache Layer**: Redis + in-memory with educational cache patterns
-- **Message Queues**: RabbitMQ + in-memory for service decoupling
-- **Monitoring**: Correlation IDs, health checks, and metrics collection
+- **EventBus**: Privacy-enhanced educational domain events with AES-256-CBC encryption
+- **Repository Pattern**: Privacy-aware data access with audit trails and consent management
+- **Cache Layer**: Privacy-aware Redis + in-memory with consent-based TTL strategies
+- **Message Queues**: RabbitMQ + in-memory with encrypted privacy event routing
+- **Monitoring**: Correlation IDs, health checks, privacy metrics, and compliance tracking
 
 ## Development Commands
 
@@ -147,12 +147,16 @@ The repository owner is the sole author and contributor to this codebase.
 - Implement dependency injection with ServiceFactory pattern
 - Create repository interfaces before database implementation
 - Abstract data access for testability and future microservices
+- Include privacy context in all repository methods
+- Implement audit trails for sensitive data operations
 
 ### Performance Standards
 - Real-time monitoring: <100ms response time
 - Analytics queries: <500ms response time
+- Privacy encryption/decryption: <100ms per operation
 - Document performance targets in feature specifications
 - Set clear targets early to prevent architecture problems
+- Consider encryption overhead in performance planning
 
 ### Type Safety Guidelines
 - Prefer pragmatic type assertions over blocking progress
@@ -166,6 +170,28 @@ The repository owner is the sole author and contributor to this codebase.
 - Educational endpoints may require specialized non-CRUD approaches
 - Complete API endpoint inventory during migrations
 
+## Privacy Standards
+
+### Data Protection
+- **Student ID Hashing**: Never store raw student IDs in events or logs
+- **AES-256-CBC Encryption**: Use for all sensitive data in events and cache
+- **Consent Management**: Verify consent before any student data access
+- **Data Minimization**: Only expose necessary fields based on role/purpose
+- **Audit Trails**: Log all data access with educational justification
+
+### Privacy Implementation
+- Include `PrivacyContext` in all service operations
+- Use `PrivacyEventUtils` for student ID hashing and encryption
+- Implement privacy-aware TTL strategies in cache
+- Publish privacy events for all sensitive operations
+- Test privacy scenarios (414+ test cases as baseline)
+
+### Compliance Requirements
+- **GDPR**: Data minimization, purpose limitation, consent management
+- **FERPA**: Educational records protection, parent access rights
+- **COPPA**: Special protections for users under 13
+- **State Laws**: California CCPA, state-specific education privacy laws
+
 ## Testing Requirements
 
 ### Mock Repository Testing
@@ -173,6 +199,8 @@ The repository owner is the sole author and contributor to this codebase.
 - Test repository contracts independently of database
 - Use mock repositories for service unit tests
 - Validate interface design before complex implementation
+- Include privacy testing scenarios (consent, audit, data minimization)
+- Test encryption/decryption in mock implementations
 
 ### Migration Testing
 - Maintain test coverage during all migrations
@@ -224,12 +252,12 @@ This is a fully functional educational writing platform with event-driven micros
 - Educational analytics and educator insights
 
 **✅ Event-Driven Architecture**
-- Complete service decoupling via event system
-- Repository pattern for all data access
+- Complete service decoupling via privacy-enhanced event system
+- Privacy-aware repository pattern with audit trails
 - Dependency injection with ServiceFactory
-- Cache abstraction layer (Redis + in-memory)
-- Message queue infrastructure (RabbitMQ + in-memory)
-- Comprehensive monitoring with correlation IDs
+- Privacy-aware cache abstraction (Redis + in-memory)
+- Encrypted message queue infrastructure (RabbitMQ + in-memory)
+- Comprehensive monitoring with correlation IDs and privacy metrics
 
 **✅ Advanced Features**
 - Writing process tracking and real-time analytics
@@ -237,6 +265,15 @@ This is a fully functional educational writing platform with event-driven micros
 - Collaborative writing and version control features
 - Educational domain events for service communication
 - Mock-first development patterns established
+
+**✅ Privacy Infrastructure**
+- AES-256-CBC encryption for sensitive data
+- Comprehensive audit trails for all data operations
+- Privacy-aware caching with consent-based TTL
+- Student ID hashing throughout the system
+- Privacy event categories (audit, consent, access, compliance)
+- GDPR/FERPA/COPPA compliance framework
+- 414+ privacy-focused test cases
 
 ## Important Files
 
@@ -263,9 +300,28 @@ This is a fully functional educational writing platform with event-driven micros
 - `backend/src/services/ai/WritingProcessAnalyzer.ts` - Writing pattern analysis
 - `backend/src/services/AIBoundaryService.ts` - Responsible AI boundaries
 
+**Privacy-Aware Services (Phase 1 Week 4)**
+- `backend/src/services/PrivacyAwareInterventionEngine.ts` - Privacy-first intervention analysis
+- `backend/src/services/PrivacyAwareLearningAnalyticsService.ts` - Privacy-filtered analytics
+- `backend/src/services/PrivacyAwareWritingProcessService.ts` - Privacy-controlled writing analysis
+- `backend/src/repositories/interfaces/` - Privacy-aware repository interfaces
+- `backend/src/repositories/__mocks__/` - Privacy-testing mock implementations
+
+**Privacy Infrastructure**
+- `backend/src/config/privacy.config.ts` - Privacy configuration and compliance settings
+- `backend/src/types/privacy.ts` - Privacy types and interfaces
+- `backend/src/repositories/AuditRepository.ts` - Audit trail implementation
+- `backend/src/cache/PrivacyCacheService.ts` - Privacy-aware cache wrapper
+- `backend/src/events/events/PrivacyEvents.ts` - Privacy event definitions
+- `backend/src/monitoring/PrivacyMonitor.ts` - Privacy metrics and monitoring
+
 **Documentation & Learning**
 - `.claude/insights/accumulated-learnings.md` - Project learnings and patterns
 - `.claude/reflections/` - Development reflections and insights
+- `backend/docs/guides/PRIVACY_AWARE_SERVICE_ARCHITECTURE.md` - Complete privacy architecture guide
+- `backend/docs/guides/PRIVACY_PATTERNS_QUICK_REFERENCE.md` - Developer quick reference
+- `docs/guides/PRIVACY_COMPLIANCE_TESTING_GUIDE.md` - Privacy testing scenarios
+- `backend/src/repositories/README-Privacy-Implementation.md` - Repository privacy patterns
 
 ## Working with Event-Driven Architecture
 
