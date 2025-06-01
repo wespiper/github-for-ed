@@ -6,7 +6,7 @@ import { Event } from '../EventBus';
 export interface StudentProgressUpdatedEvent extends Event {
   type: 'student.progress.updated';
   payload: {
-    studentId: string;
+    studentIdHash: string; // Hashed for privacy
     courseId: string;
     assignmentId?: string;
     progressType: 'writing' | 'reflection' | 'submission' | 'revision';
@@ -20,6 +20,12 @@ export interface StudentProgressUpdatedEvent extends Event {
     previousState?: Record<string, any>;
     currentState: Record<string, any>;
   };
+  privacyContext: {
+    dataMinimized: boolean;
+    consentVerified: boolean;
+    educationalPurpose: string;
+    retentionPeriod?: number; // days
+  };
 }
 
 /**
@@ -28,12 +34,18 @@ export interface StudentProgressUpdatedEvent extends Event {
 export interface LearningObjectiveAchievedEvent extends Event {
   type: 'student.objective.achieved';
   payload: {
-    studentId: string;
+    studentIdHash: string; // Hashed for privacy
     courseId: string;
     objectiveId: string;
     achievementLevel: 'basic' | 'proficient' | 'advanced';
     evidenceType: 'assignment' | 'reflection' | 'assessment';
     evidenceId: string;
+  };
+  privacyContext: {
+    dataMinimized: boolean;
+    consentVerified: boolean;
+    educationalPurpose: string;
+    retentionPeriod?: number; // days
   };
 }
 
@@ -43,12 +55,19 @@ export interface LearningObjectiveAchievedEvent extends Event {
 export interface StudentStruggleDetectedEvent extends Event {
   type: 'student.struggle.detected';
   payload: {
-    studentId: string;
+    studentIdHash: string; // Hashed for privacy
     courseId: string;
     assignmentId?: string;
     struggleType: 'cognitive_overload' | 'writing_block' | 'concept_confusion' | 'time_management';
     severity: 'low' | 'medium' | 'high';
     indicators: string[];
     recommendedInterventions?: string[];
+  };
+  privacyContext: {
+    dataMinimized: boolean;
+    consentVerified: boolean;
+    educationalPurpose: string;
+    retentionPeriod?: number; // days
+    sensitivityLevel: 'normal' | 'sensitive' | 'highly-sensitive';
   };
 }
