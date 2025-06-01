@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import prisma from './lib/prisma';
 import { startFastifyServer } from './fastify/app';
 import { trafficRouter, addRoutingHeaders } from './middleware/router';
+import { initializeServices, attachServices } from './middleware/serviceContainer';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
@@ -37,6 +38,9 @@ app.use(express.json());
 // Add routing headers to all responses
 app.use(addRoutingHeaders);
 
+// Initialize services with dependency injection
+// This will be done after database connection is established
+
 // Apply traffic routing to migrated endpoints
 app.use('/api/auth', trafficRouter);
 app.use('/api/ai', trafficRouter);
@@ -57,6 +61,9 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Attach services to requests (after routes that don't need services)
+app.use(attachServices);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/admin', adminRoutes);
@@ -71,12 +78,17 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reflections', reflectionRoutes);
 app.use('/api/boundaries', boundaryIntelligenceRoutes);
 
-// Initialize Prisma connection
+// Initialize Prisma connection and services
 const initializeDatabase = async () => {
   try {
     console.log('Connecting to PostgreSQL...');
     await prisma.$connect();
     console.log('✅ PostgreSQL connected successfully');
+    
+    // Initialize service container with repository pattern
+    console.log('Initializing service container...');
+    initializeServices(prisma);
+    console.log('✅ Service container initialized with repository pattern');
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');

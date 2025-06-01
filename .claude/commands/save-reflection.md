@@ -1,1 +1,1 @@
-Generate a task reflection using the /reflect framework, then automatically save it to .claude/reflections/ with today's date and an appropriate feature name. Confirm the file creation with the full path and file size.
+Generate a task reflection using the /reflect framework, then automatically save it to .claude/reflections/ with today's date (please ensure the date is correct) and an appropriate feature name. Confirm the file creation with the full path and file size.

@@ -299,7 +299,7 @@ router.post('/ai-assistance-request',
         timestamp: new Date()
       };
       
-      const response = await AIBoundaryService.evaluateAssistanceRequest(request);
+      const response = await req.aiService!.boundaryService.evaluateAssistanceRequest(request);
       
       res.json({
         message: 'AI assistance request evaluated',
@@ -340,10 +340,9 @@ router.get('/ai-usage/:studentId/:assignmentId',
         end: new Date(endDate as string)
       } : undefined;
       
-      const analytics = await AIBoundaryService.getAIUsageAnalytics(
+      const analytics = await req.aiService!.boundaryService.getAIUsageAnalytics(
         studentId,
-        assignmentId,
-        timeframe
+        assignmentId
       );
       
       res.json({
@@ -383,7 +382,7 @@ router.get('/ai-dependency/:studentId/:courseId',
         end: new Date(endDate as string)
       };
       
-      const assessment = await AIBoundaryService.assessAIDependency(
+      const assessment = await req.aiService!.boundaryService.assessAIDependency(
         studentId,
         courseId,
         timeframe

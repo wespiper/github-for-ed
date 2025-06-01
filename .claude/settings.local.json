@@ -60,7 +60,22 @@
       "Bash(git stash:*)",
       "mcp__ide__executeCode",
       "Bash(env)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(npm run:*)",
+      "Bash(./test-endpoints.sh:*)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"''due''\" src/repositories/mock/MockAssignmentRepository.ts)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -A 10 \"event.*created.*published\" src/repositories/interfaces/AssignmentRepository.ts)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -A 5 -B 5 \"'due'\" src/repositories/prisma/PrismaAssignmentRepository.ts)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -A 10 \"enum.*status\\|enum.*Status\" prisma/schema.prisma)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"AssignmentStatus\" prisma/schema.prisma)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"status.*String\" prisma/schema.prisma)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -B 2 -A 2 'status.*String.*\"draft\"' prisma/schema.prisma)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"AIBoundaryService\\.\" src/routes/ src/scripts/)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"attachServices\\|export.*attachServices\" src/)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg \"attachServices\" src/)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -n \"TS2345.*never\" --type ts)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -A 30 \"findNeedingInterventionInsights\" src/repositories/prisma/PrismaAssignmentRepository.ts)",
+      "Bash(/Users/wnp/opt/anaconda3/bin/rg -B 10 -A 30 \"submissions.*author.*id.*firstName.*lastName\" src/repositories/prisma/PrismaAssignmentRepository.ts)"
     ],
     "deny": []
   },

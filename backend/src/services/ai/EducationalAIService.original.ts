@@ -8,11 +8,7 @@ import {
 } from './providers/AIProviderInterface';
 import { AIAssistanceRequest, AIEducationalAction, WritingStage } from '../AIBoundaryService';
 import { Assignment } from '@prisma/client';
-import { 
-  StudentRepository, 
-  AssignmentRepository, 
-  AIInteractionRepository 
-} from '../../repositories/interfaces';
+import prisma from '../../lib/prisma';
 
 // Define Assignment interface for type safety with Prisma types
 type AssignmentType = Pick<Assignment, 'id' | 'title' | 'instructions' | 'learningObjectives'> & {
@@ -20,22 +16,16 @@ type AssignmentType = Pick<Assignment, 'id' | 'title' | 'instructions' | 'learni
 };
 
 /**
- * Educational AI Service - Refactored to use Repository Pattern
- * Orchestrates AI providers for educational assistance with strict educational boundaries
+ * Educational AI Service - Orchestrates AI providers for educational assistance
+ * Maintains strict educational boundaries and learning-first philosophy
  */
 export class EducationalAIService {
-  private provider: AIProvider = new ClaudeProvider();
-
-  constructor(
-    private studentRepository: StudentRepository,
-    private assignmentRepository: AssignmentRepository,
-    private aiInteractionRepository: AIInteractionRepository
-  ) {}
+  private static provider: AIProvider = new ClaudeProvider();
 
   /**
    * Generate educational questions based on student's writing and context
    */
-  async generateEducationalQuestions(
+  static async generateEducationalQuestions(
     request: AIAssistanceRequest,
     assignment: AssignmentType
   ): Promise<EducationalQuestionSet> {
@@ -65,7 +55,7 @@ export class EducationalAIService {
         return this.getFallbackQuestions(context);
       }
 
-      // Log successful AI interaction for analytics using repository
+      // Log successful AI interaction for analytics
       await this.logAIInteraction(request, questionSet, validation);
 
       return questionSet;
@@ -79,7 +69,7 @@ export class EducationalAIService {
   /**
    * Generate alternative perspectives for educational exploration
    */
-  async generateEducationalPerspectives(
+  static async generateEducationalPerspectives(
     topic: string,
     currentArguments: string[],
     context: EducationalContext
@@ -106,7 +96,7 @@ export class EducationalAIService {
   /**
    * Validate that AI-generated content meets educational standards
    */
-  async validateEducationalContent(content: EducationalQuestionSet): Promise<ValidationResult> {
+  static async validateEducationalContent(content: EducationalQuestionSet): Promise<ValidationResult> {
     try {
       // Check each question for educational compliance
       for (const question of content.questions) {
@@ -151,7 +141,7 @@ export class EducationalAIService {
   /**
    * Check AI provider health and availability
    */
-  async checkProviderHealth(): Promise<boolean> {
+  static async checkProviderHealth(): Promise<boolean> {
     try {
       return await this.provider.healthCheck();
     } catch (error) {
@@ -161,9 +151,9 @@ export class EducationalAIService {
   }
 
   /**
-   * Get educational statistics about AI usage (refactored to use repositories)
+   * Get educational statistics about AI usage
    */
-  async getEducationalStats(studentId: string, timeframe: { start: Date; end: Date }): Promise<{
+  static async getEducationalStats(studentId: string, timeframe: { start: Date; end: Date }): Promise<{
     totalInteractions: number;
     questionsGenerated: number;
     perspectivesExplored: number;
@@ -171,11 +161,16 @@ export class EducationalAIService {
     educationalValue: number;
   }> {
     try {
-      // Query AI interaction logs using repository
-      const interactions = await this.aiInteractionRepository.findByStudentId(
-        studentId,
-        timeframe
-      );
+      // Query AI interaction logs from database
+      const interactions = await prisma.aIInteractionLog.findMany({
+        where: {
+          studentId,
+          createdAt: {
+            gte: timeframe.start,
+            lte: timeframe.end
+          }
+        }
+      });
 
       const totalInteractions = interactions.length;
       const questionsGenerated = interactions.reduce((sum: number, log: any) => 
@@ -215,7 +210,7 @@ export class EducationalAIService {
 
   // Private helper methods
 
-  private mapToWritingStage(stage?: string): WritingStage {
+  private static mapToWritingStage(stage?: string): WritingStage {
     const stageMap: Record<string, WritingStage> = {
       'planning': 'brainstorming',
       'brainstorming': 'brainstorming',
@@ -230,34 +225,38 @@ export class EducationalAIService {
     return (stage && stageMap[stage.toLowerCase()]) || 'drafting';
   }
 
-  private async inferAcademicLevel(studentId: string, assignment: AssignmentType): Promise<'novice' | 'developing' | 'proficient' | 'advanced'> {
+  private static async inferAcademicLevel(studentId: string, assignment: AssignmentType): Promise<'novice' | 'developing' | 'proficient' | 'advanced'> {
     try {
-      // Get student learning analytics using repository
-      const analyticsTimeframe = {
-        start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // Last 90 days
-        end: new Date()
-      };
-      
-      const studentAnalytics = await this.studentRepository.findLearningAnalytics(
-        studentId,
-        analyticsTimeframe
-      );
+      // Analyze student's past submissions and performance
+      const recentSubmissions = await prisma.assignmentSubmission.findMany({
+        where: {
+          authorId: studentId,
+          status: 'submitted',
+          createdAt: {
+            gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // Last 90 days
+          }
+        },
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      });
 
-      if (!studentAnalytics || studentAnalytics.totalSubmissions === 0) {
+      if (recentSubmissions.length === 0) {
         // No submission history, base on assignment difficulty
         if (assignment.difficultyLevel === 'advanced') return 'developing';
         if (assignment.difficultyLevel === 'intermediate') return 'novice';
         return 'novice';
       }
 
-      // Calculate level based on analytics
-      const avgWordCount = studentAnalytics.averageWordCount;
-      const reflectionQuality = studentAnalytics.reflectionQuality;
+      // Calculate average word count and quality indicators
+      const avgWordCount = recentSubmissions.reduce((sum, sub) => sum + (sub.wordCount || 0), 0) / recentSubmissions.length;
+      const submissionsWithFeedback = recentSubmissions.filter(sub => 
+        sub.grade && typeof sub.grade === 'object' && (sub.grade as any).feedback
+      ).length;
       
-      // Simple heuristic based on writing volume and reflection quality
-      if (avgWordCount > 1000 && reflectionQuality >= 70) {
+      // Simple heuristic based on writing volume and engagement
+      if (avgWordCount > 1000 && submissionsWithFeedback >= recentSubmissions.length * 0.7) {
         return 'proficient';
-      } else if (avgWordCount > 500 && reflectionQuality >= 50) {
+      } else if (avgWordCount > 500 && submissionsWithFeedback >= recentSubmissions.length * 0.5) {
         return 'developing';
       } else {
         return 'novice';
@@ -271,30 +270,33 @@ export class EducationalAIService {
     }
   }
 
-  private async validatePerspective(perspective: PerspectiveSuggestion): Promise<ValidationResult> {
+  private static async validatePerspective(perspective: PerspectiveSuggestion): Promise<ValidationResult> {
     return await this.provider.validateEducationalResponse(perspective.description);
   }
 
-  private async logAIInteraction(
+  private static async logAIInteraction(
     request: AIAssistanceRequest, 
     response: EducationalQuestionSet, 
     validation: ValidationResult
   ): Promise<void> {
     try {
-      // Log to database for analytics and compliance tracking using repository
-      await this.aiInteractionRepository.logInteraction({
-        studentId: request.studentId,
-        assignmentId: request.assignmentId,
-        assistanceType: request.assistanceType,
-        writingStage: request.context.currentStage || 'unknown',
-        questionText: request.context.specificQuestion,
-        questionsGenerated: response.questions.length,
-        educationallySound: validation.isEducationallySound,
-        metadata: {
-          validation: validation,
-          educationalGoal: response.overallEducationalGoal,
-          nextSteps: response.nextStepSuggestions,
-          responseId: response.requestId
+      // Log to database for analytics and compliance tracking
+      await prisma.aIInteractionLog.create({
+        data: {
+          studentId: request.studentId,
+          assignmentId: request.assignmentId,
+          assistanceType: request.assistanceType,
+          questionsGenerated: response.questions.length,
+          educationallySound: validation.isEducationallySound,
+          writingStage: request.context.currentStage || 'unknown',
+          questionText: request.context.specificQuestion,
+          responseId: response.requestId,
+          reflectionCompleted: false, // Will be updated when student completes reflection
+          metadata: {
+            validation: validation,
+            educationalGoal: response.overallEducationalGoal,
+            nextSteps: response.nextStepSuggestions
+          } as any
         }
       });
 
@@ -311,7 +313,7 @@ export class EducationalAIService {
     }
   }
 
-  private getFallbackQuestions(context: EducationalContext): EducationalQuestionSet {
+  private static getFallbackQuestions(context: EducationalContext): EducationalQuestionSet {
     const stageQuestions = {
       brainstorming: [
         {
@@ -403,7 +405,7 @@ export class EducationalAIService {
     };
   }
 
-  private getFallbackPerspectives(_topic: string): PerspectiveSuggestion[] {
+  private static getFallbackPerspectives(_topic: string): PerspectiveSuggestion[] {
     return [
       {
         id: 'fallback-perspective-1',
@@ -440,7 +442,7 @@ export class EducationalAIService {
     ];
   }
 
-  private getActionFromStage(stage: WritingStage): AIEducationalAction {
+  private static getActionFromStage(stage: WritingStage): AIEducationalAction {
     const actionMap: Record<WritingStage, AIEducationalAction> = {
       'brainstorming': 'generate_prompts',
       'drafting': 'prompt_development',

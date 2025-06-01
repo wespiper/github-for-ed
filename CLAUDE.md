@@ -119,6 +119,72 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 The repository owner is the sole author and contributor to this codebase.
 
+## Development Standards
+
+### Repository Pattern Implementation
+- Use mock-first development for all new services
+- Implement dependency injection with ServiceFactory pattern
+- Create repository interfaces before database implementation
+- Abstract data access for testability and future microservices
+
+### Performance Standards
+- Real-time monitoring: <100ms response time
+- Analytics queries: <500ms response time
+- Document performance targets in feature specifications
+- Set clear targets early to prevent architecture problems
+
+### Type Safety Guidelines
+- Prefer pragmatic type assertions over blocking progress
+- Document type compromises with TODO comments
+- Plan iterative type improvements in technical debt backlog
+- Use Prisma-generated types for database operations
+
+### API Design Standards
+- Standard response format: `{ success: boolean, data: T, message?: string }`
+- Consistent error responses with development details when appropriate
+- Educational endpoints may require specialized non-CRUD approaches
+- Complete API endpoint inventory during migrations
+
+## Testing Requirements
+
+### Mock Repository Testing
+- Create complete mock implementations for all repositories
+- Test repository contracts independently of database
+- Use mock repositories for service unit tests
+- Validate interface design before complex implementation
+
+### Migration Testing
+- Maintain test coverage during all migrations
+- Update tests incrementally with implementation
+- Validate API contracts between frontend and backend
+- Use admin accounts to test role-based access patterns
+
+### Educational Workflow Testing
+- Test with actual educators and students regularly
+- Validate educational outcomes, not just technical function
+- Ensure features support learning process visibility
+- Test AI boundaries and reflection requirements
+
+## Educational Philosophy
+
+### Trust Through Transparency
+- Reward AI use disclosure with integrity points
+- Frame detection as educational accountability
+- Build features that students want to engage with
+- All AI contributions visible to educators for assessment
+
+### Multi-Dimensional Support
+- Consider cognitive load in AI responses
+- Adapt to emotional state, not just academic level
+- Monitor without interrupting creative flow
+- Support should enhance, not replace, thinking
+
+### Process Over Product
+- Make invisible writing processes visible
+- Track learning journey, not just outcomes
+- Enable educator insights without surveillance
+- Focus on student growth and independence
+
 ## Current State
 
 This is a fully functional educational writing platform with:
@@ -131,6 +197,9 @@ This is a fully functional educational writing platform with:
 - ✅ Writing process tracking and analytics
 - ✅ Assignment and submission management systems
 - ✅ Collaborative writing and version control features
+- ✅ Repository pattern for service architecture
+- ✅ Dependency injection with ServiceFactory
+- ✅ Mock-first development patterns established
 
 ## Important Files
 
@@ -140,3 +209,7 @@ This is a fully functional educational writing platform with:
 - `frontend/vite.config.ts` - Build configuration and path aliases
 - `.github/workflows/ci.yml` - Automated testing and deployment
 - Both `tsconfig.json` files for TypeScript compilation settings
+- `backend/src/repositories/` - Repository pattern implementations
+- `backend/src/container/` - Dependency injection configuration
+- `.claude/insights/accumulated-learnings.md` - Project learnings and patterns
+- `.claude/reflections/` - Development reflections and insights
