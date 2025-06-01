@@ -1,7 +1,14 @@
-import prisma from '../../lib/prisma';
 import { WritingSession } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 import { StudentLearningProfile } from './StudentLearningProfileService';
 import { CognitiveLoadDetector, CognitiveLoadIndicators } from './CognitiveLoadDetector';
+import { ServiceFactory } from '../../container/ServiceFactory';
+import { CacheKeyBuilder, CacheTTL } from '../../cache/CacheService';
+import { 
+  StudentProgressUpdatedEvent, 
+  AIInteractionLoggedEvent,
+  EventTypes 
+} from '../../events/events';
 
 export interface WritingPattern {
   type: 'linear' | 'recursive' | 'exploratory' | 'perfectionist' | 'burst' | 'steady';
@@ -70,6 +77,8 @@ export interface SessionPattern {
 }
 
 export class WritingProcessAnalyzer {
+  private static serviceFactory = ServiceFactory.getInstance();
+
   /**
    * Analyze a student's writing process for an assignment
    */
@@ -78,20 +87,51 @@ export class WritingProcessAnalyzer {
     assignmentId: string,
     profile?: StudentLearningProfile
   ): Promise<WritingProcessInsights> {
-    // Get all writing sessions for this assignment
-    const sessions = await prisma.writingSession.findMany({
-      where: {
-        userId: studentId,
-        document: { assignmentId }
+    const correlationId = uuidv4();
+    const cache = this.serviceFactory.getCache();
+    const eventBus = this.serviceFactory.getEventBus();
+    const sessionRepo = this.serviceFactory.getWritingSessionRepository();
+
+    // Check cache first
+    const cacheKey = CacheKeyBuilder.aiAnalysisResult('writing_process', `${studentId}:${assignmentId}`);
+    const cachedInsights = await cache.get<WritingProcessInsights>(cacheKey);
+    if (cachedInsights) {
+      return cachedInsights;
+    }
+
+    // Log AI interaction
+    await eventBus.publish<AIInteractionLoggedEvent>({
+      type: EventTypes.AI_INTERACTION_LOGGED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId,
+        courseId: '', // Would need to fetch from assignment
+        assignmentId,
+        interactionType: 'feedback_request',
+        aiService: 'writing_analyzer',
+        request: {
+          content: 'Analyze writing process',
+          context: { assignmentId }
+        },
+        response: {
+          content: 'Processing writing pattern analysis',
+          educationalValue: 0.8
+        },
+        duration: 0 // Will update later
       },
-      include: {
-        document: true
-      },
-      orderBy: { startTime: 'asc' }
+      metadata: { userId: studentId }
     });
+
+    const startTime = Date.now();
+
+    // Get all writing sessions for this assignment using repository
+    const sessions = await sessionRepo.findByAssignment(assignmentId, studentId);
     
     if (sessions.length === 0) {
-      return this.createEmptyInsights(studentId, assignmentId);
+      const emptyInsights = this.createEmptyInsights(studentId, assignmentId);
+      await cache.set(cacheKey, emptyInsights, { ttl: CacheTTL.WRITING_PATTERN });
+      return emptyInsights;
     }
     
     // Analyze individual sessions
@@ -136,7 +176,7 @@ export class WritingProcessAnalyzer {
       profile
     );
     
-    return {
+    const insights: WritingProcessInsights = {
       studentId,
       assignmentId,
       dominantPattern,
@@ -153,6 +193,65 @@ export class WritingProcessAnalyzer {
       processRecommendations,
       interventionSuggestions
     };
+
+    // Cache the insights
+    await cache.set(cacheKey, insights, { ttl: CacheTTL.WRITING_PATTERN });
+
+    // Publish progress update event
+    await eventBus.publish<StudentProgressUpdatedEvent>({
+      type: EventTypes.STUDENT_PROGRESS_UPDATED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId,
+        courseId: '', // Would need to fetch from assignment
+        assignmentId,
+        progressType: 'writing',
+        metrics: {
+          completionPercentage: Math.round((coherenceScore + developmentScore) / 2),
+          wordsWritten: sessions.reduce((sum, s) => {
+            const activity = s.activity as any;
+            return sum + (activity?.wordsAdded || 0);
+          }, 0),
+          timeSpent: sessions.reduce((sum, s) => sum + (s.duration || 0), 0),
+          aiInteractionCount: 1
+        },
+        currentState: {
+          dominantPattern: dominantPattern.type,
+          coherenceScore,
+          developmentScore,
+          revisionQuality
+        }
+      },
+      metadata: { userId: studentId }
+    });
+
+    // Update AI interaction duration
+    const duration = Date.now() - startTime;
+    await eventBus.publish<AIInteractionLoggedEvent>({
+      type: EventTypes.AI_INTERACTION_LOGGED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId,
+        courseId: '',
+        assignmentId,
+        interactionType: 'feedback_request',
+        aiService: 'writing_analyzer',
+        request: {
+          content: 'Analyze writing process',
+          context: { assignmentId }
+        },
+        response: {
+          content: 'Writing pattern analysis completed',
+          educationalValue: 0.8
+        },
+        duration
+      },
+      metadata: { userId: studentId }
+    });
+
+    return insights;
   }
   
   /**
@@ -167,31 +266,22 @@ export class WritingProcessAnalyzer {
     evolution: Array<{ date: Date; pattern: string; confidence: number }>;
     recommendations: string[];
   }> {
-    const startDate = new Date(Date.now() - timeframeDays * 24 * 60 * 60 * 1000);
+    const cache = this.serviceFactory.getCache();
+    const sessionRepo = this.serviceFactory.getWritingSessionRepository();
     
-    // Get all assignments and their sessions
-    const whereClause: any = {
-      userId: studentId,
-      startTime: { gte: startDate }
-    };
-    
-    if (courseId) {
-      whereClause.document = {
-        assignment: { courseId }
-      };
+    // Check cache
+    const cacheKey = CacheKeyBuilder.writingPattern(studentId, `cross_assignment_${courseId || 'all'}`);
+    const cachedResult = await cache.get<any>(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
     }
     
-    const sessions = await prisma.writingSession.findMany({
-      where: whereClause,
-      include: {
-        document: {
-          include: {
-            assignment: true
-          }
-        }
-      },
-      orderBy: { startTime: 'asc' }
-    });
+    // Get all sessions from repository
+    const sessions = courseId 
+      ? await sessionRepo.findByCourse(courseId, studentId, timeframeDays)
+      : await sessionRepo.findByUser(studentId, {
+          startDate: new Date(Date.now() - timeframeDays * 24 * 60 * 60 * 1000)
+        });
     
     // Group by assignment
     const assignmentGroups = this.groupSessionsByAssignment(sessions);
@@ -240,11 +330,16 @@ export class WritingProcessAnalyzer {
       evolution
     );
     
-    return {
+    const result = {
       consistentPatterns,
       evolution,
       recommendations
     };
+
+    // Cache the result
+    await cache.set(cacheKey, result, { ttl: CacheTTL.WRITING_PATTERN });
+    
+    return result;
   }
   
   /**
@@ -255,7 +350,7 @@ export class WritingProcessAnalyzer {
     profile?: StudentLearningProfile
   ): SessionPattern {
     // Get cognitive load indicators
-    const cognitiveLoadProfile = CognitiveLoadDetector.detectFromSession(session, profile);
+    const cognitiveLoadProfile = CognitiveLoadDetector.detectFromSessionSync(session, profile);
     
     // Determine session pattern
     let pattern: SessionPattern['pattern'];
@@ -414,7 +509,7 @@ export class WritingProcessAnalyzer {
         revisionIntensity = 0.3;
       }
       
-      const cognitiveLoad = CognitiveLoadDetector.detectFromSession(session);
+      const cognitiveLoad = CognitiveLoadDetector.detectFromSessionSync(session);
       
       stages.push({
         stage,
@@ -581,7 +676,7 @@ export class WritingProcessAnalyzer {
           count: 0
         };
         
-        const cognitiveLoad = CognitiveLoadDetector.detectFromSession(session);
+        const cognitiveLoad = CognitiveLoadDetector.detectFromSessionSync(session);
         
         current.totalWords += activity.wordsAdded;
         current.totalTime += (session.duration || 0) / 60;

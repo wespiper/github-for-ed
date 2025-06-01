@@ -1,5 +1,13 @@
+import { v4 as uuidv4 } from 'uuid';
 import { StudentLearningProfile, StudentLearningProfileService } from './StudentLearningProfileService';
 import { WritingSession } from '@prisma/client';
+import { ServiceFactory } from '../../container/ServiceFactory';
+import { CacheKeyBuilder, CacheTTL } from '../../cache/CacheService';
+import { 
+  StudentStruggleDetectedEvent,
+  InterventionTriggeredEvent,
+  EventTypes 
+} from '../../events/events';
 
 export interface CognitiveLoadIndicators {
   // Behavioral patterns
@@ -44,10 +52,81 @@ export class CognitiveLoadDetector {
   private static readonly STAGNATION_THRESHOLD = 300; // 5 minutes
   private static readonly OPTIMAL_WPM = 20; // Optimal words per minute
   
+  private static serviceFactory = ServiceFactory.getInstance();
+  
   /**
    * Real-time cognitive load assessment from writing behavior
    */
-  static detectFromSession(
+  static async detectFromSession(
+    sessionData: WritingSession & { activity?: any },
+    studentProfile?: StudentLearningProfile,
+    context?: {
+      studentId: string;
+      courseId?: string;
+      assignmentId?: string;
+    }
+  ): Promise<CognitiveLoadIndicators> {
+    const activity = sessionData.activity as WritingSessionActivity;
+    
+    if (!activity) {
+      return this.createDefaultIndicators();
+    }
+    
+    // Calculate behavioral indicators
+    const deletionRatio = this.calculateDeletionRatio(activity);
+    const pausePatterns = this.analyzePauses(activity.timestamps);
+    const revisionCycles = this.countRevisionCycles(activity.edits);
+    const cursorThrashing = this.detectCursorThrashing(activity.cursorPositions);
+    
+    // Calculate progress indicators
+    const wordProductionRate = this.calculateWordProductionRate(
+      activity.wordsAdded,
+      sessionData.duration || 0
+    );
+    const timeOnTask = (sessionData.duration || 0); // Keep in seconds for now
+    const progressStagnation = this.detectStagnation(
+      wordProductionRate,
+      timeOnTask,
+      activity.wordsAdded
+    );
+    
+    // Estimate cognitive load with factors
+    const { load, confidence, factors } = this.calculateLoadScore({
+      deletionRatio,
+      pausePatterns,
+      revisionCycles,
+      cursorThrashing,
+      wordProductionRate,
+      timeOnTask,
+      progressStagnation,
+      studentProfile
+    });
+    
+    const indicators: CognitiveLoadIndicators = {
+      deletionRatio,
+      pausePatterns,
+      revisionCycles,
+      cursorThrashing,
+      wordProductionRate,
+      timeOnTask: timeOnTask / 60, // Convert to minutes for display
+      progressStagnation,
+      estimatedLoad: load,
+      confidence,
+      factors
+    };
+    
+    // Publish events for high cognitive load or struggles
+    if (context) {
+      await this.publishCognitiveLoadEvents(indicators, context);
+    }
+    
+    return indicators;
+  }
+  
+  /**
+   * Synchronous version for compatibility
+   */
+  static detectFromSessionSync(
     sessionData: WritingSession & { activity?: any },
     studentProfile?: StudentLearningProfile
   ): CognitiveLoadIndicators {
@@ -99,6 +178,142 @@ export class CognitiveLoadDetector {
       confidence,
       factors
     };
+  }
+  
+  /**
+   * Publish events based on cognitive load indicators
+   */
+  private static async publishCognitiveLoadEvents(
+    indicators: CognitiveLoadIndicators,
+    context: {
+      studentId: string;
+      courseId?: string;
+      assignmentId?: string;
+    }
+  ): Promise<void> {
+    const eventBus = this.serviceFactory.getEventBus();
+    const cache = this.serviceFactory.getCache();
+    const correlationId = uuidv4();
+    
+    // Check if we've recently sent an event for this student to avoid spam
+    const cacheKey = CacheKeyBuilder.monitoringMetric('cognitive_load_event', context.studentId);
+    const recentEvent = await cache.get<boolean>(cacheKey);
+    if (recentEvent) {
+      return; // Don't spam events
+    }
+    
+    // Detect struggle conditions
+    if (indicators.estimatedLoad === 'overload' || 
+        (indicators.estimatedLoad === 'high' && indicators.confidence > 0.7)) {
+      
+      // Determine struggle type
+      let struggleType: 'cognitive_overload' | 'writing_block' | 'concept_confusion' | 'time_management' = 'cognitive_overload';
+      
+      if (indicators.progressStagnation && indicators.wordProductionRate < 2) {
+        struggleType = 'writing_block';
+      } else if (indicators.revisionCycles > 5 && indicators.deletionRatio > 2) {
+        struggleType = 'concept_confusion';
+      }
+      
+      // Publish struggle detected event
+      await eventBus.publish<StudentStruggleDetectedEvent>({
+        type: EventTypes.STUDENT_STRUGGLE_DETECTED,
+        correlationId,
+        timestamp: new Date(),
+        payload: {
+          studentId: context.studentId,
+          courseId: context.courseId || '',
+          assignmentId: context.assignmentId,
+          struggleType,
+          severity: indicators.estimatedLoad === 'overload' ? 'high' : 'medium',
+          indicators: indicators.factors,
+          recommendedInterventions: this.getRecommendations(indicators)
+        },
+        metadata: { userId: context.studentId }
+      });
+      
+      // Cache to prevent spam (5 minute cooldown)
+      await cache.set(cacheKey, true, { ttl: 300 });
+      
+      // Trigger intervention for severe cases
+      if (indicators.estimatedLoad === 'overload' && indicators.confidence > 0.8) {
+        await this.triggerIntervention(indicators, context, correlationId);
+      }
+    }
+  }
+  
+  /**
+   * Trigger an intervention for high cognitive load
+   */
+  private static async triggerIntervention(
+    indicators: CognitiveLoadIndicators,
+    context: {
+      studentId: string;
+      courseId?: string;
+      assignmentId?: string;
+    },
+    correlationId: string
+  ): Promise<void> {
+    const eventBus = this.serviceFactory.getEventBus();
+    
+    // Determine intervention type based on indicators
+    const interventionActions = [];
+    
+    if (indicators.progressStagnation) {
+      interventionActions.push({
+        type: 'ui_prompt' as const,
+        target: 'student' as const,
+        content: 'It looks like you might be stuck. Would you like some help brainstorming ideas?'
+      });
+    }
+    
+    if (indicators.deletionRatio > 3) {
+      interventionActions.push({
+        type: 'ui_prompt' as const,
+        target: 'student' as const,
+        content: 'Perfectionism can slow progress. Try moving forward with a rough draft first.'
+      });
+    }
+    
+    if (indicators.timeOnTask > 60) {
+      interventionActions.push({
+        type: 'notification' as const,
+        target: 'student' as const,
+        content: 'You\'ve been working hard! Consider taking a 5-minute break to refresh.'
+      });
+    }
+    
+    // Always notify educator for high severity
+    interventionActions.push({
+      type: 'notification' as const,
+      target: 'educator' as const,
+      content: `Student ${context.studentId} is experiencing cognitive overload while writing.`
+    });
+    
+    await eventBus.publish<InterventionTriggeredEvent>({
+      type: EventTypes.INTERVENTION_TRIGGERED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId: context.studentId,
+        courseId: context.courseId || '',
+        assignmentId: context.assignmentId,
+        interventionType: 'automated',
+        triggerReason: {
+          type: 'cognitive_overload',
+          severity: 'high',
+          indicators: indicators.factors
+        },
+        intervention: {
+          id: uuidv4(),
+          title: 'Cognitive Load Support',
+          description: 'Automated support for detected cognitive overload',
+          actions: interventionActions
+        },
+        expectedOutcome: 'Reduce cognitive load and help student progress'
+      },
+      metadata: { userId: context.studentId }
+    });
   }
   
   /**

@@ -172,7 +172,7 @@ export class EducationalAIService {
   }> {
     try {
       // Query AI interaction logs using repository
-      const interactions = await this.aiInteractionRepository.findByStudentId(
+      const interactions = await this.aiInteractionRepository.findByStudent(
         studentId,
         timeframe
       );

@@ -35,6 +35,12 @@ app.use(cors({
 
 app.use(express.json());
 
+// Add monitoring middleware
+import { createMonitoringMiddleware, logger, metricsCollector } from './monitoring';
+const monitoringMiddleware = createMonitoringMiddleware();
+app.use(monitoringMiddleware.correlationId());
+app.use(monitoringMiddleware.metrics());
+
 // Add routing headers to all responses
 app.use(addRoutingHeaders);
 
@@ -45,7 +51,17 @@ app.use(addRoutingHeaders);
 app.use('/api/auth', trafficRouter);
 app.use('/api/ai', trafficRouter);
 
-app.get('/api/health', async (req, res) => {
+// Health check endpoint with comprehensive monitoring
+app.get('/api/health', monitoringMiddleware.health);
+
+// Metrics endpoint
+app.get('/api/metrics', (req, res) => {
+  const metrics = metricsCollector.getAllMetrics();
+  res.json(metrics);
+});
+
+// Legacy health check endpoint
+app.get('/api/health-simple', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ 
@@ -89,6 +105,12 @@ const initializeDatabase = async () => {
     console.log('Initializing service container...');
     initializeServices(prisma);
     console.log('✅ Service container initialized with repository pattern');
+    
+    // Initialize new ServiceFactory for event-driven services
+    const { ServiceFactory } = await import('./container/ServiceFactory');
+    const serviceFactory = ServiceFactory.getInstance();
+    await serviceFactory.initialize();
+    console.log('✅ Event-driven service factory initialized');
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');

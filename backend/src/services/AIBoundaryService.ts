@@ -418,11 +418,11 @@ export class AIBoundaryService {
     this.validateObjectId(courseId);
     
     // Get all assignments in the course using repository
-    const assignments = await this.assignmentRepository.findByCourseId(courseId);
+    const assignments = await this.assignmentRepository.findByCourse(courseId);
     const assignmentIds = assignments.map(a => a.id);
     
     // Get AI usage across all assignments using repository
-    const allInteractions = await this.aiInteractionRepository.findByStudentId(
+    const allInteractions = await this.aiInteractionRepository.findByStudent(
       studentId,
       timeframe
     );
@@ -470,8 +470,8 @@ export class AIBoundaryService {
     this.validateObjectId(instructorId);
     this.validateObjectId(courseId);
     
-    // Get assignments with AI analytics using repository
-    const assignments = await this.assignmentRepository.findWithAIAnalytics(courseId);
+    // Get assignments for the course using repository
+    const assignments = await this.assignmentRepository.findByCourse(courseId);
     
     // Filter by instructor
     const instructorAssignments = assignments.filter(
