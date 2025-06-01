@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import prisma from './lib/prisma';
+import { startFastifyServer } from './fastify/app';
+import { trafficRouter, addRoutingHeaders } from './middleware/router';
+import { initializeServices, attachServices } from './middleware/serviceContainer';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
@@ -19,7 +22,8 @@ import boundaryIntelligenceRoutes from './routes/boundaryIntelligence';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const EXPRESS_PORT = process.env.PORT || 5001;
+const FASTIFY_PORT = process.env.FASTIFY_PORT || 3001;
 
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
@@ -31,7 +35,33 @@ app.use(cors({
 
 app.use(express.json());
 
-app.get('/api/health', async (req, res) => {
+// Add monitoring middleware
+import { createMonitoringMiddleware, logger, metricsCollector } from './monitoring';
+const monitoringMiddleware = createMonitoringMiddleware();
+app.use(monitoringMiddleware.correlationId());
+app.use(monitoringMiddleware.metrics());
+
+// Add routing headers to all responses
+app.use(addRoutingHeaders);
+
+// Initialize services with dependency injection
+// This will be done after database connection is established
+
+// Apply traffic routing to migrated endpoints
+app.use('/api/auth', trafficRouter);
+app.use('/api/ai', trafficRouter);
+
+// Health check endpoint with comprehensive monitoring
+app.get('/api/health', monitoringMiddleware.health);
+
+// Metrics endpoint
+app.get('/api/metrics', (req, res) => {
+  const metrics = metricsCollector.getAllMetrics();
+  res.json(metrics);
+});
+
+// Legacy health check endpoint
+app.get('/api/health-simple', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ 
@@ -47,6 +77,9 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Attach services to requests (after routes that don't need services)
+app.use(attachServices);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/admin', adminRoutes);
@@ -61,12 +94,23 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reflections', reflectionRoutes);
 app.use('/api/boundaries', boundaryIntelligenceRoutes);
 
-// Initialize Prisma connection
+// Initialize Prisma connection and services
 const initializeDatabase = async () => {
   try {
     console.log('Connecting to PostgreSQL...');
     await prisma.$connect();
     console.log('✅ PostgreSQL connected successfully');
+    
+    // Initialize service container with repository pattern
+    console.log('Initializing service container...');
+    initializeServices(prisma);
+    console.log('✅ Service container initialized with repository pattern');
+    
+    // Initialize new ServiceFactory for event-driven services
+    const { ServiceFactory } = await import('./container/ServiceFactory');
+    const serviceFactory = ServiceFactory.getInstance();
+    await serviceFactory.initialize();
+    console.log('✅ Event-driven service factory initialized');
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');
@@ -90,14 +134,25 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start server
-const startServer = async () => {
+// Start servers
+const startServers = async () => {
   await initializeDatabase();
   
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📚 API available at http://localhost:${PORT}/api`);
+  // Start Express server
+  app.listen(EXPRESS_PORT, () => {
+    console.log(`✅ Express server running on port ${EXPRESS_PORT}`);
+    console.log(`📚 Express API available at http://localhost:${EXPRESS_PORT}/api`);
   });
+
+  // Start Fastify server
+  try {
+    await startFastifyServer(FASTIFY_PORT as number);
+    console.log(`⚡ Fastify server running on port ${FASTIFY_PORT}`);
+    console.log(`🚀 Fastify API available at http://localhost:${FASTIFY_PORT}/api`);
+  } catch (error) {
+    console.error('❌ Failed to start Fastify server:', error);
+    process.exit(1);
+  }
 };
 
-startServer();
+startServers();

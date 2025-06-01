@@ -105,7 +105,7 @@ describe('Real-Time Systems Integration', () => {
       (prisma.writingSession.findMany as jest.Mock).mockResolvedValueOnce([]);
 
       // Step 1: Detect cognitive load
-      const cognitiveLoad = CognitiveLoadDetector.detectFromSession(strugglingSession);
+      const cognitiveLoad = CognitiveLoadDetector.detectFromSessionSync(strugglingSession);
       
       expect(cognitiveLoad.estimatedLoad).toBe('overload');
       expect(cognitiveLoad.deletionRatio).toBeGreaterThan(1.5);
@@ -439,7 +439,7 @@ describe('Real-Time Systems Integration', () => {
       const initialProfile = await StudentLearningProfileService.buildProfile('student-123');
       
       // Detect breakthrough - using the actual session not influenced by previous ones
-      const breakthroughLoad = CognitiveLoadDetector.detectFromSession(breakthroughSession);
+      const breakthroughLoad = CognitiveLoadDetector.detectFromSessionSync(breakthroughSession);
       
       // The session shows good progress but may not be classified as 'optimal' due to the scoring system
       // High word production (500 words in 30 minutes = 16.7 wpm) is good but not exceptional
@@ -603,7 +603,7 @@ describe('Real-Time Systems Integration', () => {
         } as any;
         
         // Detect load
-        const load = CognitiveLoadDetector.detectFromSession(session, profile);
+        const load = CognitiveLoadDetector.detectFromSessionSync(session, profile);
         
         // Evaluate intervention
         return RealTimeInterventionEngine.evaluateInterventionNeed(

@@ -5,7 +5,7 @@
  * into the existing AIBoundaryService.
  */
 
-import { MCPValidationService } from './ai/MCPValidationService';
+// import { MCPValidationService } from './ai/MCPValidationService'; // Temporarily disabled
 import { AIBoundaryService, AIAssistanceRequest, AIAssistanceResponse } from './AIBoundaryService';
 import prisma from '../lib/prisma';
 

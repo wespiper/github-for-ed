@@ -34,7 +34,7 @@ describe('CognitiveLoadDetector', () => {
         }))
       };
 
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(activity, 600) // 10 minutes in seconds
       );
 
@@ -63,7 +63,7 @@ describe('CognitiveLoadDetector', () => {
         ]
       };
 
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(activity, 1800) // 30 minutes in seconds
       );
 
@@ -92,7 +92,7 @@ describe('CognitiveLoadDetector', () => {
         cursorPositions: Array.from({ length: 20 }, (_, i) => i % 2 === 0 ? 0 : 500) // Jumping back and forth
       };
 
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(activity, 2700) // 45 minutes in seconds
       );
 
@@ -114,7 +114,7 @@ describe('CognitiveLoadDetector', () => {
         edits: []
       };
 
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(activity, 1200) // 20 minutes in seconds
       );
 
@@ -159,7 +159,7 @@ describe('CognitiveLoadDetector', () => {
         }
       } as any;
 
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(activity, 1800), // 30 minutes in seconds
         frustratedProfile as StudentLearningProfile
       );
@@ -170,7 +170,7 @@ describe('CognitiveLoadDetector', () => {
     });
 
     it('should handle missing activity data gracefully', () => {
-      const result = CognitiveLoadDetector.detectFromSession(
+      const result = CognitiveLoadDetector.detectFromSessionSync(
         createMockSession(null)
       );
 

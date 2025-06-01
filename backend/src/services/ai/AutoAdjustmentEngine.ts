@@ -503,15 +503,17 @@ export class AutoAdjustmentEngine {
       await NotificationService.createNotification({
         userId: assignment.course.instructorId,
         type: 'boundary_proposal',
+        category: 'ai_adjustment',
         title: 'AI Boundary Adjustment Proposed',
         message: `A new boundary adjustment has been proposed for "${assignment.title}": ${proposal.reason}`,
         priority: 'medium',
-        metadata: {
+        context: {
           proposalId: storedProposal.id,
           assignmentId: proposal.assignmentId,
           type: proposal.type,
           affectedCount: proposal.affectedStudents.length
-        }
+        },
+        actionRequired: true
       });
 
       console.log(`Boundary proposal submitted for assignment ${proposal.assignmentId}`);
@@ -570,13 +572,15 @@ export class AutoAdjustmentEngine {
         await NotificationService.createNotification({
           userId: studentId,
           type: 'boundary_adjusted',
+          category: 'ai_adjustment',
           title: 'AI Support Settings Updated',
           message: 'Your educator has adjusted the AI support settings for this assignment to better support your learning.',
           priority: 'low',
-          metadata: {
+          context: {
             assignmentId: proposal.assignmentId,
             changeType: proposal.type
-          }
+          },
+          actionRequired: false
         });
       }
     } catch (error) {

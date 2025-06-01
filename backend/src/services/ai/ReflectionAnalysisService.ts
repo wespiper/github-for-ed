@@ -1,7 +1,14 @@
+import { v4 as uuidv4 } from 'uuid';
 import { AIBoundaryService } from '../AIBoundaryService';
-import prisma from '../../lib/prisma';
 import { AuthenticityDetector } from './AuthenticityDetector';
 import { ReflectionCacheService } from '../cache/ReflectionCacheService';
+import { ServiceFactory } from '../../container/ServiceFactory';
+import { CacheKeyBuilder, CacheTTL } from '../../cache/CacheService';
+import { 
+  AIInteractionLoggedEvent, 
+  StudentProgressUpdatedEvent,
+  EventTypes 
+} from '../../events/events';
 
 export interface ReflectionAnalysis {
   // Multi-dimensional assessment
@@ -48,6 +55,8 @@ export interface ReflectionAnalysis {
 }
 
 export class ReflectionAnalysisService {
+  private static serviceFactory = ServiceFactory.getInstance();
+
   /**
    * Analyze reflection quality with NLP-enhanced assessment
    */
@@ -60,18 +69,45 @@ export class ReflectionAnalysisService {
       writingStage: string;
     }
   ): Promise<ReflectionAnalysis> {
+    const correlationId = uuidv4();
+    const cache = this.serviceFactory.getCache();
+    const eventBus = this.serviceFactory.getEventBus();
+
     // Check cache first
     const reflectionHash = ReflectionCacheService.hashReflection(reflection);
-    const cached = ReflectionCacheService.getCachedAnalysis(
-      context.studentId,
-      context.assignmentId,
-      reflectionHash
-    );
+    const cacheKey = CacheKeyBuilder.reflectionQuality(`${context.studentId}:${context.assignmentId}:${reflectionHash}`);
+    const cached = await cache.get<ReflectionAnalysis>(cacheKey);
     
     if (cached) {
       console.log('Cache hit for reflection analysis');
       return cached;
     }
+
+    // Log AI interaction
+    await eventBus.publish<AIInteractionLoggedEvent>({
+      type: EventTypes.AI_INTERACTION_LOGGED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId: context.studentId,
+        courseId: '', // Would need to fetch from assignment
+        assignmentId: context.assignmentId,
+        interactionType: 'feedback_request',
+        aiService: 'reflection_analyzer',
+        request: {
+          content: 'Analyze reflection quality',
+          context: { reflectionLength: reflection.length }
+        },
+        response: {
+          content: 'Processing reflection analysis',
+          educationalValue: 0.9
+        },
+        duration: 0 // Will update later
+      },
+      metadata: { userId: context.studentId }
+    });
+
+    const startTime = Date.now();
 
     // Phase detection patterns
     const patterns = {
@@ -132,16 +168,62 @@ export class ReflectionAnalysisService {
       }
     };
 
-    // Store analysis for learning analytics
-    await this.storeAnalysis(context, analysis);
+    // Store analysis in database
+    await this.storeAnalysis(context, analysis, reflection);
     
     // Cache the result
-    ReflectionCacheService.cacheAnalysis(
-      context.studentId,
-      context.assignmentId,
-      reflectionHash,
-      analysis
-    );
+    await cache.set(cacheKey, analysis, { ttl: CacheTTL.REFLECTION_QUALITY });
+
+    // Publish progress update event
+    await eventBus.publish<StudentProgressUpdatedEvent>({
+      type: EventTypes.STUDENT_PROGRESS_UPDATED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId: context.studentId,
+        courseId: '', // Would need to fetch from assignment
+        assignmentId: context.assignmentId,
+        progressType: 'reflection',
+        metrics: {
+          reflectionQuality: overallScore,
+          aiInteractionCount: 1
+        },
+        currentState: {
+          reflectionDepth: depth.score,
+          selfAwareness: selfAwareness.score,
+          criticalThinking: criticalEngagement.score,
+          growthMindset: growthMindset.score,
+          accessLevel
+        }
+      },
+      metadata: { userId: context.studentId }
+    });
+
+    // Update AI interaction duration
+    const duration = Date.now() - startTime;
+    await eventBus.publish<AIInteractionLoggedEvent>({
+      type: EventTypes.AI_INTERACTION_LOGGED,
+      correlationId,
+      timestamp: new Date(),
+      payload: {
+        studentId: context.studentId,
+        courseId: '',
+        assignmentId: context.assignmentId,
+        interactionType: 'feedback_request',
+        aiService: 'reflection_analyzer',
+        request: {
+          content: 'Analyze reflection quality',
+          context: { reflectionLength: reflection.length }
+        },
+        response: {
+          content: 'Reflection analysis completed',
+          educationalValue: 0.9
+        },
+        duration,
+        bloomsLevel: this.determineBloomsLevel(overallScore)
+      },
+      metadata: { userId: context.studentId }
+    });
     
     return analysis;
   }
@@ -404,58 +486,49 @@ export class ReflectionAnalysisService {
     return recommendations;
   }
 
-  private static async storeAnalysis(context: any, analysis: any): Promise<void> {
+  private static async storeAnalysis(context: any, analysis: ReflectionAnalysis, reflectionText: string): Promise<void> {
     try {
-      // Store in dedicated ReflectionAnalysis table
-      await prisma.reflectionAnalysis.create({
-        data: {
-          studentId: context.studentId,
-          assignmentId: context.assignmentId,
-          aiInteractionId: context.aiInteractionId,
-          reflectionText: context.reflection || context.reflectionText || '',
-          
-          // Depth scores
-          depthScore: analysis.depth.score,
-          reasoningChains: analysis.depth.reasoningChains,
-          abstractionLevel: analysis.depth.abstractionLevel,
-          evidenceOfThinking: analysis.depth.evidenceOfThinking,
-          
-          // Self-awareness scores
-          selfAwarenessScore: analysis.selfAwareness.score,
-          recognizesGaps: analysis.selfAwareness.recognizesGaps,
-          questionsAssumptions: analysis.selfAwareness.questionsAssumptions,
-          identifiesLearningProcess: analysis.selfAwareness.identifiesLearningProcess,
-          articulatesStruggle: analysis.selfAwareness.articulatesStruggle,
-          
-          // Critical thinking scores
-          criticalThinkingScore: analysis.criticalEngagement.score,
-          challengesAIPrompts: analysis.criticalEngagement.challengesAIPrompts,
-          offersAlternatives: analysis.criticalEngagement.offersAlternatives,
-          evaluatesPerspectives: analysis.criticalEngagement.evaluatesMultiplePerspectives,
-          synthesizesIdeas: analysis.criticalEngagement.synthesizesIdeas,
-          
-          // Growth mindset scores
-          growthMindsetScore: analysis.growthMindset.score,
-          focusOnLearning: analysis.growthMindset.focusOnLearning,
-          embracesChallenge: analysis.growthMindset.embracesChallenge,
-          seeksImprovement: analysis.growthMindset.seeksImprovement,
-          
-          // Overall assessment
-          overallQualityScore: analysis.overall.qualityScore,
-          authenticityScore: analysis.overall.authenticityScore,
-          progressiveAccessLevel: analysis.overall.progressiveAccessLevel,
-          recommendations: analysis.overall.recommendations
-        }
+      const serviceFactory = this.serviceFactory;
+      
+      // Note: This would normally get the reflection analysis repository from service factory
+      // For now, import directly until ServiceFactory is updated
+      const { PrismaReflectionAnalysisRepository } = await import('../../repositories/ReflectionRepository');
+      const reflectionAnalysisRepo = new PrismaReflectionAnalysisRepository();
+      
+      await reflectionAnalysisRepo.create({
+        studentId: context.studentId,
+        assignmentId: context.assignmentId,
+        aiInteractionId: context.aiInteractionId,
+        reflectionText,
+        depthScore: analysis.depth.score,
+        reasoningChains: analysis.depth.reasoningChains,
+        abstractionLevel: analysis.depth.abstractionLevel,
+        evidenceOfThinking: analysis.depth.evidenceOfThinking,
+        selfAwarenessScore: analysis.selfAwareness.score,
+        recognizesGaps: analysis.selfAwareness.recognizesGaps,
+        questionsAssumptions: analysis.selfAwareness.questionsAssumptions,
+        identifiesLearningProcess: analysis.selfAwareness.identifiesLearningProcess,
+        articulatesStruggle: analysis.selfAwareness.articulatesStruggle,
+        criticalThinkingScore: analysis.criticalEngagement.score,
+        challengesAIPrompts: analysis.criticalEngagement.challengesAIPrompts,
+        offersAlternatives: analysis.criticalEngagement.offersAlternatives,
+        evaluatesPerspectives: analysis.criticalEngagement.evaluatesMultiplePerspectives,
+        synthesizesIdeas: analysis.criticalEngagement.synthesizesIdeas,
+        growthMindsetScore: analysis.growthMindset.score,
+        focusOnLearning: analysis.growthMindset.focusOnLearning,
+        embracesChallenge: analysis.growthMindset.embracesChallenge,
+        seeksImprovement: analysis.growthMindset.seeksImprovement,
+        overallQualityScore: analysis.overall.qualityScore,
+        authenticityScore: analysis.overall.authenticityScore,
+        progressiveAccessLevel: analysis.overall.progressiveAccessLevel,
+        recommendations: analysis.overall.recommendations
       });
-
-      // Update AI interaction log with reflection completion
-      await prisma.aIInteractionLog.update({
-        where: { id: context.aiInteractionId },
-        data: {
-          reflectionCompleted: true,
-          reflectionQualityScore: analysis.overall.qualityScore,
-          reflectionSubmittedAt: new Date()
-        }
+      
+      console.log('Reflection analysis stored successfully', {
+        studentId: context.studentId,
+        assignmentId: context.assignmentId,
+        qualityScore: analysis.overall.qualityScore,
+        authenticityScore: analysis.overall.authenticityScore
       });
     } catch (error) {
       console.error('Error storing reflection analysis:', error);
@@ -475,34 +548,24 @@ export class ReflectionAnalysisService {
     strengths: string[];
     areasForGrowth: string[];
   }> {
+    const cache = this.serviceFactory.getCache();
+
     try {
       // Check cache first
-      const cached = ReflectionCacheService.getCachedHistory(studentId, assignmentId);
+      const cacheKey = CacheKeyBuilder.studentLearningState(studentId, assignmentId || 'reflections');
+      const cached = await cache.get<any>(cacheKey);
       if (cached) {
         console.log('Cache hit for reflection history');
         return cached;
       }
 
-      const where: any = {
-        studentId
-      };
+      // Get reflection analyses from repository
+      const { PrismaReflectionAnalysisRepository } = await import('../../repositories/ReflectionRepository');
+      const reflectionAnalysisRepo = new PrismaReflectionAnalysisRepository();
       
-      if (assignmentId) {
-        where.assignmentId = assignmentId;
-      }
-      
-      const reflections = await prisma.reflectionAnalysis.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        select: {
-          overallQualityScore: true,
-          depthScore: true,
-          selfAwarenessScore: true,
-          criticalThinkingScore: true,
-          growthMindsetScore: true,
-          createdAt: true
-        }
+      const reflections = await reflectionAnalysisRepo.findByStudent(studentId, {
+        assignmentId,
+        limit: 20
       });
       
       if (reflections.length === 0) {
@@ -558,7 +621,7 @@ export class ReflectionAnalysisService {
       };
       
       // Cache the result
-      ReflectionCacheService.cacheHistory(studentId, result, assignmentId);
+      await cache.set(cacheKey, result, { ttl: CacheTTL.STUDENT_STATE });
       
       return result;
     } catch (error) {
@@ -627,5 +690,14 @@ export class ReflectionAnalysisService {
       qualityThreshold,
       prompts
     };
+  }
+
+  private static determineBloomsLevel(qualityScore: number): 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create' {
+    if (qualityScore >= 90) return 'create';
+    if (qualityScore >= 80) return 'evaluate';
+    if (qualityScore >= 70) return 'analyze';
+    if (qualityScore >= 60) return 'apply';
+    if (qualityScore >= 40) return 'understand';
+    return 'remember';
   }
 }

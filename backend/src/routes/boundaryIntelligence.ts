@@ -7,7 +7,7 @@ import prisma from '../lib/prisma';
 const router = Router();
 
 // Get boundary recommendations for an assignment
-router.get('/recommendations/:assignmentId', authenticate, authorize('educator'), async (req: Request, res: Response) => {
+router.get('/recommendations/:assignmentId', authenticate, authorize(['educator']), async (req: Request, res: Response) => {
   try {
     const { assignmentId } = req.params;
     
@@ -25,10 +25,11 @@ router.get('/recommendations/:assignmentId', authenticate, authorize('educator')
     });
 
     if (!assignment) {
-      return res.status(404).json({ 
+      res.status(404).json({ 
         success: false, 
         message: 'Assignment not found or access denied' 
       });
+      return;
     }
 
     // Generate recommendations
@@ -43,7 +44,7 @@ router.get('/recommendations/:assignmentId', authenticate, authorize('educator')
         data: {
           assignmentId,
           recommendationType: recommendation.recommendationType,
-          recommendation: recommendation,
+          recommendation: recommendation as any,
           evidence: recommendation.classAdjustments?.evidence || 
                    recommendation.individualAdjustments || 
                    recommendation.temporalStrategy || {},
@@ -56,7 +57,7 @@ router.get('/recommendations/:assignmentId', authenticate, authorize('educator')
       success: true,
       data: {
         assignmentId,
-        courseName: assignment.course.name,
+        courseName: assignment.course.title,
         recommendations
       }
     });
@@ -70,7 +71,7 @@ router.get('/recommendations/:assignmentId', authenticate, authorize('educator')
 });
 
 // Get pending proposals for educator review
-router.get('/proposals', authenticate, authorize('educator'), async (req: Request, res: Response) => {
+router.get('/proposals', authenticate, authorize(['educator']), async (req: Request, res: Response) => {
   try {
     const proposals = await prisma.boundaryProposal.findMany({
       where: {
@@ -99,7 +100,7 @@ router.get('/proposals', authenticate, authorize('educator'), async (req: Reques
         id: proposal.id,
         assignmentId: proposal.assignmentId,
         assignmentTitle: proposal.assignment.title,
-        courseName: proposal.assignment.course.name,
+        courseName: proposal.assignment.course.title,
         type: proposal.type,
         reason: proposal.reason,
         specificChange: proposal.specificChange,
@@ -119,7 +120,7 @@ router.get('/proposals', authenticate, authorize('educator'), async (req: Reques
 });
 
 // Get proposal details
-router.get('/proposals/:proposalId', authenticate, authorize('educator'), async (req: Request, res: Response) => {
+router.get('/proposals/:proposalId', authenticate, authorize(['educator']), async (req: Request, res: Response) => {
   try {
     const { proposalId } = req.params;
 
@@ -139,10 +140,10 @@ router.get('/proposals/:proposalId', authenticate, authorize('educator'), async 
               include: {
                 enrollments: {
                   include: {
-                    user: true
+                    student: true
                   },
                   where: {
-                    userId: {
+                    studentId: {
                       in: [] // Will be populated below
                     }
                   }
@@ -155,10 +156,11 @@ router.get('/proposals/:proposalId', authenticate, authorize('educator'), async 
     });
 
     if (!proposal) {
-      return res.status(404).json({ 
+      res.status(404).json({ 
         success: false, 
         message: 'Proposal not found or access denied' 
       });
+      return;
     }
 
     // Get affected student details
@@ -177,7 +179,8 @@ router.get('/proposals/:proposalId', authenticate, authorize('educator'), async 
           select: {
             currentCognitiveLoad: true,
             emotionalState: true,
-            independenceMetrics: true
+            aiRequestFrequency: true,
+            lastSuccessfulInteraction: true
           }
         }
       }
@@ -200,7 +203,7 @@ router.get('/proposals/:proposalId', authenticate, authorize('educator'), async 
 });
 
 // Approve a proposal
-router.post('/proposals/:proposalId/approve', authenticate, authorize('educator'), async (req: Request, res: Response) => {
+router.post('/proposals/:proposalId/approve', authenticate, authorize(['educator']), async (req: Request, res: Response) => {
   try {
     const { proposalId } = req.params;
     const { educatorNotes } = req.body;
@@ -219,10 +222,11 @@ router.post('/proposals/:proposalId/approve', authenticate, authorize('educator'
     });
 
     if (!proposal) {
-      return res.status(404).json({ 
+      res.status(404).json({ 
         success: false, 
         message: 'Proposal not found or already processed' 
       });
+      return;
     }
 
     // Approve and implement
@@ -246,16 +250,17 @@ router.post('/proposals/:proposalId/approve', authenticate, authorize('educator'
 });
 
 // Reject a proposal
-router.post('/proposals/:proposalId/reject', authenticate, authorize('educator'), async (req: Request, res: Response) => {
+router.post('/proposals/:proposalId/reject', authenticate, authorize(['educator']), async (req: Request, res: Response) => {
   try {
     const { proposalId } = req.params;
     const { reason } = req.body;
 
     if (!reason) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         message: 'Rejection reason is required' 
       });
+      return;
     }
 
     // Verify educator has access
@@ -272,10 +277,11 @@ router.post('/proposals/:proposalId/reject', authenticate, authorize('educator')
     });
 
     if (!proposal) {
-      return res.status(404).json({ 
+      res.status(404).json({ 
         success: false, 
         message: 'Proposal not found or already processed' 
       });
+      return;
     }
 
     // Reject proposal
@@ -320,7 +326,7 @@ router.get('/effectiveness/:assignmentId', authenticate, async (req: Request, re
     } else if (userRole === 'student') {
       const enrollment = await prisma.courseEnrollment.findFirst({
         where: {
-          userId,
+          studentId: userId,
           course: {
             assignments: {
               some: { id: assignmentId }
@@ -332,10 +338,11 @@ router.get('/effectiveness/:assignmentId', authenticate, async (req: Request, re
     }
 
     if (!hasAccess) {
-      return res.status(403).json({ 
+      res.status(403).json({ 
         success: false, 
         message: 'Access denied' 
       });
+      return;
     }
 
     // Get effectiveness metrics
@@ -385,7 +392,7 @@ router.get('/effectiveness/:assignmentId', authenticate, async (req: Request, re
 });
 
 // Trigger auto-adjustment analysis (admin only)
-router.post('/analyze/:assignmentId', authenticate, authorize('admin'), async (req: Request, res: Response) => {
+router.post('/analyze/:assignmentId', authenticate, authorize(['admin']), async (req: Request, res: Response) => {
   try {
     const { assignmentId } = req.params;
 
@@ -395,10 +402,11 @@ router.post('/analyze/:assignmentId', authenticate, authorize('admin'), async (r
     });
 
     if (!assignment) {
-      return res.status(404).json({ 
+      res.status(404).json({ 
         success: false, 
         message: 'Assignment not found' 
       });
+      return;
     }
 
     // Run auto-adjustment analysis

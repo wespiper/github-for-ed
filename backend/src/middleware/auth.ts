@@ -58,3 +58,5 @@ export const requireRole = (roles: ('student' | 'educator' | 'admin')[]) => {
     next();
   };
 };
+
+export const authorize = requireRole;

@@ -39,6 +39,7 @@ model User {
   notificationsReceived Notification[] @relation("NotificationRecipient")
   notificationsSent     Notification[] @relation("NotificationSender")
   aiInteractionLogs     AIInteractionLog[]
+  reflections           Reflection[]
   reflectionAnalyses    ReflectionAnalysis[]
   studentProfile        StudentProfile?
 
@@ -152,6 +153,7 @@ model Assignment {
   // Relations
   submissions       AssignmentSubmission[]
   documents         Document[]
+  reflections       Reflection[]
   aiInteractionLogs AIInteractionLog[]
   reflectionAnalyses ReflectionAnalysis[]
   boundaryRecommendations BoundaryRecommendation[]
@@ -232,6 +234,7 @@ model Document {
   collaborators   DocumentCollaborator[]
   versions        DocumentVersion[]
   writingSessions WritingSession[]
+  reflections     Reflection[]
 
   @@map("documents")
   @@index([courseId, authorId])
@@ -423,6 +426,30 @@ model ReflectionAnalysis {
   @@index([createdAt])
   @@index([overallQualityScore])
   @@index([progressiveAccessLevel])
+}
+
+// Base Reflection model for student reflection entries
+model Reflection {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignmentId String?   @map("assignment_id")
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  documentId   String?   @map("document_id")
+  document     Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  type         String    // e.g., "ai_interaction", "milestone", "self_assessment", "peer_feedback"
+  content      String
+  metadata     Json      @default("{}")
+  stage        String?   // Writing stage if applicable
+  wordCount    Int       @default(0) @map("word_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("reflections")
+  @@index([userId])
+  @@index([assignmentId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // Student Learning Profile for adaptive AI

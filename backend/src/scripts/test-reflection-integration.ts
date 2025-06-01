@@ -1,10 +1,14 @@
 import 'dotenv/config';
-import { AIBoundaryService } from '../services/AIBoundaryService';
 import { ReflectionAnalysisService } from '../services/ai/ReflectionAnalysisService';
 import prisma from '../lib/prisma';
+import { initializeServiceFactory } from '../container/repositories';
 
 async function testReflectionIntegration() {
   console.log('🧪 Testing Reflection Analysis Integration...\n');
+
+  // Initialize services
+  const serviceFactory = initializeServiceFactory(prisma);
+  const aiBoundaryService = serviceFactory.createAIBoundaryService();
 
   // Test data
   const timestamp = Date.now();
@@ -192,7 +196,7 @@ async function testReflectionIntegration() {
       timestamp: new Date()
     };
 
-    const aiResponse = await AIBoundaryService.evaluateAssistanceRequest(aiRequest);
+    const aiResponse = await aiBoundaryService.evaluateAssistanceRequest(aiRequest);
     
     if (!aiResponse.approved) {
       console.log('   ✅ AI access correctly DENIED due to poor reflection quality');
