@@ -7,20 +7,27 @@ Extract academic integrity monitoring and AI detection systems into a specialize
 - **Current Phase**: Phase 2 - Extract Services (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 10 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Educator Alerts MCP (Week 9), Unified Migration Plan (Phase 1 complete)
-- **Unified Approach**: Dual interface architecture (MCP protocol + HTTP REST APIs)
+- **Dependencies**: 
+  - **Phase 1 Foundation**: Privacy-aware repository pattern, event-driven architecture, monitoring system (completed)
+  - **Week 7**: Writing Analysis MCP Server with repository integration (completed 2025-06-02)
+  - **Week 8**: Student Profiling MCP Server with triple-tier fallback architecture (completed 2025-06-03)
+  - **Week 9**: Educator Alerts MCP Server with intervention management (expected completion)
+- **Architecture Foundation**: Built on privacy-aware repository pattern from Phase 1 Week 2
+- **Unified Approach**: Triple-tier architecture (MCP protocol + HTTP REST APIs + Repository fallback)
 
 ## Scope
 ### In Scope
-- Create NestJS MCP server for academic integrity monitoring with **DUAL INTERFACE**
-- Extract AI detection and academic integrity validation logic
-- Implement 4 tools with dual interfaces:
-  - **MCP Tools**: For Claude Code integration and AI development
-  - **HTTP REST APIs**: For Fastify gateway and internal service communication
+- Create NestJS MCP server for academic integrity monitoring with **TRIPLE-TIER ARCHITECTURE**
+- Extract AI detection and academic integrity validation logic following established patterns
+- Implement 4 tools with triple-tier fallback architecture:
+  - **MCP Tools**: For Claude Code integration and AI development (primary)
+  - **HTTP REST APIs**: For Fastify gateway and internal service communication (secondary)
+  - **Repository Pattern**: Privacy-aware database fallback following Phase 1 Week 2 architecture (tertiary)
   - Tools: detect_ai_assistance_levels, analyze_academic_integrity, validate_educational_ai_use, generate_integrity_reports
-- Set up sophisticated AI usage pattern analysis
-- **Integration**: HTTP client for communication with Writing Analysis, Student Profiling, and Educator Alerts services
-- Integrate with educational AI boundaries and privacy framework
+- Set up sophisticated AI usage pattern analysis with privacy controls
+- **Repository Integration**: Create AcademicIntegrityRepository extending PrivacyAwareRepository
+- **Integration**: Leverage existing repositories and MCP clients from Weeks 7-9
+- Integrate with ServiceFactory dependency injection container
 
 ### Out of Scope
 - Traditional plagiarism detection (focus on AI-specific integrity)
@@ -28,25 +35,77 @@ Extract academic integrity monitoring and AI detection systems into a specialize
 - Advanced machine learning model training for detection
 - Integration with external plagiarism detection services
 
+## Architectural Foundation Reference
+
+### Completed Work to Build Upon
+Before implementing this week's tasks, review the following completed implementations:
+
+1. **Phase 1 Week 2 - Repository Pattern** (`docs/prompts/review/phase-1-week-2-repository-pattern-enhanced-completed-2025-01-06.md`):
+   - Privacy-aware repository interfaces with PrivacyContext
+   - Audit trail integration for all data operations
+   - Mock-first development patterns
+   - ServiceFactory dependency injection container
+
+2. **Phase 2 Week 7 - Writing Analysis MCP** (`docs/prompts/review/phase-2-week-7-writing-analysis-mcp-enhanced-completed-2025-06-02.md`):
+   - NestJS MCP server architecture patterns
+   - Repository integration with MCP servers
+   - Privacy-enhanced content analysis
+   - Educational purpose validation
+
+3. **Phase 2 Week 8 - Student Profiling MCP** (`docs/prompts/review/phase-2-week-8-student-profiling-mcp-enhanced-completed-2025-06-03.md`):
+   - Triple-tier fallback architecture (MCP → HTTP → Repository)
+   - Student data agency and privacy controls
+   - Comprehensive repository interface implementation
+   - ServiceFactory integration patterns
+
+4. **Phase 2 Week 9 - Educator Alerts MCP** (review when completed):
+   - Intervention management with repository integration
+   - Real-time notification system with privacy controls
+   - Educator workflow patterns
+
+### Required Architecture Patterns
+- **Repository Interface**: Create `AcademicIntegrityRepository` extending `PrivacyAwareRepository<T, CreateDTO, UpdateDTO>`
+- **Privacy Context**: All operations must include `PrivacyContext` parameter with educational justification
+- **ServiceFactory Integration**: Add repository to container and create getter method
+- **Mock Implementation**: Create comprehensive mock repository for testing
+- **Audit Trails**: Log all integrity analysis and AI detection operations
+- **Triple-Tier Service**: Implement fallback from MCP → HTTP → Repository
+
 ## Technical Requirements
-1. **Framework**: NestJS 10.x with advanced pattern analysis capabilities and dual interface support
-2. **MCP Protocol**: Complete tool registration with integrity-focused functionality (for Claude Code)
-3. **HTTP REST API**: OpenAPI/Swagger documented endpoints for integrity analysis (for internal services)
-4. **Performance**: <200ms response time for integrity analysis (both protocols)
+1. **Framework**: NestJS 10.x with advanced pattern analysis capabilities
+2. **Repository Pattern**: Extend established privacy-aware repository architecture
+3. **MCP Protocol**: Complete tool registration with integrity-focused functionality
+4. **Performance**: <200ms response time for integrity analysis including repository fallback
 5. **Educational Focus**: Support legitimate educational AI use while detecting misuse
-6. **Service Communication**: HTTP client integration with circuit breakers and fallbacks
-7. **Protocol Routing**: Unified service layer supporting both MCP tools and HTTP endpoints
+6. **Integration**: Seamless communication with other MCP servers and repository layer
+7. **Privacy Compliance**: Follow FERPA/COPPA patterns with academic integrity context
 
 ## Implementation Steps
 
-### Step 1: NestJS MCP Server Setup
+### Step 1: Repository Pattern Integration (REQUIRED FIRST)
+- [ ] **Review completed architecture**: Study Phase 1 Week 2 and Phase 2 Week 7-9 patterns
+- [ ] Create `backend/src/repositories/interfaces/AcademicIntegrityRepository.ts`
+- [ ] Extend `PrivacyAwareRepository` with integrity-specific methods:
+  - `detectAIAssistanceLevels()` with PrivacyContext and educational justification
+  - `analyzeAcademicIntegrity()` with audit trail
+  - `validateEducationalAIUse()` with privacy controls
+  - `generateIntegrityReports()` with access controls
+- [ ] Create `backend/src/repositories/__mocks__/AcademicIntegrityRepository.mock.ts`
+- [ ] Create `backend/src/repositories/prisma/PrismaAcademicIntegrityRepository.ts`
+- [ ] Update `backend/src/repositories/interfaces.ts` to include AcademicIntegrityRepository
+- [ ] Update `backend/src/container/ServiceFactory.ts` to include repository and getter
+- [ ] Create `backend/src/services/AcademicIntegrityService.ts` with triple-tier fallback
+- [ ] Create Express routes in `backend/src/routes/academicIntegrity.ts`
+- [ ] Update `backend/src/server.ts` to register routes
+
+### Step 2: NestJS MCP Server Setup
 - [ ] Create `mcp-servers/academic-integrity/` directory structure
 - [ ] Initialize NestJS project: `nest new academic-integrity-mcp-server`
 - [ ] Install dependencies: `npm install @anthropic/mcp-sdk natural compromise`
-- [ ] Configure TypeScript and project structure following established patterns
+- [ ] Configure TypeScript and project structure following Week 7-8 patterns
 - [ ] Set up Docker container with text analysis optimization
 
-### Step 2: MCP Protocol Integration
+### Step 3: MCP Protocol Integration
 - [ ] Create `src/mcp/mcp-server.module.ts` for MCP integration
 - [ ] Implement `src/mcp/mcp-tools.controller.ts` for tool registration
 - [ ] Define MCP tool schemas in `src/mcp/schemas/integrity-schemas.ts`

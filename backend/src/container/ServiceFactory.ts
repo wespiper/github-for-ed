@@ -8,15 +8,18 @@ import { createCacheService, defaultCacheConfig } from '../config/cache';
 import { MessageQueue } from '../messaging/MessageQueue';
 import { createMessageQueue, defaultMessagingConfig } from '../config/messaging';
 import { WritingAnalysisMCPClient } from '../services/mcp/WritingAnalysisMCPClient';
+import { StudentProfilingMCPClient } from '../services/mcp/StudentProfilingMCPClient';
 
 // Repositories
 import { 
   WritingSessionRepository,
   DocumentRepository,
   StudentProfileRepository,
+  StudentProfilingRepository,
   AssignmentRepository,
   LearningAnalyticsRepository,
-  InterventionRepository
+  InterventionRepository,
+  EducatorAlertsRepository
 } from '../repositories/interfaces';
 import { PrismaWritingSessionRepository } from '../repositories/WritingSessionRepository';
 
@@ -24,6 +27,8 @@ import { PrismaWritingSessionRepository } from '../repositories/WritingSessionRe
 import { MockDocumentRepository } from '../repositories/__mocks__/DocumentRepository.mock';
 import { MockLearningAnalyticsRepository } from '../repositories/__mocks__/LearningAnalyticsRepository.mock';
 import { MockInterventionRepository } from '../repositories/__mocks__/InterventionRepository.mock';
+import { MockStudentProfilingRepository } from '../repositories/__mocks__/StudentProfilingRepository.mock';
+import { MockEducatorAlertsRepository } from '../repositories/__mocks__/EducatorAlertsRepository.mock';
 
 /**
  * Service container interface
@@ -34,14 +39,17 @@ export interface ServiceContainer {
   cache: CacheService;
   messageQueue: MessageQueue;
   mcpClient: WritingAnalysisMCPClient;
+  studentProfilingMCPClient: StudentProfilingMCPClient;
   
   // Repositories
   writingSessionRepository: WritingSessionRepository;
   documentRepository: DocumentRepository;
   studentProfileRepository?: StudentProfileRepository;
+  studentProfilingRepository: StudentProfilingRepository;
   assignmentRepository?: AssignmentRepository;
   learningAnalyticsRepository: LearningAnalyticsRepository;
   interventionRepository: InterventionRepository;
+  educatorAlertsRepository: EducatorAlertsRepository;
 }
 
 /**
@@ -72,12 +80,15 @@ export class ServiceFactory {
     this.container.cache = createCacheService(defaultCacheConfig);
     this.container.messageQueue = createMessageQueue(defaultMessagingConfig);
     this.container.mcpClient = new WritingAnalysisMCPClient();
+    this.container.studentProfilingMCPClient = new StudentProfilingMCPClient();
 
     // Initialize repositories
     this.container.writingSessionRepository = new PrismaWritingSessionRepository();
     this.container.documentRepository = new MockDocumentRepository(); // Using mock for now
+    this.container.studentProfilingRepository = new MockStudentProfilingRepository(); // Using mock for now
     this.container.learningAnalyticsRepository = new MockLearningAnalyticsRepository(); // Using mock for now
     this.container.interventionRepository = new MockInterventionRepository(); // Using mock for now
+    this.container.educatorAlertsRepository = new MockEducatorAlertsRepository(); // Using mock for now
     
     // Connect to external services
     if (defaultCacheConfig.type === 'redis') {
@@ -88,8 +99,9 @@ export class ServiceFactory {
       await this.container.messageQueue.connect();
     }
 
-    // Connect to MCP server
+    // Connect to MCP servers
     await this.container.mcpClient.connect();
+    await this.container.studentProfilingMCPClient.connect();
 
     this.initialized = true;
   }
@@ -105,13 +117,23 @@ export class ServiceFactory {
   }
 
   /**
-   * Get MCP client
+   * Get Writing Analysis MCP client
    */
   getMCPClient(): WritingAnalysisMCPClient {
     if (!this.container.mcpClient) {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.mcpClient;
+  }
+
+  /**
+   * Get Student Profiling MCP client
+   */
+  getStudentProfilingMCPClient(): StudentProfilingMCPClient {
+    if (!this.container.studentProfilingMCPClient) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.studentProfilingMCPClient;
   }
 
   /**
@@ -155,6 +177,16 @@ export class ServiceFactory {
   }
 
   /**
+   * Get student profiling repository
+   */
+  getStudentProfilingRepository(): StudentProfilingRepository {
+    if (!this.container.studentProfilingRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.studentProfilingRepository;
+  }
+
+  /**
    * Get learning analytics repository
    */
   getLearningAnalyticsRepository(): LearningAnalyticsRepository {
@@ -172,6 +204,16 @@ export class ServiceFactory {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.interventionRepository;
+  }
+
+  /**
+   * Get educator alerts repository
+   */
+  getEducatorAlertsRepository(): EducatorAlertsRepository {
+    if (!this.container.educatorAlertsRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.educatorAlertsRepository;
   }
 
   // Note: Reflection repositories not implemented yet

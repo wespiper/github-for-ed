@@ -11,12 +11,42 @@ export const migrationConfig: MigrationConfig = {
   
   // Endpoints that have been migrated to Fastify
   enabledEndpoints: [
+    // Auth endpoints
     '/api/auth/login',
     '/api/auth/verify',
     '/api/auth/register',
     '/api/auth/profile',
+    // AI endpoints
     '/api/ai/generate',
-    '/api/ai/capabilities'
+    '/api/ai/capabilities',
+    // Educator alerts endpoints
+    '/api/educator-alerts/create',
+    '/api/educator-alerts/list',
+    '/api/educator-alerts/:alertId',
+    '/api/educator-alerts/:alertId/dismiss',
+    '/api/educator-alerts/:alertId/respond',
+    '/api/educator-alerts/metrics',
+    // Analytics endpoints
+    '/api/analytics/writing-progress/:studentId/:assignmentId',
+    '/api/analytics/analyze-patterns',
+    '/api/analytics/evaluate-reflection',
+    '/api/analytics/track-progress',
+    '/api/analytics/generate-insights',
+    '/api/analytics/classify-sensitivity',
+    '/api/analytics/validate-educational-purpose',
+    '/api/analytics/apply-ai-boundaries',
+    '/api/analytics/audit-data-access',
+    '/api/analytics/health',
+    // Student profiling endpoints
+    '/api/student-profiling/profiles/build',
+    '/api/student-profiling/profiles/:studentId/privacy-choices',
+    '/api/student-profiling/analytics/privacy-preserving',
+    '/api/student-profiling/access-validation',
+    '/api/student-profiling/profiles/:studentId/privacy-dashboard',
+    '/api/student-profiling/profiles/:studentId/learning-trajectory',
+    '/api/student-profiling/profiles/:studentId/skill-assessment',
+    '/api/student-profiling/profiles/:studentId/recommendations',
+    '/api/student-profiling/status'
   ],
   
   // Whether to automatically rollback to Express on Fastify errors
@@ -27,8 +57,20 @@ export const migrationConfig: MigrationConfig = {
 };
 
 export function shouldUseFastify(endpoint: string): boolean {
-  // Check if endpoint is migrated
-  if (!migrationConfig.enabledEndpoints.includes(endpoint)) {
+  // Check if endpoint is migrated (including parameterized routes)
+  const isMigrated = migrationConfig.enabledEndpoints.some(migratedEndpoint => {
+    // Direct match
+    if (migratedEndpoint === endpoint) {
+      return true;
+    }
+    
+    // Handle parameterized routes like /api/educator-alerts/:alertId
+    const pattern = migratedEndpoint.replace(/:[\w]+/g, '[^/]+');
+    const regex = new RegExp(`^${pattern}$`);
+    return regex.test(endpoint);
+  });
+  
+  if (!isMigrated) {
     return false;
   }
   

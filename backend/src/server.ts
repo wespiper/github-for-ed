@@ -15,7 +15,7 @@ import courseAssignmentRoutes from './routes/courseAssignments';
 import submissionRoutes from './routes/submissions';
 import notificationRoutes from './routes/notifications';
 import learningObjectivesRoutes from './routes/learningObjectives';
-import analyticsRoutes from './routes/analytics.resilient';
+import analyticsRoutes from './routes/analytics';
 import reflectionRoutes from './routes/reflections';
 import boundaryIntelligenceRoutes from './routes/boundaryIntelligence';
 
@@ -50,6 +50,9 @@ app.use(addRoutingHeaders);
 // Apply traffic routing to migrated endpoints
 app.use('/api/auth', trafficRouter);
 app.use('/api/ai', trafficRouter);
+app.use('/api/educator-alerts', trafficRouter);
+app.use('/api/analytics', trafficRouter);
+app.use('/api/student-profiling', trafficRouter);
 
 // Health check endpoint with comprehensive monitoring
 app.get('/api/health', monitoringMiddleware.health);
@@ -94,7 +97,6 @@ app.use('/api/course-assignments', courseAssignmentRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/learning-objectives', learningObjectivesRoutes);
-app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reflections', reflectionRoutes);
 app.use('/api/boundaries', boundaryIntelligenceRoutes);
 
@@ -115,6 +117,9 @@ const initializeDatabase = async () => {
     const serviceFactory = ServiceFactory.getInstance();
     await serviceFactory.initialize();
     console.log('✅ Event-driven service factory initialized');
+    
+    // Note: Educator alerts routes are now handled by Fastify server
+    console.log('✅ Educator alerts will be served via Fastify server');
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', (error as Error).message);
     console.log('\n💡 Solutions:');

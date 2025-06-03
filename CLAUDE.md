@@ -8,8 +8,9 @@ Quick operational reference for Claude Code. For detailed documentation, use the
 Scribe Tree is a monorepo containing a React frontend and Node.js backend for teaching writing using version control concepts with responsible AI integration.
 
 **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + ShadCN UI
-**Backend**: Event-driven microservices architecture with Node.js + Express + TypeScript + PostgreSQL + Prisma
+**Backend**: Hybrid event-driven microservices architecture with Node.js + Fastify (primary) + Express (legacy) + TypeScript + PostgreSQL + Prisma
 **Structure**: Separate `/frontend` and `/backend` directories with independent package.json files
+**Migration Status**: Active migration from Express to Fastify with traffic routing (FASTIFY_TRAFFIC_PERCENTAGE)
 
 ### Event-Driven Architecture
 - **ServiceFactory**: Dependency injection container managing all services
@@ -31,25 +32,41 @@ npm run lint    # ESLint checking
 npm run preview # Preview production build
 ```
 
-### Backend (Node.js + Express)
+### Backend (Node.js + Fastify/Express Hybrid)
 
 ```bash
 cd backend
-npm run dev     # Nodemon with ts-node hot reload on http://localhost:5001
-npm run build   # TypeScript compilation to ./dist
-npm run start   # Production server from compiled JS
+npm run dev          # Runs BOTH servers during migration:
+                     # - Fastify on http://localhost:5001 (primary)
+                     # - Express on http://localhost:5002 (legacy)
+npm run dev:fastify  # Fastify server only (for new feature development)
+npm run dev:express  # Express server only (legacy, being phased out)
+npm run build        # TypeScript compilation to ./dist
+npm run start        # Production servers with traffic routing
 
 # Privacy Testing
 npm test -- --testPathPattern=privacy  # Run privacy test suite (116/119 passing)
+
+# Traffic Routing (set in .env)
+FASTIFY_TRAFFIC_PERCENTAGE=50  # Routes 50% of traffic to Fastify
 ```
 
 ## Setup Requirements
 
 1. Install dependencies in both directories: `npm install`
 2. Copy `backend/.env.example` to `backend/.env`
-3. Ensure PostgreSQL is running (local or provide DATABASE_URL)
-4. Run Prisma migrations: `npx prisma migrate dev`
-5. Run both frontend and backend concurrently for development
+3. Configure traffic routing: Set `FASTIFY_TRAFFIC_PERCENTAGE` (0-100)
+4. Ensure PostgreSQL is running (local or provide DATABASE_URL)
+5. Run Prisma migrations: `npx prisma migrate dev`
+6. Run frontend and BOTH backend servers for development (hybrid mode)
+
+### Traffic Routing Configuration
+```bash
+# .env configuration
+FASTIFY_TRAFFIC_PERCENTAGE=0    # All traffic to Express (legacy)
+FASTIFY_TRAFFIC_PERCENTAGE=50   # Split traffic 50/50 (recommended during migration)
+FASTIFY_TRAFFIC_PERCENTAGE=100  # All traffic to Fastify (target state)
+```
 
 ## Key Configuration
 
@@ -73,6 +90,15 @@ npm test -- --testPathPattern=privacy  # Run privacy test suite (116/119 passing
 - **ServiceFactory**: Dependency injection container in `src/container/ServiceFactory.ts`
 - **Cache Abstraction**: Educational cache patterns with Redis/in-memory backends
 - **Message Queues**: RabbitMQ/in-memory for asynchronous service communication
+- **NestJS Decorators**: Services use `@Injectable()` for dependency injection compatibility
+- **Traffic Routing**: Intelligent routing between Fastify (new) and Express (legacy) servers
+
+### Migration Guidelines
+- **NEW FEATURES**: Build in Fastify (`/fastify` directory), NOT Express
+- **Migrated Endpoints**: Health check, auth routes, AI routes (see migration status)
+- **Legacy Support**: Express remains for unmigrated endpoints during transition
+- **Gradual Migration**: Use FASTIFY_TRAFFIC_PERCENTAGE to control rollout
+- **Service Compatibility**: All services work with both frameworks via NestJS decorators
 
 ### Reflection System
 - **Quality Analysis**: Multi-dimensional assessment (depth, self-awareness, critical thinking, growth mindset)
@@ -457,7 +483,28 @@ Planned evolution from current Express/Fastify hybrid with in-process MCP servic
 - **Fallback Architecture**: Always maintain in-process fallback for ultimate reliability
 - **Feature Flags**: Gradual migration control with instant rollback capabilities
 
-### Target Architecture
+### Current Architecture (Hybrid During Migration)
+```
+┌─────────────────────────┐
+│    Traffic Router       │
+│ (FASTIFY_TRAFFIC_%)     │
+└───────┬────────┬────────┘
+        │        │
+┌───────▼────┐ ┌─▼────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Fastify   │ │  Express     │  │   Writing    │  │   Student    │
+│  (Primary) │ │  (Legacy)    │  │  Analysis    │  │  Profiling   │
+│  Port 5001 │ │ Port 5002    │  │   Service    │  │   Service    │
+└────────────┘ └──────────────┘  │ (NestJS)     │  │ (NestJS)     │
+                                  └──────────────┘  └──────────────┘
+                                      Port 3001        Port 3002
+
+Migration Status:
+✅ Migrated to Fastify: /health, /auth/*, /ai/*
+⏳ In Progress: /assignments, /analytics, /documents
+❌ Legacy Express: /courses, /notifications, /submissions
+```
+
+### Target Architecture (Post-Migration)
 ```
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │   API        │  │   Writing    │  │   Student    │  │   Strategic  │
@@ -540,13 +587,14 @@ Planned evolution from current Express/Fastify hybrid with in-process MCP servic
 
 ## Current State
 
-This is a fully functional educational writing platform with event-driven microservices architecture:
+This is a fully functional educational writing platform with hybrid Fastify/Express architecture during active migration:
 
 **✅ Core Platform**
 - Complete development environment with PostgreSQL + Prisma
 - Build tooling and CI/CD pipeline
-- Comprehensive API with educational features
+- Hybrid Fastify (primary) + Express (legacy) API architecture
 - Multi-role access control (students, educators, administrators)
+- Traffic routing system for gradual migration (FASTIFY_TRAFFIC_PERCENTAGE)
 
 **✅ Educational AI System**
 - Educational AI assistant with bounded enhancement philosophy
@@ -602,7 +650,9 @@ This is a fully functional educational writing platform with event-driven micros
 
 **Core Configuration**
 - `frontend/components.json` - ShadCN UI configuration
-- `backend/src/server.ts` - Express app and PostgreSQL connection
+- `backend/src/server.ts` - Express app (legacy) and PostgreSQL connection
+- `backend/src/fastify/server.ts` - Fastify app (primary) with NestJS integration
+- `backend/src/middleware/router.ts` - Traffic routing between Fastify and Express
 - `backend/prisma/schema.prisma` - Database schema with reflection models
 - `frontend/vite.config.ts` - Build configuration and path aliases
 - Both `tsconfig.json` files for TypeScript compilation settings

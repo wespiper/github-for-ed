@@ -8,6 +8,7 @@ export * from './AIInteractionRepository';
 export * from './DocumentRepository';
 export * from './LearningAnalyticsRepository';
 export * from './InterventionRepository';
+export * from './EducatorAlertsRepository';
 
 // Re-export common types for convenience
 export type { 

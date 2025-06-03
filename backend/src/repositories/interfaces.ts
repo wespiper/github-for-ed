@@ -377,6 +377,134 @@ export interface StudentRepository extends PrivacyAwareRepository<User, any, any
 }
 
 /**
+ * Student Profiling Repository with privacy controls and data agency
+ */
+export interface StudentProfilingRepository extends PrivacyAwareRepository<any, any, any> {
+  buildStudentProfile(
+    studentId: string,
+    requesterContext: {
+      userId: string;
+      role: 'student' | 'teacher' | 'parent' | 'admin';
+      purpose: string;
+    },
+    includePrivateData: boolean,
+    context: PrivacyContext
+  ): Promise<any>;
+
+  updatePrivacyChoices(
+    studentId: string,
+    choices: any,
+    context: PrivacyContext
+  ): Promise<any>;
+
+  generatePrivacyPreservingAnalytics(
+    cohortIds: string[],
+    metrics: string[],
+    epsilon?: number,
+    delta?: number,
+    context: PrivacyContext
+  ): Promise<AnonymizedData>;
+
+  validateDataAccessRequest(
+    requesterId: string,
+    requesterType: 'teacher' | 'peer' | 'platform' | 'researcher',
+    studentId: string,
+    purpose: string,
+    dataTypes: string[],
+    studentBenefit: string | undefined,
+    context: PrivacyContext
+  ): Promise<any>;
+
+  createPrivacyDashboard(
+    studentId: string,
+    includeRecommendations: boolean,
+    timeRange: string,
+    context: PrivacyContext
+  ): Promise<any>;
+
+  trackLearningTrajectory(
+    studentId: string,
+    milestone: {
+      skill: string;
+      level: number;
+      evidence?: string[];
+    },
+    privacyLevel: 'full' | 'anonymized' | 'aggregate',
+    context: PrivacyContext
+  ): Promise<any>;
+
+  assessSkillDevelopment(
+    studentId: string,
+    skills: Array<{
+      skillName: string;
+      currentLevel: number;
+      targetLevel: number;
+      progress: number;
+    }>,
+    sharedWith: string[],
+    context: PrivacyContext
+  ): Promise<any>;
+
+  generatePersonalizedRecommendations(
+    studentId: string,
+    useEnhancedData: boolean,
+    recommendationTypes: string[] | undefined,
+    context: PrivacyContext
+  ): Promise<any>;
+}
+
+/**
+ * Educator Alerts Repository Interface for alert and intervention management
+ */
+export interface EducatorAlertsRepository extends PrivacyAwareRepository<any, any, any> {
+  generateInterventionRecommendations(
+    studentId: string,
+    analysisData: Record<string, any>,
+    educationalContext: {
+      assignmentId?: string;
+      courseId?: string;
+      learningObjectives?: string[];
+    },
+    privacyContext: PrivacyContext
+  ): Promise<any[]>;
+
+  sendEducatorAlerts(
+    alerts: any[],
+    deliveryOptions: {
+      immediate?: boolean;
+      channels?: ('in_app' | 'email' | 'sms')[];
+      batchWithOthers?: boolean;
+    },
+    privacyContext: PrivacyContext
+  ): Promise<{
+    sent: any[];
+    failed: { alert: any; reason: string }[];
+    queued: any[];
+  }>;
+
+  scheduleInterventionActions(
+    interventionId: string,
+    scheduleData: any,
+    reminderSettings: {
+      sendReminders: boolean;
+      reminderTimes: string[];
+      includePreparation?: boolean;
+    },
+    privacyContext: PrivacyContext
+  ): Promise<any>;
+
+  trackInterventionEffectiveness(
+    interventionId: string,
+    measurementData: any,
+    comparisonPeriod: {
+      baseline: { start: Date; end: Date };
+      measurement: { start: Date; end: Date };
+    },
+    privacyContext: PrivacyContext
+  ): Promise<any>;
+}
+
+/**
  * AI Interaction Repository with comprehensive audit trail
  */
 export interface AIInteractionRepository extends PrivacyAwareRepository<AIInteractionLog, any, any> {

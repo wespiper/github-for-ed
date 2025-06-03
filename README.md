@@ -51,6 +51,18 @@ Scribe Tree implements a privacy-first, event-driven microservices architecture 
 - **Risk Mitigation**: Circuit breaker patterns, fallback services, and adaptive service management
 - **Performance**: <50ms privacy overhead, <200ms total response time targets
 
+### Fastify/Express Migration Status
+- **Active Migration**: Transitioning from Express to Fastify with intelligent traffic routing
+- **Traffic Control**: `FASTIFY_TRAFFIC_PERCENTAGE` environment variable (0-100)
+- **Dual Server Mode**: Both servers run concurrently during migration period
+- **New Features**: MUST be built in Fastify (`/fastify` directory), NOT Express
+- **Service Layer**: All services use NestJS `@Injectable()` decorators for framework compatibility
+
+**Migration Progress:**
+- ✅ **Completed**: `/health`, `/auth/*`, `/ai/*` endpoints
+- ⏳ **In Progress**: `/assignments`, `/analytics`, `/documents`
+- ❌ **Legacy Express**: `/courses`, `/notifications`, `/submissions`
+
 ## 🚀 **Tech Stack**
 
 ### Frontend
@@ -310,6 +322,9 @@ docker-compose up -d
 
 # Scale services as needed
 docker-compose up -d --scale backend=3
+
+# Configure traffic routing in production
+# Set FASTIFY_TRAFFIC_PERCENTAGE environment variable (0-100)
 ```
 
 ### Environment Configuration
@@ -319,6 +334,8 @@ Essential environment variables:
 - `ENCRYPTION_KEY` - AES encryption key for sensitive data
 - `CLAUDE_API_KEY` - Educational AI service integration
 - `PRIVACY_MODE` - Compliance level (strict/standard)
+- `FASTIFY_TRAFFIC_PERCENTAGE` - Traffic routing control (0-100, default: 50)
+- `NODE_ENV` - Environment mode (development/production)
 
 ## 🤝 **Contributing**
 
@@ -340,9 +357,11 @@ Essential environment variables:
 
 **✅ Production-Ready Educational Platform**
 - Complete development environment with PostgreSQL + Prisma
+- Hybrid Fastify (primary) + Express (legacy) API architecture
 - Multi-role access control (students, educators, administrators)
 - Privacy-enhanced event-driven microservices architecture
 - Comprehensive monitoring with correlation IDs and privacy metrics
+- Traffic routing system for gradual migration (FASTIFY_TRAFFIC_PERCENTAGE)
 
 **✅ Privacy-First Architecture (GDPR/FERPA/COPPA Compliant)**
 - AES-256-CBC encryption for sensitive data with differential privacy
@@ -361,6 +380,8 @@ Essential environment variables:
 - Strategic CTO MCP Server with 60+ business intelligence tools
 - Comprehensive risk mitigation with circuit breaker patterns and fallback services
 - Performance optimized: <50ms privacy overhead, <200ms total response time
+- NestJS-based services with `@Injectable()` decorators for dependency injection
+- Dual MCP/HTTP interfaces for flexible integration patterns
 
 ## 📄 **License**
 

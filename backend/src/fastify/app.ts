@@ -2,6 +2,9 @@ import { FastifyInstance } from 'fastify';
 import { buildFastifyServer } from './server';
 import authRoutes from './routes/auth';
 import aiRoutes from './routes/ai';
+import educatorAlertsRoutes from './routes/educatorAlerts';
+import { analyticsRoutes } from './routes/analytics';
+import { studentProfilingRoutes } from './routes/studentProfiling';
 
 export async function createFastifyApp(): Promise<FastifyInstance> {
   const fastify = await buildFastifyServer();
@@ -9,6 +12,9 @@ export async function createFastifyApp(): Promise<FastifyInstance> {
   // Register routes
   await fastify.register(authRoutes, { prefix: '/api/auth' });
   await fastify.register(aiRoutes, { prefix: '/api/ai' });
+  await fastify.register(educatorAlertsRoutes, { prefix: '/api/educator-alerts' });
+  await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
+  await fastify.register(studentProfilingRoutes, { prefix: '/api/student-profiling' });
 
   return fastify;
 }
