@@ -4,17 +4,22 @@
 Extract academic integrity monitoring and AI detection systems into a specialized NestJS MCP server that handles AI usage detection, plagiarism analysis, and academic integrity compliance while supporting educational AI use.
 
 ## Context
-- **Current Phase**: Phase 2 - Extract Services
+- **Current Phase**: Phase 2 - Extract Services (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 10 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Educator Alerts MCP (Week 9)
+- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Educator Alerts MCP (Week 9), Unified Migration Plan (Phase 1 complete)
+- **Unified Approach**: Dual interface architecture (MCP protocol + HTTP REST APIs)
 
 ## Scope
 ### In Scope
-- Create NestJS MCP server for academic integrity monitoring
+- Create NestJS MCP server for academic integrity monitoring with **DUAL INTERFACE**
 - Extract AI detection and academic integrity validation logic
-- Implement 4 MCP tools: detect_ai_assistance_levels, analyze_academic_integrity, validate_educational_ai_use, generate_integrity_reports
+- Implement 4 tools with dual interfaces:
+  - **MCP Tools**: For Claude Code integration and AI development
+  - **HTTP REST APIs**: For Fastify gateway and internal service communication
+  - Tools: detect_ai_assistance_levels, analyze_academic_integrity, validate_educational_ai_use, generate_integrity_reports
 - Set up sophisticated AI usage pattern analysis
+- **Integration**: HTTP client for communication with Writing Analysis, Student Profiling, and Educator Alerts services
 - Integrate with educational AI boundaries and privacy framework
 
 ### Out of Scope
@@ -24,10 +29,13 @@ Extract academic integrity monitoring and AI detection systems into a specialize
 - Integration with external plagiarism detection services
 
 ## Technical Requirements
-1. **Framework**: NestJS 10.x with advanced pattern analysis capabilities
-2. **MCP Protocol**: Complete tool registration with integrity-focused functionality
-3. **Performance**: <200ms response time for integrity analysis
-4. **Educational Focus**: Support legitimate educational AI use while detecting misuse
+1. **Framework**: NestJS 10.x with advanced pattern analysis capabilities and dual interface support
+2. **MCP Protocol**: Complete tool registration with integrity-focused functionality (for Claude Code)
+3. **HTTP REST API**: OpenAPI/Swagger documented endpoints for integrity analysis (for internal services)
+4. **Performance**: <200ms response time for integrity analysis (both protocols)
+5. **Educational Focus**: Support legitimate educational AI use while detecting misuse
+6. **Service Communication**: HTTP client integration with circuit breakers and fallbacks
+7. **Protocol Routing**: Unified service layer supporting both MCP tools and HTTP endpoints
 
 ## Implementation Steps
 
@@ -171,3 +179,32 @@ After completing this prompt:
 2. Commit with message: "feat: Implement academic integrity MCP server with educational AI validation"
 3. Create comprehensive PR with academic integrity framework documentation
 4. Next prompt: `phase-2-week-11-remaining-services.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

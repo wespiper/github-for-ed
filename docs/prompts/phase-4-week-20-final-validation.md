@@ -7,16 +7,19 @@ Complete the MCP microservices migration with final system validation, execute p
 - **Current Phase**: Phase 4 - Complete Migration (Final Week)
 - **Week**: Week 20 of 20
 - **Branch**: `feat/mcp-microservices-migration`
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **Dependencies**: E2E testing complete (Week 19), user acceptance validated, all stakeholder approvals obtained
 
 ## Scope
-### In Scope
+### In Scope (DUAL INTERFACE)
 - Final comprehensive system validation and sign-off
 - Production deployment execution
 - Post-deployment validation and monitoring
 - Team transition to operational mode
 - Migration project completion documentation
 - Establishment of ongoing maintenance and support procedures
+- **MCP Interface**: Production tools deployment, operational monitoring
+- **HTTP Interface**: Public API deployment, external system integrations
 
 ### Out of Scope
 - New feature development
@@ -28,6 +31,8 @@ Complete the MCP microservices migration with final system validation, execute p
 2. **Deployment**: Smooth, reliable production deployment
 3. **Monitoring**: Comprehensive post-deployment monitoring and validation
 4. **Operations**: Operational procedures and support systems established
+5. **Protocol Deployment**: Both MCP and HTTP interfaces in production
+6. **Service Architecture**: Complete dual-interface microservices operational
 
 ## Implementation Steps
 
@@ -193,6 +198,7 @@ Complete the MCP microservices migration with final system validation, execute p
 - [ ] Technical debt and improvement planning
 
 ## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
 - [Migration Plan - Final Completion](../roadmaps/AI_MCP_MIGRATION_SUMMARY.md#phase-4-complete-migration-weeks-17-20)
 - [Production Deployment Procedures](../docs/deployment/PRODUCTION_DEPLOYMENT.md)
 - [Post-Deployment Monitoring](../docs/operations/POST_DEPLOYMENT_MONITORING.md)
@@ -245,3 +251,32 @@ After completing this prompt:
 **🎉 Congratulations on completing the MCP Microservices Migration! 🎉**
 
 *This migration has transformed Scribe Tree into a modern, scalable, privacy-first educational AI platform that will serve students and educators more effectively while providing a foundation for continued innovation in educational technology.*
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

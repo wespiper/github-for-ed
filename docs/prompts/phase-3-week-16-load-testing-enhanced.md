@@ -239,6 +239,12 @@ Conduct comprehensive load testing with a strong focus on privacy-aware scenario
 - [ ] **Deletion Propagation**: Ensure cascading deletions work at scale
 - [ ] **Access Control**: Verify authorization remains accurate under load
 
+## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
+- [Load Testing Strategies](../docs/testing/LOAD_TESTING_STRATEGIES.md)
+- [Privacy Performance Guide](../docs/privacy/PRIVACY_PERFORMANCE.md)
+- [Dual Interface Architecture](../docs/architecture/DUAL_INTERFACE.md)
+
 ## Notes
 - Privacy operations must never be bypassed for performance
 - Document any privacy bottlenecks for architectural review
@@ -253,3 +259,32 @@ After completing this prompt:
 3. Review privacy bottlenecks with architecture team
 4. Update privacy SLAs based on validated performance
 5. Commit with message: "test: Complete privacy-aware load testing and compliance validation"
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

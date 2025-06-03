@@ -7,11 +7,12 @@ Prepare the complete MCP microservices system for production deployment with com
 - **Current Phase**: Phase 4 - Complete Migration
 - **Week**: Week 18 of 20
 - **Branch**: `feat/mcp-microservices-migration`
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **Dependencies**: Migration completion (Week 17), all services integrated and tested
 - **Privacy Focus**: FERPA, COPPA, GDPR, and state privacy law compliance
 
 ## Scope
-### In Scope
+### In Scope (DUAL INTERFACE)
 - Production environment configuration and security hardening
 - Privacy incident response and breach notification procedures
 - Privacy compliance monitoring and audit preparation
@@ -20,6 +21,8 @@ Prepare the complete MCP microservices system for production deployment with com
 - Privacy-preserving analytics and monitoring
 - Consent management and privacy rights fulfillment
 - Cross-border data transfer compliance
+- **MCP Interface**: Production monitoring tools, development operations
+- **HTTP Interface**: External monitoring systems, compliance reporting APIs
 
 ### Out of Scope
 - Actual production deployment (Week 19-20)
@@ -32,6 +35,8 @@ Prepare the complete MCP microservices system for production deployment with com
 2. **Security**: Privacy-focused security implementation
 3. **Compliance**: Multi-jurisdictional privacy law compliance
 4. **Transparency**: Clear privacy operations and incident response
+5. **Protocol Deployment**: Both MCP and HTTP interfaces production-ready
+6. **Service Discovery**: Unified service registry for both protocols
 
 ## Implementation Steps
 
@@ -287,6 +292,7 @@ Prepare the complete MCP microservices system for production deployment with com
 - [ ] **Audit Readiness Score**: > 95% on self-assessment
 
 ## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
 - [Migration Plan - Production Readiness](../roadmaps/AI_MCP_MIGRATION_SUMMARY.md#phase-4-complete-migration-weeks-17-20)
 - [Production Deployment Guide](../docs/deployment/PRODUCTION_DEPLOYMENT.md)
 - [Security Hardening Checklist](../docs/security/PRODUCTION_SECURITY.md)
@@ -324,3 +330,32 @@ After completing this prompt:
 3. Create comprehensive production deployment documentation with privacy sections
 4. Schedule privacy incident response drill before production launch
 5. Next prompt: `phase-4-week-19-end-to-end-testing.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

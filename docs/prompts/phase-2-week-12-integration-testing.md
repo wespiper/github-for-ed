@@ -4,17 +4,21 @@
 Complete Phase 2 with comprehensive integration testing, validate all microservices functionality, and prepare for Phase 3 infrastructure and performance optimization.
 
 ## Context
-- **Current Phase**: Phase 2 - Extract Services (Final Week)
+- **Current Phase**: Phase 2 - Extract Services (Final Week - Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 12 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: All MCP servers operational (Weeks 7-11), distributed architecture implemented
+- **Dependencies**: All MCP servers operational (Weeks 7-11), Unified Migration Plan (Dual Interface) implemented, distributed architecture operational
+- **Unified Approach**: Comprehensive testing of both MCP protocol and HTTP REST API interfaces
 
 ## Scope
 ### In Scope
-- Comprehensive integration testing of all MCP services
-- End-to-end educational workflow validation
-- Performance baseline establishment for Phase 3
-- System reliability and resilience testing
+- Comprehensive integration testing of all **DUAL INTERFACE** services
+- **Protocol Testing**: Both MCP tools and HTTP REST API endpoints
+- End-to-end educational workflow validation (Claude Code + Fastify Gateway)
+- Performance baseline establishment for Phase 3 (both protocols)
+- **Circuit Breaker Testing**: HTTP client resilience validation
+- **Service Discovery Testing**: Both MCP and HTTP service coordination
+- System reliability and resilience testing across dual interfaces
 - Documentation completion and knowledge transfer
 - Phase 3 readiness assessment
 
@@ -208,3 +212,32 @@ After completing this prompt:
 3. Conduct Phase 2 retrospective and Phase 3 planning session
 4. Commit with message: "docs: Complete Phase 2 integration testing and validation"
 5. Next phase: Begin Phase 3 with `phase-3-week-13-infrastructure-setup.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

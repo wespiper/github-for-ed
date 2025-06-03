@@ -4,18 +4,21 @@
 Complete Phase 2 by extracting any remaining services, implementing comprehensive inter-service communication, and establishing robust integration patterns for the MCP microservices architecture.
 
 ## Context
-- **Current Phase**: Phase 2 - Extract Services
+- **Current Phase**: Phase 2 - Extract Services (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 11 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Educator Alerts MCP (Week 9), Academic Integrity MCP (Week 10)
+- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Educator Alerts MCP (Week 9), Academic Integrity MCP (Week 10), Unified Migration Plan (Phase 1 complete)
+- **Unified Approach**: Dual interface architecture integration and service orchestration
 
 ## Scope
 ### In Scope
-- Extract any remaining AI services not covered in previous weeks
-- Implement comprehensive inter-service communication patterns
-- Set up service discovery and configuration management
-- Create unified API gateway for MCP services
-- Establish monitoring and observability for distributed services
+- Extract any remaining AI services not covered in previous weeks with **DUAL INTERFACE**
+- Implement comprehensive inter-service communication patterns (HTTP + MCP)
+- Set up service discovery and configuration management for both protocols
+- Enhance Fastify API gateway with **complete MCP service routing**
+- Establish monitoring and observability for distributed dual-interface services
+- **HTTP Client Integration**: Complete circuit breaker and fallback architecture
+- **Protocol Coordination**: Unified service orchestration across MCP and HTTP
 - Prepare for Phase 3 performance optimization
 
 ### Out of Scope
@@ -179,3 +182,32 @@ After completing this prompt:
 2. Commit with message: "feat: Complete Phase 2 service extraction with distributed architecture"
 3. Create comprehensive distributed services documentation
 4. Next prompt: `phase-2-week-12-integration-testing.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

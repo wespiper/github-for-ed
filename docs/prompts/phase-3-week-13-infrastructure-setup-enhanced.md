@@ -4,20 +4,23 @@
 Establish high-performance infrastructure foundation with comprehensive privacy protection, implement privacy-preserving monitoring and observability, secure inter-service communication, and prepare for cognitive monitoring service extraction with privacy-by-design principles.
 
 ## Context
-- **Current Phase**: Phase 3 - Infrastructure & Performance with Privacy Enhancement
+- **Current Phase**: Phase 3 - Infrastructure & Performance with Privacy Enhancement (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 13 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: All Phase 2 MCP services operational with privacy features, integration testing complete, privacy compliance validated
+- **Dependencies**: All Phase 2 dual interface services operational with privacy features, integration testing complete, privacy compliance validated, Unified Migration Plan (Phases 1-2 complete)
+- **Unified Approach**: Infrastructure supporting both MCP protocol and HTTP REST API communication
 
 ## Scope
 ### In Scope
-- Set up production-grade privacy-preserving monitoring and observability
-- Implement encrypted communication between all MCP servers
-- Create privacy-aware service mesh configuration
-- Deploy secure key management for privacy features
-- Establish privacy-compliant monitoring infrastructure
-- Implement privacy-preserving data pipelines
-- Set up compliant caching and database optimization
+- Set up production-grade privacy-preserving monitoring and observability for **DUAL INTERFACE** services
+- Implement encrypted communication between all MCP servers (HTTP + MCP protocols)
+- Create privacy-aware service mesh configuration supporting both protocols
+- Deploy secure key management for privacy features across MCP and HTTP
+- Establish privacy-compliant monitoring infrastructure for unified architecture
+- Implement privacy-preserving data pipelines with protocol-aware routing
+- Set up compliant caching and database optimization for dual interfaces
+- **Protocol Infrastructure**: Service discovery and load balancing for both MCP and HTTP
+- **Circuit Breaker Infrastructure**: Production-grade failover and resilience
 
 ### Out of Scope
 - Actual cognitive monitoring service implementation (Week 14)
@@ -26,11 +29,14 @@ Establish high-performance infrastructure foundation with comprehensive privacy 
 - External privacy certification processes
 
 ## Technical Requirements
-1. **Privacy Monitoring**: End-to-end encrypted observability with privacy-preserving metrics
-2. **Secure Communication**: mTLS between all services with certificate rotation
-3. **Data Protection**: Encryption at rest and in transit for all educational data
-4. **Key Management**: Centralized secure key storage and rotation
-5. **Compliance**: FERPA, COPPA, and GDPR-ready infrastructure
+1. **Privacy Monitoring**: End-to-end encrypted observability with privacy-preserving metrics (both protocols)
+2. **Secure Communication**: mTLS between all services with certificate rotation (HTTP) + MCP protocol security
+3. **Data Protection**: Encryption at rest and in transit for all educational data across dual interfaces
+4. **Key Management**: Centralized secure key storage and rotation for unified architecture
+5. **Compliance**: FERPA, COPPA, and GDPR-ready infrastructure supporting MCP + HTTP
+6. **Protocol Routing**: Kong API Gateway with MCP and HTTP routing capabilities
+7. **Service Discovery**: Consul/etcd integration for both protocol types
+8. **Performance**: Unified monitoring for MCP tool calls and HTTP API requests
 
 ## Implementation Steps
 
@@ -276,3 +282,32 @@ After completing this prompt:
 3. Create comprehensive privacy infrastructure documentation
 4. Run privacy compliance validation suite
 5. Next prompt: `phase-3-week-14-cognitive-monitoring-mcp.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

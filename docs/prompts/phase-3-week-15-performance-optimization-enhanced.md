@@ -7,11 +7,12 @@ Optimize performance across all MCP services while maintaining strong privacy gu
 - **Current Phase**: Phase 3 - Infrastructure & Performance
 - **Week**: Week 15 of 20
 - **Branch**: `feat/mcp-microservices-migration`
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **Dependencies**: Infrastructure setup complete (Week 13), Cognitive Monitoring MCP operational (Week 14)
 - **Privacy Focus**: Achieving high performance without compromising student privacy
 
 ## Scope
-### In Scope
+### In Scope (DUAL INTERFACE)
 - Optimize privacy operations (encryption, anonymization, pseudonymization)
 - Implement privacy-preserving caching strategies
 - Develop efficient consent checking mechanisms
@@ -19,6 +20,8 @@ Optimize performance across all MCP services while maintaining strong privacy gu
 - Create privacy-aware database query optimization
 - Implement differential privacy with minimal performance overhead
 - Performance testing with full privacy features enabled
+- **MCP Tools**: High-frequency operations (analytics queries, privacy checks)
+- **HTTP REST APIs**: Bulk operations, administrative functions, integration endpoints
 
 ### Out of Scope
 - Reducing privacy guarantees for performance gains
@@ -32,6 +35,8 @@ Optimize performance across all MCP services while maintaining strong privacy gu
 3. **Caching**: Privacy-preserving cache strategies with 95% hit rate
 4. **Encryption**: Optimized encryption operations under 10ms
 5. **Consent**: Sub-5ms consent checking for all operations
+6. **Protocol Optimization**: MCP for low-latency operations, HTTP for batch processing
+7. **Service Communication**: Efficient inter-service protocols selection based on operation type
 
 ## Implementation Steps
 
@@ -226,6 +231,7 @@ interface OptimizedConsentEngine {
 ```
 
 ## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
 - [Privacy-Preserving Performance Guide](../docs/privacy/PERFORMANCE_GUIDE.md)
 - [Encryption Optimization Strategies](../docs/privacy/ENCRYPTION_OPTIMIZATION.md)
 - [Privacy-Aware Caching Patterns](../docs/privacy/CACHING_PATTERNS.md)
@@ -245,3 +251,32 @@ After completing this prompt:
 2. Commit with message: "feat: Implement privacy-aware performance optimizations maintaining sub-200ms response times"
 3. Create comprehensive privacy performance documentation
 4. Next prompt: `phase-3-week-16-load-testing.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

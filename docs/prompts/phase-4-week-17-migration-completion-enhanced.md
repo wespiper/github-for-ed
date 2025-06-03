@@ -7,10 +7,11 @@ Complete the MCP microservices migration by finalizing system integration, condu
 - **Current Phase**: Phase 4 - Complete Migration
 - **Week**: Week 17 of 20
 - **Branch**: `feat/mcp-microservices-migration`
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **Dependencies**: All Phase 3 performance optimization complete, load testing validated, system stable under peak usage, privacy services integrated
 
 ## Scope
-### In Scope
+### In Scope (DUAL INTERFACE)
 - Complete final system integration and configuration
 - Conduct comprehensive end-to-end educational workflow testing
 - **Validate privacy feature parity between monolith and MCP architecture**
@@ -20,6 +21,8 @@ Complete the MCP microservices migration by finalizing system integration, condu
 - Complete migration of any remaining legacy components
 - Validate complete system functionality and educational effectiveness
 - **Prepare privacy compliance certification documentation**
+- **MCP Interface**: Developer tools, real-time analytics, educational AI operations
+- **HTTP REST APIs**: External integrations, bulk operations, administrative functions
 
 ### Out of Scope
 - Production deployment (Phase 4 focus)
@@ -34,6 +37,8 @@ Complete the MCP microservices migration by finalizing system integration, condu
 3. **Functionality**: All educational features preserved and enhanced
 4. **Quality**: Comprehensive testing validates system readiness
 5. **Privacy**: Complete privacy feature parity with enhanced security in distributed architecture
+6. **Dual Protocol Support**: Both MCP tools and HTTP APIs fully operational
+7. **Service Communication**: Optimized inter-service communication using appropriate protocol
 
 ## Implementation Steps
 
@@ -291,6 +296,7 @@ Complete the MCP microservices migration by finalizing system integration, condu
 - [ ] **Audit Trail**: Complete audit trail demonstrating compliance
 
 ## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
 - [Migration Plan - Phase 4 Migration Completion](../roadmaps/AI_MCP_MIGRATION_SUMMARY.md#phase-4-complete-migration-weeks-17-20)
 - [System Integration Guide](../docs/integration/SYSTEM_INTEGRATION.md)
 - [Educational Workflow Documentation](../docs/education/COMPLETE_WORKFLOWS.md)
@@ -325,3 +331,32 @@ After completing this prompt:
 3. Create comprehensive migration completion documentation including privacy feature parity report
 4. Document any privacy-related issues or gaps that need addressing
 5. Next prompt: `phase-4-week-18-production-readiness.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

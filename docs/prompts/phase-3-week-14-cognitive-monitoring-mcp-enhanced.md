@@ -4,11 +4,12 @@
 Implement a privacy-first, high-performance MCP server using Fastify for real-time cognitive monitoring that respects student privacy while providing educational value. Process 100+ behavioral events per second with <50ms response times while maintaining comprehensive privacy protections.
 
 ## Context
-- **Current Phase**: Phase 3 - Infrastructure & Performance
+- **Current Phase**: Phase 3 - Infrastructure & Performance (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 14 of 20
 - **Branch**: `feat/mcp-microservices-migration`
 - **Privacy Focus**: Implement comprehensive privacy protections throughout the cognitive monitoring pipeline
-- **Dependencies**: Phase 2 NestJS patterns established, message queue infrastructure operational, Redis caching layer ready, privacy framework established
+- **Dependencies**: Phase 2 NestJS patterns established, message queue infrastructure operational, Redis caching layer ready, privacy framework established, Unified Migration Plan (Phases 1-2 complete)
+- **Unified Approach**: High-performance Fastify service with dual interface architecture (MCP protocol + HTTP REST APIs)
 
 ## Scope
 ### In Scope
@@ -219,3 +220,32 @@ After completing this prompt:
 3. Create privacy protection documentation
 4. Run privacy compliance audit
 5. Next prompt: `phase-3-week-15-performance-optimization.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

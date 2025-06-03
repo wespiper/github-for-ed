@@ -7,17 +7,20 @@ Conduct comprehensive end-to-end testing in production-like environment with enh
 - **Current Phase**: Phase 4 - Complete Migration
 - **Week**: Week 19 of 20
 - **Branch**: `feat/mcp-microservices-migration`
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **Dependencies**: Production readiness complete (Week 18), privacy infrastructure operational
 - **Focus**: Privacy-first validation of complete system
 
 ## Scope
-### In Scope
+### In Scope (DUAL INTERFACE)
 - Comprehensive privacy journey testing for students and educators
 - Data access control and permission workflow validation
 - Privacy rights exercise testing (access, rectification, deletion)
 - Cross-border data scenarios and multi-jurisdiction compliance
 - Educational workflow validation with privacy safeguards
 - Privacy incident response and breach notification testing
+- **MCP Tools**: Real-time privacy monitoring, developer privacy testing
+- **HTTP APIs**: Compliance reporting, privacy rights management endpoints
 
 ### Out of Scope
 - Production deployment (Week 20)
@@ -30,6 +33,8 @@ Conduct comprehensive end-to-end testing in production-like environment with enh
 2. **Data Sovereignty**: Multi-jurisdiction compliance testing
 3. **Rights Management**: Privacy rights exercise workflow validation
 4. **Audit Trail**: Complete privacy audit logging and monitoring
+5. **Protocol Validation**: Both MCP and HTTP interfaces privacy-compliant
+6. **Integration Testing**: Cross-protocol privacy consistency verification
 
 ## Implementation Steps
 
@@ -324,6 +329,7 @@ Conduct comprehensive end-to-end testing in production-like environment with enh
 - **Low**: Enhancement requests, minor UI issues, feature suggestions
 
 ## Reference Documents
+- [Unified MCP + HTTP Migration Plan](../planning/MCP_HTTP_UNIFIED_MIGRATION_PLAN.md)
 - [Privacy Integration Strategy](PRIVACY_INTEGRATION_STRATEGY.md)
 - [FERPA Compliance Guide](../docs/compliance/FERPA_COMPLIANCE.md)
 - [GDPR Implementation](../docs/compliance/GDPR_IMPLEMENTATION.md)
@@ -350,3 +356,32 @@ After completing this prompt:
 3. Obtain privacy and legal team sign-off
 4. Commit with message: "docs: Complete privacy-enhanced end-to-end testing validation"
 5. Final prompt: `phase-4-week-20-final-validation.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.
