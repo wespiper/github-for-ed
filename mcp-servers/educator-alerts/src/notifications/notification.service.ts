@@ -385,10 +385,10 @@ export class NotificationService {
   private async sendBatchedNotifications(educatorId: string, notifications: any[]): Promise<void> {
     try {
       const batchNotification = {
-        type: 'batch',
+        type: 'system' as const,
         title: `${notifications.length} New Alerts`,
         message: `You have ${notifications.length} new notifications`,
-        severity: 'medium',
+        severity: 'medium' as const,
         data: {
           notifications,
           count: notifications.length

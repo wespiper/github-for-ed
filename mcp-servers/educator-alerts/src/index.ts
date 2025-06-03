@@ -5,8 +5,9 @@
  * Supports both MCP protocol and HTTP REST API modes
  */
 
-import { MCPServer } from '@anthropic/mcp-sdk/server/index.js';
-import { StdioServerTransport } from '@anthropic/mcp-sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { MCPToolsService } from './mcp/mcp-tools.service';
 import { Logger } from './utils/logger';
 
@@ -19,17 +20,14 @@ async function startMCPServer() {
   try {
     logger.info('Starting Educator Alerts MCP Server...');
 
-    const server = new MCPServer(
+    const server = new Server(
       {
         name: 'educator-alerts-mcp-server',
         version: '1.0.0',
-        description: 'Privacy-enhanced educator alerts and intervention management for educational AI systems'
       },
       {
         capabilities: {
           tools: {},
-          resources: {},
-          prompts: {}
         }
       }
     );
@@ -39,15 +37,33 @@ async function startMCPServer() {
     await mcpToolsService.initialize();
 
     // Register MCP tools
-    server.setRequestHandler('tools/list', async () => {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: mcpToolsService.getToolSchemas()
       };
     });
 
-    server.setRequestHandler('tools/call', async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      return await mcpToolsService.executeTool(name, args);
+      
+      try {
+        const result = await mcpToolsService.executeTool(name, args);
+        return {
+          content: [{
+            type: 'text',
+            text: result.content[0].text,
+          }],
+        };
+      } catch (error) {
+        logger.error(`Error executing tool ${name}:`, error);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+          }],
+          isError: true,
+        };
+      }
     });
 
     // Start server with stdio transport

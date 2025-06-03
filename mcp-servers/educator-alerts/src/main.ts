@@ -28,4 +28,9 @@ async function bootstrap() {
   console.log(`🔗 HTTP API available at http://localhost:${HTTP_PORT}/api`);
 }
 
-bootstrap();
+export { bootstrap };
+
+// Run directly if this is the main module
+if (require.main === module) {
+  bootstrap();
+}

@@ -9,6 +9,8 @@ import { MessageQueue } from '../messaging/MessageQueue';
 import { createMessageQueue, defaultMessagingConfig } from '../config/messaging';
 import { WritingAnalysisMCPClient } from '../services/mcp/WritingAnalysisMCPClient';
 import { StudentProfilingMCPClient } from '../services/mcp/StudentProfilingMCPClient';
+import { EducatorAlertsMCPClient } from '../services/mcp/EducatorAlertsMCPClient';
+import { EducationalAIValidatorMCPClient } from '../services/mcp/EducationalAIValidatorMCPClient';
 
 // Repositories
 import { 
@@ -40,6 +42,8 @@ export interface ServiceContainer {
   messageQueue: MessageQueue;
   mcpClient: WritingAnalysisMCPClient;
   studentProfilingMCPClient: StudentProfilingMCPClient;
+  educatorAlertsMCPClient: EducatorAlertsMCPClient;
+  educationalAIValidatorMCPClient: EducationalAIValidatorMCPClient;
   
   // Repositories
   writingSessionRepository: WritingSessionRepository;
@@ -81,6 +85,8 @@ export class ServiceFactory {
     this.container.messageQueue = createMessageQueue(defaultMessagingConfig);
     this.container.mcpClient = new WritingAnalysisMCPClient();
     this.container.studentProfilingMCPClient = new StudentProfilingMCPClient();
+    this.container.educatorAlertsMCPClient = new EducatorAlertsMCPClient();
+    this.container.educationalAIValidatorMCPClient = new EducationalAIValidatorMCPClient();
 
     // Initialize repositories
     this.container.writingSessionRepository = new PrismaWritingSessionRepository();
@@ -134,6 +140,26 @@ export class ServiceFactory {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.studentProfilingMCPClient;
+  }
+
+  /**
+   * Get educator alerts MCP client
+   */
+  getEducatorAlertsMCPClient(): EducatorAlertsMCPClient {
+    if (!this.container.educatorAlertsMCPClient) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.educatorAlertsMCPClient;
+  }
+
+  /**
+   * Get educational AI validator MCP client
+   */
+  getEducationalAIValidatorMCPClient(): EducationalAIValidatorMCPClient {
+    if (!this.container.educationalAIValidatorMCPClient) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.educationalAIValidatorMCPClient;
   }
 
   /**

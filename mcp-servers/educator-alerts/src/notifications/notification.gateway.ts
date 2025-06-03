@@ -8,7 +8,7 @@ import {
   WebSocketServer,
   SubscribeMessage,
   OnGatewayConnection,
-  OnGatewayDisconnection,
+  OnGatewayDisconnect,
   MessageBody,
   ConnectedSocket
 } from '@nestjs/websockets';
@@ -42,7 +42,7 @@ interface NotificationMessage {
   },
   namespace: '/educator-alerts'
 })
-export class NotificationGateway implements OnGatewayConnection, OnGatewayDisconnection {
+export class NotificationGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 

@@ -159,6 +159,15 @@ export class EducatorAlertsService {
     this.eventBus = serviceFactory.getEventBus();
     this.logger = new Logger('EducatorAlertsService');
     
+    // Use MCP client from ServiceFactory if not provided
+    if (!this.mcpClient) {
+      try {
+        this.mcpClient = serviceFactory.getEducatorAlertsMCPClient();
+      } catch (error) {
+        this.logger.warn('MCP client not available from ServiceFactory, falling back to HTTP/Repository');
+      }
+    }
+    
     this.healthStatus = {
       mcp: false,
       http: false,
