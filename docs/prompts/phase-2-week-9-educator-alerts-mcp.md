@@ -4,17 +4,22 @@
 Extract intervention and educator alert systems into a sophisticated NestJS MCP server that handles real-time educator notifications, intervention recommendations, and automated support triggers based on student analysis.
 
 ## Context
-- **Current Phase**: Phase 2 - Extract Services
+- **Current Phase**: Phase 2 - Extract Services (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 9 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), event system operational
+- **Dependencies**: Writing Analysis MCP (Week 7), Student Profiling MCP (Week 8), Unified Migration Plan (Phase 1 complete), event system operational
+- **Unified Approach**: Dual interface architecture (MCP protocol + HTTP REST APIs)
 
 ## Scope
 ### In Scope
-- Create NestJS MCP server for educator alerts and interventions
+- Create NestJS MCP server for educator alerts and interventions with **DUAL INTERFACE**
 - Extract InterventionService and educator notification logic
-- Implement 4 MCP tools: generate_intervention_recommendations, send_educator_alerts, schedule_intervention_actions, track_intervention_effectiveness
+- Implement 4 tools with dual interfaces:
+  - **MCP Tools**: For Claude Code integration and AI development
+  - **HTTP REST APIs**: For Fastify gateway and internal service communication
+  - Tools: generate_intervention_recommendations, send_educator_alerts, schedule_intervention_actions, track_intervention_effectiveness
 - Set up real-time notification system with educator preferences
+- **Integration**: HTTP client for communication with Writing Analysis and Student Profiling services
 - Integrate with existing MCP servers for comprehensive student insights
 
 ### Out of Scope
@@ -171,3 +176,32 @@ After completing this prompt:
 2. Commit with message: "feat: Implement educator alerts MCP server with real-time intervention management"
 3. Create comprehensive PR with educator workflow documentation
 4. Next prompt: `phase-2-week-10-academic-integrity-mcp.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.

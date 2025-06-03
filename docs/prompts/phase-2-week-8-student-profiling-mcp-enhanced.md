@@ -4,21 +4,25 @@
 Extract student profiling services with integrated data agency controls, privacy-preserving analytics, and comprehensive consent management to create a privacy-first student profile system.
 
 ## Context
-- **Current Phase**: Phase 2 - Extract Services
+- **Current Phase**: Phase 2 - Extract Services (Unified MCP + HTTP Microservices Migration)
 - **Week**: Week 8 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Dependencies**: Writing Analysis MCP (Week 7), privacy-aware repositories, audit event system
+- **Dependencies**: Writing Analysis MCP (Week 7), Unified Migration Plan (Phase 1 complete), privacy-aware repositories, audit event system
 - **Privacy Architecture**: Consolidating Student Profiling + Student Data Agency + Analytics Privacy
+- **Unified Approach**: Dual interface architecture (MCP protocol + HTTP REST APIs)
 
 ## Scope
 ### In Scope
-- Create privacy-enhanced NestJS MCP server for student profiling
+- Create privacy-enhanced NestJS MCP server for student profiling with **DUAL INTERFACE**
 - Extract LearningProgressTracker and student profiling logic
-- Implement 8 MCP tools (4 original + 4 privacy):
+- Implement 8 tools with dual interfaces (4 original + 4 privacy):
+  - **MCP Tools**: For Claude Code integration and AI development
+  - **HTTP REST APIs**: For Fastify gateway and internal service communication
   - Original: build_student_profile, track_learning_trajectory, assess_skill_development, generate_personalized_recommendations
   - Privacy: manage_student_privacy_choices, generate_privacy_preserving_analytics, validate_data_access_requests, create_student_privacy_dashboard
 - Implement comprehensive student data agency controls
 - Set up differential privacy for analytics
+- **Integration**: HTTP client for Fastify gateway communication
 
 ### Out of Scope
 - Separate privacy MCP servers (integrated into this service)
@@ -27,10 +31,13 @@ Extract student profiling services with integrated data agency controls, privacy
 - Advanced ML model training
 
 ## Technical Requirements
-1. **Framework**: NestJS 10.x with privacy-by-design architecture
-2. **MCP Protocol**: Complete tool registration with consent validation
-3. **Performance**: <150ms response time including privacy checks
-4. **Privacy**: Student data agency, differential privacy, consent management, privacy dashboards
+1. **Framework**: NestJS 10.x with privacy-by-design architecture and dual interface support
+2. **MCP Protocol**: Complete tool registration with consent validation (for Claude Code)
+3. **HTTP REST API**: OpenAPI/Swagger documented endpoints (for internal services)
+4. **Performance**: <150ms response time including privacy checks (both protocols)
+5. **Privacy**: Student data agency, differential privacy, consent management, privacy dashboards
+6. **Service Communication**: HTTP client integration with circuit breakers and fallbacks
+7. **Protocol Routing**: Unified service layer supporting both MCP tools and HTTP endpoints
 
 ## Implementation Steps
 
@@ -42,12 +49,55 @@ Extract student profiling services with integrated data agency controls, privacy
 - [ ] Set up Docker container with data protection
 - [ ] Create student privacy configuration system
 
-### Step 2: Data Agency MCP Protocol Integration
-- [ ] Create `src/mcp/mcp-server.module.ts` with consent middleware
-- [ ] Implement `src/mcp/consent-guard.ts` for all tool access
+### Step 2: Dual Interface Architecture Setup
+- [ ] Create `src/mcp/mcp-server.module.ts` with consent middleware (MCP Protocol)
+- [ ] Create `src/http/http-api.module.ts` with REST endpoints (HTTP API)
+- [ ] Implement `src/mcp/consent-guard.ts` for MCP tool access
+- [ ] Implement `src/http/api-auth.guard.ts` for HTTP endpoint access
+- [ ] Create `src/shared/student-profiling.service.ts` (unified business logic)
 - [ ] Define MCP tool schemas with privacy metadata
+- [ ] Define OpenAPI/Swagger schemas for HTTP endpoints
 - [ ] Create `src/mcp/privacy-context.decorator.ts`
-- [ ] Set up consent-aware tool registration
+- [ ] Set up consent-aware tool registration and HTTP routing
+
+### Step 2a: Service Communication Integration
+- [ ] Install HTTP client dependencies: `npm install @nestjs/axios axios`
+- [ ] Create `src/http-client/fastify-gateway.client.ts`
+- [ ] Implement circuit breaker integration for HTTP calls
+- [ ] Add service discovery configuration
+- [ ] Create health check endpoints for both protocols
+
+**Dual Interface Implementation Example:**
+```typescript
+// Shared business logic service
+@Injectable()
+export class StudentProfilingService {
+  async buildProfile(params: BuildProfileParams): Promise<StudentProfile> {
+    // Core business logic used by both interfaces
+  }
+}
+
+// MCP Tool Interface (for Claude Code)
+@MCPTool('build_student_profile')
+export class BuildProfileMCPTool {
+  constructor(private service: StudentProfilingService) {}
+  
+  async execute(params: MCPParams): Promise<MCPResponse> {
+    return this.service.buildProfile(params);
+  }
+}
+
+// HTTP API Interface (for Fastify Gateway)
+@Controller('student-profiles')
+export class StudentProfileController {
+  constructor(private service: StudentProfilingService) {}
+  
+  @Post('build')
+  async buildProfile(@Body() params: HTTPParams): Promise<StudentProfile> {
+    return this.service.buildProfile(params);
+  }
+}
+```
 
 ### Step 3: Core Domain Modules with Privacy Controls
 - [ ] Create `src/student-profiling/student-profiling.module.ts`
@@ -56,9 +106,10 @@ Extract student profiling services with integrated data agency controls, privacy
 - [ ] Create `src/learning-trajectory/learning-trajectory.module.ts`
 - [ ] Implement privacy-first domain services
 
-### Step 4: Student Privacy Choices Management Tool (Privacy Tool #1)
-- [ ] Create `src/data-agency/services/privacy-choices.service.ts`
-- [ ] Implement `manage_student_privacy_choices` MCP tool
+### Step 4: Student Privacy Choices Management Tool (Privacy Tool #1 - Dual Interface)
+- [ ] Create `src/data-agency/services/privacy-choices.service.ts` (shared business logic)
+- [ ] Implement `manage_student_privacy_choices` MCP tool (for Claude Code)
+- [ ] Implement `POST /privacy-choices` HTTP endpoint (for Fastify gateway)
 - [ ] Add comprehensive choice categories:
   ```typescript
   - Educational sharing (teacher, peer, parent access levels)
@@ -224,20 +275,27 @@ Extract student profiling services with integrated data agency controls, privacy
   - [ ] Verify no punishment for privacy choices
 
 ## Success Criteria
-- [ ] All 8 MCP tools implemented (4 original + 4 privacy)
-- [ ] Student data agency fully functional
+- [ ] All 8 tools implemented with dual interfaces (4 original + 4 privacy)
+- [ ] **MCP Protocol**: All tools accessible via Claude Code integration
+- [ ] **HTTP REST API**: All endpoints accessible via Fastify gateway
+- [ ] Student data agency fully functional (both protocols)
 - [ ] Differential privacy protecting analytics
 - [ ] Privacy dashboard empowering students
 - [ ] Consent enforcement 100% effective
 - [ ] Value exchange clearly demonstrated
-- [ ] Privacy overhead <30ms
-- [ ] Test coverage >95%
+- [ ] Privacy overhead <30ms (both protocols)
+- [ ] HTTP client integration with circuit breakers
+- [ ] Service discovery and health checks operational
+- [ ] Test coverage >95% (including both interfaces)
 
 ## Reference Documents
+- **[Unified Migration Plan](../roadmaps/HTTP_MICROSERVICES_MIGRATION_PLAN.md)** - Dual interface architecture
+- **[Migration Plan Summary](../MIGRATION_PLAN_SUMMARY.md)** - Implementation strategy
 - [Consolidated Privacy Architecture](../docs/consolidated-privacy-mcp-architecture.md)
 - [Student Data Agency Framework](../docs/scribe-tree-privacy-mcp-architecture.md#student-data-agency)
 - [Differential Privacy Guide](../docs/privacy/DIFFERENTIAL_PRIVACY_IMPLEMENTATION.md)
 - [Value Exchange Model](../docs/privacy/VALUE_EXCHANGE_PATTERNS.md)
+- **[Phase 2 Week 7 Completion](./review/phase-2-week-7-writing-analysis-mcp-enhanced-completed-2025-06-02.md)** - Risk mitigation patterns
 
 ## Notes
 - Students are partners, not subjects - emphasize agency and value
@@ -252,3 +310,32 @@ After completing this prompt:
 2. Commit with message: "feat: Implement student profiling MCP with comprehensive data agency and privacy analytics"
 3. Create PR with privacy compliance and value exchange documentation
 4. Next prompt: `phase-2-week-9-educator-alerts-mcp-enhanced.md`
+
+---
+
+# Completion Instructions
+
+After completing the implementation in this prompt:
+
+1. **Run `/reflect`** to capture implementation insights and lessons learned
+2. **Update this prompt file** by appending a "## Completion Reflection" section with:
+   - Implementation date and completion status
+   - Key insights and lessons learned from `/reflect`
+   - Any deviations from the original plan
+   - Recommendations for future similar work
+3. **Create review folder** (`review/` in same directory as prompt file) if it doesn't exist
+4. **Move the updated prompt** to the review folder with timestamp suffix
+5. **Log the completion** for project tracking
+
+## File Organization
+
+```
+docs/prompts/
+├── phase-1-week-1-fastify-setup.md          # Active prompts
+├── phase-1-week-2-repository-pattern.md
+├── review/                                   # Completed prompts
+│   ├── phase-1-week-1-fastify-setup-completed-2025-06-01.md
+│   └── phase-2-week-7-mcp-server-completed-2025-06-01.md
+```
+
+**Note**: This process ensures all implementation work is properly documented and archived for future reference.
