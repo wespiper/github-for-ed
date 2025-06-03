@@ -1,21 +1,34 @@
-# HTTP Microservices Migration Plan
+# HTTP Microservices Migration Plan (Unified with AI Services MCP Plan)
 
-**Project**: Scribe Tree - Evolution to True HTTP-Based Microservices  
+**Project**: Scribe Tree - Unified MCP + HTTP Microservices Architecture  
 **Created**: June 2, 2025  
-**Status**: 📋 Planning  
+**Updated**: June 2, 2025 - Aligned with AI Services MCP Microservices Plan  
+**Status**: 📋 Planning - Unified Approach  
 **Current Architecture**: Express/Fastify Hybrid with In-Process MCP Integration  
-**Target Architecture**: Fastify API Gateway + Independent HTTP Microservices  
+**Target Architecture**: Fastify API Gateway + MCP Servers with Dual Interface (MCP + HTTP)
+
+## ⚠️ **IMPORTANT: Unified Migration Plan**
+
+This plan has been **aligned with the existing [AI Services MCP Microservices Plan](./AI_SERVICES_MCP_MICROSERVICES_PLAN.md)** to create a unified approach that achieves both MCP protocol integration AND HTTP-based microservices communication.
+
+**Key Changes from Original HTTP Plan:**
+- Extended timeline to 20 weeks (aligns with AI Services plan)
+- Dual interface architecture (MCP + HTTP) for each service
+- Preserved MCP protocol for Claude Code integration
+- Added HTTP layer for internal service communication  
 
 ---
 
 ## 🎯 **Executive Summary**
 
-Transform Scribe Tree from a hybrid Express/Fastify monolith with in-process MCP services to a true microservices architecture using HTTP communication while preserving our proven risk mitigation patterns.
+Transform Scribe Tree from a hybrid Express/Fastify monolith with in-process services to a unified MCP + HTTP microservices architecture that supports both Claude Code integration (via MCP protocol) and internal service communication (via HTTP) while preserving our proven risk mitigation patterns.
 
 ### **Key Objectives**
 - ✅ Maintain 100% functionality during migration
 - ✅ Preserve existing risk mitigation (circuit breakers, fallbacks, adaptive routing)
-- ✅ Enable independent service scaling and deployment
+- ✅ Enable Claude Code integration via MCP protocol
+- ✅ Enable HTTP-based internal service communication
+- ✅ Independent service scaling and deployment
 - ✅ Improve system observability and debugging
 - ✅ Maintain sub-200ms response time requirements
 
@@ -53,10 +66,13 @@ Current (June 2, 2025):
 
 ---
 
-## 🗺️ **Migration Phases**
+## 🗺️ **Unified Migration Phases (20 Weeks - Aligned with AI Services Plan)**
 
-### **Phase A: Foundation (Weeks 1-2)**
-**Goal**: Complete Fastify migration and standardize service interfaces
+⚠️ **NOTE**: This timeline aligns with the [AI Services MCP Microservices Plan](./AI_SERVICES_MCP_MICROSERVICES_PLAN.md) and implements a **dual interface architecture** where each MCP server supports both MCP protocol (for Claude Code) and HTTP APIs (for internal communication).
+
+### **Phase 1: Foundation & Fastify Migration (Weeks 1-2)**
+**Goal**: Complete Express→Fastify migration and implement repository pattern
+*Aligns with AI Services Plan Weeks 1-2*
 
 #### **A1: Fastify Migration Completion**
 - [ ] **Week 1.1**: Migrate remaining Express routes to Fastify
