@@ -352,6 +352,40 @@ Add to Claude Desktop configuration:
 - **Privacy-Aware Analytics**: Student benefit from data sharing while maintaining privacy protection
 - **Educational Value Exchange**: Transparent data use with clear student benefits
 
+## HTTP Microservices Migration
+
+### Overview
+Planned evolution from current Express/Fastify hybrid with in-process MCP services to true HTTP-based microservices architecture while preserving all risk mitigation patterns.
+
+### Migration Plan
+- **[Complete Migration Plan](./docs/roadmaps/HTTP_MICROSERVICES_MIGRATION_PLAN.md)**: 9-week phased approach
+- **[Progress Tracker](./docs/HTTP_MICROSERVICES_PROGRESS.md)**: Real-time progress tracking
+- **Current Status**: 📋 Planning Phase - Ready for Phase A implementation
+
+### Key Phases
+1. **Phase A (Weeks 1-2)**: Complete Fastify migration and standardize service interfaces
+2. **Phase B (Weeks 3-5)**: Extract Writing Analysis to HTTP microservice with service discovery
+3. **Phase C (Weeks 6-7)**: Implement HTTP-aware circuit breakers and advanced resilience
+4. **Phase D (Week 8)**: Containerize services with Docker/Kubernetes orchestration
+5. **Phase E (Week 9)**: Production readiness with observability and monitoring
+
+### Preserved Resilience
+- **Circuit Breaker Patterns**: Extended for HTTP communication with cascading fallbacks
+- **Adaptive Service Management**: Enhanced for HTTP load balancing and health-based routing
+- **Fallback Architecture**: Always maintain in-process fallback for ultimate reliability
+- **Feature Flags**: Gradual migration control with instant rollback capabilities
+
+### Target Architecture
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│   API        │  │   Writing    │  │   Student    │  │   Strategic  │
+│  Gateway     │  │  Analysis    │  │  Profiling   │  │     CTO      │
+│ (Fastify)    │  │  Service     │  │   Service    │  │   Service    │
+│              │  │ (NestJS)     │  │ (NestJS)     │  │ (Node.js)    │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+     Port 3001        Port 3002        Port 3003        Port 3004
+```
+
 ### API Design Standards
 - Standard response format: `{ success: boolean, data: T, message?: string }`
 - Consistent error responses with development details when appropriate
