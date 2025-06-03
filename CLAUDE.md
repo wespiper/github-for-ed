@@ -352,6 +352,88 @@ Add to Claude Desktop configuration:
 - **Privacy-Aware Analytics**: Student benefit from data sharing while maintaining privacy protection
 - **Educational Value Exchange**: Transparent data use with clear student benefits
 
+## Student Profiling MCP Server
+
+### Overview
+The Student Profiling MCP Server provides privacy-enhanced student profiling with comprehensive data agency controls, differential privacy analytics, and dual MCP/HTTP interfaces. Located at `mcp-servers/student-profiling/`, it implements 8 privacy-focused tools for student data management.
+
+### Core MCP Tools (4 Core + 4 Privacy)
+
+#### Privacy Tools
+- **manage_student_privacy_choices**: Granular privacy preference management with value exchange explanations
+- **generate_privacy_preserving_analytics**: Differential privacy analytics with epsilon/delta parameters and Laplace noise
+- **validate_data_access_requests**: Role-based access validation with educational purpose verification and audit trails
+- **create_student_privacy_dashboard**: Real-time privacy metrics with personalized recommendations and data inventory
+
+#### Core Tools (Privacy-Enhanced)
+- **build_student_profile**: Privacy-aware profile construction with consent verification and access control
+- **track_learning_trajectory**: Consent-based trajectory tracking with privacy level selection (full/anonymized/aggregate)
+- **assess_skill_development**: Privacy-controlled skill assessment with granular sharing permissions
+- **generate_personalized_recommendations**: Value-exchange based recommendations with transparent data usage
+
+### Student Data Agency Architecture
+- **Privacy Choice Management**: Granular controls for educational sharing, platform improvement, and personal benefits
+- **Value Exchange Model**: Clear explanations of data usage benefits for each feature
+- **Progressive Consent**: Default maximum privacy with opt-in enhancements
+- **No Privacy Punishment**: Full educational functionality regardless of privacy choices
+- **Instant Enforcement**: Privacy preferences immediately applied across all services
+
+### Differential Privacy Implementation
+- **Configurable Parameters**: Epsilon/delta privacy parameters with recommended defaults
+- **Laplace Noise Mechanism**: Mathematical privacy guarantees with utility preservation
+- **Privacy Budget Tracking**: Prevents privacy erosion over time with per-entity budget management
+- **Minimum Cohort Size**: Automatic suppression for groups smaller than 10 students
+- **Federated Analytics**: Cross-institutional research with privacy preservation
+
+### Dual Interface Architecture
+- **MCP Protocol**: For Claude Code integration and AI-assisted development
+- **HTTP REST API**: For Fastify gateway and service-to-service communication (Port 3002)
+- **Shared Business Logic**: Single implementation serving both interfaces with unified privacy controls
+- **Mode Selection**: Can run in MCP, HTTP, or dual mode
+
+### Performance Specifications
+- **Response Time**: <150ms including privacy checks (both protocols)
+- **Privacy Overhead**: <30ms additional processing for privacy operations
+- **Concurrent Operations**: Multiple consent checks and access validations supported
+- **Privacy Dashboard**: Real-time metrics calculation and recommendation generation
+
+### MCP Server Setup
+Add to Claude Desktop configuration:
+```json
+{
+  "mcpServers": {
+    "student-profiling": {
+      "command": "node",
+      "args": ["./mcp-servers/student-profiling/dist/main.js", "mcp"]
+    }
+  }
+}
+```
+
+### HTTP API Integration
+```typescript
+// Example usage with Fastify gateway
+const studentProfilingClient = axios.create({
+  baseURL: 'http://localhost:3002/api/v1',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+const profile = await studentProfilingClient.post('/student-profiles/build', {
+  studentId: 'student123',
+  requesterContext: {
+    userId: 'teacher456',
+    role: 'teacher',
+    purpose: 'grade_assignment'
+  }
+});
+```
+
+### Privacy Compliance
+- **FERPA**: Educational records protection with legitimate educational interest validation
+- **COPPA**: Enhanced protections for students under 13 with parental consent workflows
+- **GDPR**: Right to access, rectification, erasure, and data portability implementation
+- **State Laws**: Configurable compliance with state-specific educational privacy requirements
+
 ## HTTP Microservices Migration
 
 ### Overview
@@ -383,7 +465,7 @@ Planned evolution from current Express/Fastify hybrid with in-process MCP servic
 │ (Fastify)    │  │  Service     │  │   Service    │  │   Service    │
 │              │  │ (NestJS)     │  │ (NestJS)     │  │ (Node.js)    │
 └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
-     Port 3001        Port 3002        Port 3003        Port 3004
+     Port 5001        Port 3001        Port 3002        Port 3003
 ```
 
 ### API Design Standards

@@ -46,6 +46,7 @@ Scribe Tree implements a privacy-first, event-driven microservices architecture 
 
 ### MCP Microservices Architecture
 - **Writing Analysis MCP Server**: 8 privacy-enhanced tools for content analysis and AI boundaries
+- **Student Profiling MCP Server**: 8 privacy-focused tools for student data agency and differential privacy analytics
 - **Strategic CTO MCP Server**: 60+ tools for strategic planning and business intelligence
 - **Risk Mitigation**: Circuit breaker patterns, fallback services, and adaptive service management
 - **Performance**: <50ms privacy overhead, <200ms total response time targets
@@ -153,6 +154,7 @@ cd ../backend && npm install
 
 # Install MCP server dependencies
 cd ../mcp-servers/writing-analysis && npm install
+cd ../student-profiling && npm install
 cd ../scribe-tree-strategic-cto && npm install
 ```
 
@@ -184,12 +186,16 @@ cd frontend && npm run dev
 
 # Terminal 3: MCP servers (optional, for AI features)
 cd mcp-servers/writing-analysis && npm run dev
+
+# Terminal 4: Student Profiling MCP server (optional, for privacy-enhanced profiling)
+cd mcp-servers/student-profiling && npm run start:dual
 ```
 
 **Access Points:**
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:5001/api`
-- Fastify API: `http://localhost:3001/api`
+- Backend API: `http://localhost:5001/api`  
+- Writing Analysis MCP: `http://localhost:3001/api`
+- Student Profiling API: `http://localhost:3002/api/v1` (with Swagger docs at `/api/docs`)
 
 ### Testing
 
