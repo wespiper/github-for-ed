@@ -15,7 +15,7 @@ import courseAssignmentRoutes from './routes/courseAssignments';
 import submissionRoutes from './routes/submissions';
 import notificationRoutes from './routes/notifications';
 import learningObjectivesRoutes from './routes/learningObjectives';
-import analyticsRoutes from './routes/analytics';
+import analyticsRoutes from './routes/analytics.resilient';
 import reflectionRoutes from './routes/reflections';
 import boundaryIntelligenceRoutes from './routes/boundaryIntelligence';
 
@@ -79,6 +79,10 @@ app.get('/api/health-simple', async (req, res) => {
 
 // Attach services to requests (after routes that don't need services)
 app.use(attachServices);
+
+// Apply enhanced service container for analytics routes
+import { attachEnhancedServices } from './middleware/serviceContainer.enhanced';
+app.use('/api/analytics', attachEnhancedServices);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);

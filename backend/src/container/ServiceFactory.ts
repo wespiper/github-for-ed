@@ -7,6 +7,7 @@ import { CacheService } from '../cache/CacheService';
 import { createCacheService, defaultCacheConfig } from '../config/cache';
 import { MessageQueue } from '../messaging/MessageQueue';
 import { createMessageQueue, defaultMessagingConfig } from '../config/messaging';
+import { WritingAnalysisMCPClient } from '../services/mcp/WritingAnalysisMCPClient';
 
 // Repositories
 import { 
@@ -32,6 +33,7 @@ export interface ServiceContainer {
   eventBus: EventBus;
   cache: CacheService;
   messageQueue: MessageQueue;
+  mcpClient: WritingAnalysisMCPClient;
   
   // Repositories
   writingSessionRepository: WritingSessionRepository;
@@ -69,6 +71,7 @@ export class ServiceFactory {
     this.container.eventBus = getEventBus();
     this.container.cache = createCacheService(defaultCacheConfig);
     this.container.messageQueue = createMessageQueue(defaultMessagingConfig);
+    this.container.mcpClient = new WritingAnalysisMCPClient();
 
     // Initialize repositories
     this.container.writingSessionRepository = new PrismaWritingSessionRepository();
@@ -85,6 +88,9 @@ export class ServiceFactory {
       await this.container.messageQueue.connect();
     }
 
+    // Connect to MCP server
+    await this.container.mcpClient.connect();
+
     this.initialized = true;
   }
 
@@ -96,6 +102,16 @@ export class ServiceFactory {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.eventBus;
+  }
+
+  /**
+   * Get MCP client
+   */
+  getMCPClient(): WritingAnalysisMCPClient {
+    if (!this.container.mcpClient) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.mcpClient;
   }
 
   /**

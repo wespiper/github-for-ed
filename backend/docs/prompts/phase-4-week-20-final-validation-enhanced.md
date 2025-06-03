@@ -6,9 +6,11 @@ This week represents the final privacy checkpoint before go-live, focusing on co
 ## Context
 You are working on Scribe Tree's final privacy validation phase. The system consists of:
 - **Core Platform**: Node.js backend with PostgreSQL, React frontend
+- **Migration Approach**: Unified MCP + HTTP Microservices Migration (dual interface architecture)
 - **MCP Servers**: Writing Analysis, Educational AI Validator, Cognitive Pattern Recognition
 - **Privacy Infrastructure**: Orchestration service, unified dashboards, compliance monitoring
 - **Educational Features**: AI-assisted writing with privacy-preserving boundaries
+- **Dual Interfaces**: MCP tools for real-time operations, HTTP APIs for integrations
 
 ## Privacy Certification Requirements
 

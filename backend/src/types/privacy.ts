@@ -26,6 +26,18 @@ export interface PrivacyContext {
   
   /** Optional session ID for tracking user sessions */
   sessionId?: string;
+  
+  /** User ID for tracking (legacy compatibility) */
+  userId?: string;
+  
+  /** Data types being accessed */
+  dataTypes?: string[];
+  
+  /** Data retention category */
+  retentionCategory?: string;
+  
+  /** Whether consent is required */
+  consentRequired?: boolean;
 }
 
 /**

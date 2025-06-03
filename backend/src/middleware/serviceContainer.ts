@@ -15,6 +15,7 @@ declare global {
         boundaryService: any;
         educationalService: any;
       };
+      mcpClient?: any; // Add MCP client to request
     }
   }
 }

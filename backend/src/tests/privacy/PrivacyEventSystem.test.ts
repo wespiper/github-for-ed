@@ -34,10 +34,10 @@ describe('Privacy Event System', () => {
     
     // Mock cache service
     mockCacheService = {
-      get: async () => null,
-      set: async () => undefined,
-      delete: async () => true,
-      deletePattern: async () => 0
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(true),
+      deletePattern: jest.fn().mockResolvedValue(0)
     };
   });
 
