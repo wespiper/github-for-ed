@@ -11,17 +11,19 @@ import { WritingAnalysisMCPClient } from '../services/mcp/WritingAnalysisMCPClie
 import { StudentProfilingMCPClient } from '../services/mcp/StudentProfilingMCPClient';
 import { EducatorAlertsMCPClient } from '../services/mcp/EducatorAlertsMCPClient';
 import { EducationalAIValidatorMCPClient } from '../services/mcp/EducationalAIValidatorMCPClient';
+import { AcademicIntegrityService } from '../services/AcademicIntegrityService';
 
 // Repositories
 import { 
   WritingSessionRepository,
   DocumentRepository,
-  StudentProfileRepository,
   StudentProfilingRepository,
   AssignmentRepository,
   LearningAnalyticsRepository,
-  InterventionRepository,
-  EducatorAlertsRepository
+  StudentRepository,
+  AIInteractionRepository,
+  EducatorAlertsRepository,
+  AcademicIntegrityRepository
 } from '../repositories/interfaces';
 import { PrismaWritingSessionRepository } from '../repositories/WritingSessionRepository';
 
@@ -31,6 +33,7 @@ import { MockLearningAnalyticsRepository } from '../repositories/__mocks__/Learn
 import { MockInterventionRepository } from '../repositories/__mocks__/InterventionRepository.mock';
 import { MockStudentProfilingRepository } from '../repositories/__mocks__/StudentProfilingRepository.mock';
 import { MockEducatorAlertsRepository } from '../repositories/__mocks__/EducatorAlertsRepository.mock';
+import { MockAcademicIntegrityRepository } from '../repositories/__mocks__/AcademicIntegrityRepository.mock';
 
 /**
  * Service container interface
@@ -45,15 +48,19 @@ export interface ServiceContainer {
   educatorAlertsMCPClient: EducatorAlertsMCPClient;
   educationalAIValidatorMCPClient: EducationalAIValidatorMCPClient;
   
+  // Services
+  academicIntegrityService: AcademicIntegrityService;
+  
   // Repositories
   writingSessionRepository: WritingSessionRepository;
   documentRepository: DocumentRepository;
-  studentProfileRepository?: StudentProfileRepository;
+  studentRepository?: StudentRepository;
   studentProfilingRepository: StudentProfilingRepository;
   assignmentRepository?: AssignmentRepository;
   learningAnalyticsRepository: LearningAnalyticsRepository;
   interventionRepository: InterventionRepository;
   educatorAlertsRepository: EducatorAlertsRepository;
+  academicIntegrityRepository: AcademicIntegrityRepository;
 }
 
 /**
@@ -95,6 +102,10 @@ export class ServiceFactory {
     this.container.learningAnalyticsRepository = new MockLearningAnalyticsRepository(); // Using mock for now
     this.container.interventionRepository = new MockInterventionRepository(); // Using mock for now
     this.container.educatorAlertsRepository = new MockEducatorAlertsRepository(); // Using mock for now
+    this.container.academicIntegrityRepository = new MockAcademicIntegrityRepository(); // Using mock for now
+    
+    // Initialize services
+    this.container.academicIntegrityService = new AcademicIntegrityService();
     
     // Connect to external services
     if (defaultCacheConfig.type === 'redis') {
@@ -240,6 +251,26 @@ export class ServiceFactory {
       throw new Error('ServiceFactory not initialized');
     }
     return this.container.educatorAlertsRepository;
+  }
+
+  /**
+   * Get academic integrity repository
+   */
+  getAcademicIntegrityRepository(): AcademicIntegrityRepository {
+    if (!this.container.academicIntegrityRepository) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.academicIntegrityRepository;
+  }
+
+  /**
+   * Get academic integrity service
+   */
+  getAcademicIntegrityService(): AcademicIntegrityService {
+    if (!this.container.academicIntegrityService) {
+      throw new Error('ServiceFactory not initialized');
+    }
+    return this.container.academicIntegrityService;
   }
 
   // Note: Reflection repositories not implemented yet
