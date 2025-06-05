@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 import prisma from './lib/prisma';
 import { startFastifyServer } from './fastify/app';
 import { trafficRouter, addRoutingHeaders } from './middleware/router';
-import { initializeServices, attachServices } from './middleware/serviceContainer';
+// TODO: Temporarily disabled due to repository interface mismatches
+// import { initializeServices, attachServices } from './middleware/serviceContainer';
 import authRoutes from './routes/auth';
 import courseRoutes from './routes/courses';
 import adminRoutes from './routes/admin';
@@ -54,6 +55,20 @@ app.use('/api/educator-alerts', trafficRouter);
 app.use('/api/analytics', trafficRouter);
 app.use('/api/student-profiling', trafficRouter);
 
+// Apply traffic routing to newly migrated endpoints
+app.use('/api/simple', trafficRouter); // For testing traffic routing
+app.use('/api/assignments', trafficRouter);
+app.use('/api/courses', trafficRouter);
+app.use('/api/documents', trafficRouter);
+app.use('/api/submissions', trafficRouter);
+app.use('/api/notifications', trafficRouter);
+app.use('/api/admin', trafficRouter);
+app.use('/api/course-assignments', trafficRouter);
+app.use('/api/assignment-templates', trafficRouter);
+app.use('/api/reflections', trafficRouter);
+app.use('/api/learning-objectives', trafficRouter);
+app.use('/api/boundary-intelligence', trafficRouter);
+
 // Health check endpoint with comprehensive monitoring
 app.get('/api/health', monitoringMiddleware.health);
 
@@ -80,12 +95,12 @@ app.get('/api/health-simple', async (req, res) => {
   }
 });
 
-// Attach services to requests (after routes that don't need services)
-app.use(attachServices);
+// TODO: Temporarily disabled service container middleware due to repository interface mismatches
+// app.use(attachServices);
 
-// Apply enhanced service container for analytics routes
-import { attachEnhancedServices } from './middleware/serviceContainer.enhanced';
-app.use('/api/analytics', attachEnhancedServices);
+// TODO: Temporarily disabled enhanced service container for analytics routes
+// import { attachEnhancedServices } from './middleware/serviceContainer.enhanced';
+// app.use('/api/analytics', attachEnhancedServices);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
@@ -98,7 +113,7 @@ app.use('/api/submissions', submissionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/learning-objectives', learningObjectivesRoutes);
 app.use('/api/reflections', reflectionRoutes);
-app.use('/api/boundaries', boundaryIntelligenceRoutes);
+app.use('/api/boundary-intelligence', boundaryIntelligenceRoutes);
 
 // Initialize Prisma connection and services
 const initializeDatabase = async () => {
@@ -107,10 +122,10 @@ const initializeDatabase = async () => {
     await prisma.$connect();
     console.log('✅ PostgreSQL connected successfully');
     
-    // Initialize service container with repository pattern
-    console.log('Initializing service container...');
-    initializeServices(prisma);
-    console.log('✅ Service container initialized with repository pattern');
+    // TODO: Temporarily disabled service container initialization due to repository interface mismatches
+    // console.log('Initializing service container...');
+    // initializeServices(prisma);
+    // console.log('✅ Service container initialized with repository pattern');
     
     // Initialize new ServiceFactory for event-driven services
     const { ServiceFactory } = await import('./container/ServiceFactory');

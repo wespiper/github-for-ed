@@ -337,7 +337,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema
       }
     }
-  }, async (request, reply) => {
+  }, async (request: any, reply) => {
     try {
       const { content, context } = request.body;
 
@@ -381,7 +381,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema
       }
     }
-  }, async (request, reply) => {
+  }, async (request: any, reply) => {
     try {
       const { purpose, requestContext } = request.body;
 
@@ -425,7 +425,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema
       }
     }
-  }, async (request, reply) => {
+  }, async (request: any, reply) => {
     try {
       const { content, aiRequest, assignmentContext } = request.body;
 
@@ -470,7 +470,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema
       }
     }
-  }, async (request, reply) => {
+  }, async (request: any, reply) => {
     try {
       const { accessLog } = request.body;
 
@@ -525,7 +525,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         data: {
           status: 'healthy',
           services: healthStatus,
-          metrics: Object.fromEntries(serviceMetrics)
+          metrics: serviceMetrics as any
         },
         message: 'Analytics service is healthy'
       };

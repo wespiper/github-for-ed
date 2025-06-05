@@ -6,7 +6,49 @@
 
 import prisma from '../lib/prisma';
 import { Prisma, Assignment } from '@prisma/client';
-import { CreateAssignmentInput, UpdateAssignmentInput, AssignmentValidation } from '@shared/types';
+// Note: Shared types temporarily inlined to resolve import issues
+interface CreateAssignmentInput {
+  title: string;
+  instructions?: string; // Made optional to match route usage
+  description?: string; // Alternative field name sometimes used
+  courseId: string;
+  dueDate?: Date | string; // Support both Date and string for flexibility
+  maxPoints?: number;
+  type?: 'essay' | 'research' | 'creative' | 'reflection' | 'analysis';
+  status?: 'draft' | 'published' | 'archived';
+  settings?: {
+    allowLateSubmissions?: boolean;
+    requireReflection?: boolean;
+    aiAssistanceLevel?: 'none' | 'basic' | 'standard' | 'enhanced';
+    plagiarismDetection?: boolean;
+    collaborativeWriting?: boolean;
+  };
+  learningObjectives?: string[];
+  // Additional properties used by service implementation
+  requirements?: any;
+  writingStages?: any;
+  aiSettings?: any;
+  grading?: any;
+  gradingCriteria?: any; // Alternative field name
+  collaboration?: any;
+  versionControl?: any;
+}
+
+interface UpdateAssignmentInput extends Partial<CreateAssignmentInput> {}
+
+interface AssignmentValidation {
+  valid: boolean;
+  isValid?: boolean; // Legacy compatibility
+  warnings: string[];
+  suggestions: string[];
+  errors?: string[]; // Legacy compatibility
+  educationalMetrics?: {
+    bloomsLevelDistribution: Record<number, number>;
+    categoryDistribution: Record<string, number>;
+    averageWeight: number;
+    totalObjectives: number;
+  };
+}
 
 export class AssignmentService {
   /**
@@ -70,22 +112,30 @@ export class AssignmentService {
       this.validateEducationalRequirements(data as CreateAssignmentInput);
     }
     
+    // Build update data with proper type handling
+    const updateData: any = {};
+    if (data.title) updateData.title = data.title;
+    if (data.instructions || data.description) {
+      updateData.instructions = data.instructions || data.description;
+    }
+    if (data.type) updateData.type = data.type;
+    if (data.dueDate) {
+      updateData.dueDate = typeof data.dueDate === 'string' ? new Date(data.dueDate) : data.dueDate;
+    }
+    if (data.requirements) updateData.requirements = data.requirements as any;
+    if (data.writingStages) updateData.writingStages = data.writingStages as any;
+    if (data.learningObjectives) updateData.learningObjectives = data.learningObjectives as any;
+    if (data.aiSettings) updateData.aiSettings = data.aiSettings as any;
+    if (data.grading || data.gradingCriteria) {
+      updateData.gradingCriteria = (data.grading || data.gradingCriteria) as any;
+    }
+    if (data.status) updateData.status = data.status;
+    updateData.updatedAt = new Date();
+
     // Update assignment
     const updatedAssignment = await prisma.assignment.update({
       where: { id: assignmentId },
-      data: {
-        ...(data.title && { title: data.title }),
-        ...(data.instructions && { instructions: data.instructions }),
-        ...(data.type && { type: data.type }),
-        ...(data.dueDate && { dueDate: data.dueDate }),
-        ...(data.requirements && { requirements: data.requirements as any }),
-        ...(data.writingStages && { writingStages: data.writingStages as any }),
-        ...(data.learningObjectives && { learningObjectives: data.learningObjectives as any }),
-        ...(data.aiSettings && { aiSettings: data.aiSettings as any }),
-        ...(data.grading && { gradingCriteria: data.grading as any }),
-        ...(data.status && { status: data.status }),
-        updatedAt: new Date()
-      },
+      data: updateData,
       include: {
         instructor: {
           select: {
@@ -383,9 +433,11 @@ export class AssignmentService {
     };
     
     return {
-      isValid: errors.length === 0,
+      valid: errors.length === 0,
+      isValid: errors.length === 0, // Legacy compatibility
       errors,
       warnings,
+      suggestions: [], // Default empty suggestions
       educationalMetrics
     };
   }
@@ -396,8 +448,10 @@ export class AssignmentService {
     if (!data.title?.trim()) {
       throw new Error('Assignment title is required');
     }
-    if (!data.instructions?.trim()) {
-      throw new Error('Assignment instructions are required');
+    // Accept either instructions or description
+    const content = data.instructions || data.description;
+    if (!content?.trim()) {
+      throw new Error('Assignment instructions or description are required');
     }
     if (!data.courseId) {
       throw new Error('Course ID is required');
@@ -426,17 +480,26 @@ export class AssignmentService {
   }
   
   private static buildAssignmentData(data: CreateAssignmentInput, userId: string): Prisma.AssignmentCreateInput {
+    // Handle instructions vs description
+    const instructions = data.instructions || data.description || '';
+    
+    // Handle date conversion
+    let dueDate: Date | undefined = undefined;
+    if (data.dueDate) {
+      dueDate = typeof data.dueDate === 'string' ? new Date(data.dueDate) : data.dueDate;
+    }
+    
     return {
       title: data.title,
-      instructions: data.instructions,
+      instructions,
       requirements: (data.requirements || {}) as any,
       writingStages: (data.writingStages || []) as any,
       learningObjectives: (data.learningObjectives || []) as any,
       aiSettings: (data.aiSettings || {}) as any,
-      gradingCriteria: (data.grading || {}) as any,
-      dueDate: data.dueDate,
+      gradingCriteria: (data.grading || data.gradingCriteria || {}) as any,
+      dueDate,
       stageDueDates: {},
-      status: 'draft',
+      status: data.status || 'draft',
       type: data.type || 'individual',
       collaborationSettings: data.collaboration || {},
       versionControlSettings: data.versionControl || {},

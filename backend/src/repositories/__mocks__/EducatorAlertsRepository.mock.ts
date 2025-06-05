@@ -202,8 +202,8 @@ export class MockEducatorAlertsRepository implements EducatorAlertsRepository {
     const id = `schedule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const schedule: InterventionSchedule = {
       id,
-      interventionId,
       ...scheduleData,
+      interventionId, // Override the interventionId from scheduleData with the parameter
       remindersSent: [],
       createdAt: new Date(),
       updatedAt: new Date()
@@ -234,8 +234,8 @@ export class MockEducatorAlertsRepository implements EducatorAlertsRepository {
     const id = `effectiveness_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const effectiveness: InterventionEffectiveness = {
       id,
-      interventionId,
       ...measurementData,
+      interventionId, // Override the interventionId from measurementData with the parameter
       measurementDate: new Date(),
       // Calculate mock improvement score based on baseline vs measurement
       improvementScore: this.calculateMockImprovement(measurementData.baselineData, measurementData.postInterventionData)
@@ -760,6 +760,34 @@ export class MockEducatorAlertsRepository implements EducatorAlertsRepository {
     };
   }
 
+  // Missing BaseRepository methods
+  async findByIdWithPrivacy(id: string, privacyContext: PrivacyContext): Promise<EducatorAlert | null> {
+    await this.logPrivacyOperation('findByIdWithPrivacy', privacyContext);
+    return this.findById(id);
+  }
+
+  async findByIdWithConsent(id: string, privacyContext: PrivacyContext): Promise<EducatorAlert | null> {
+    await this.logPrivacyOperation('findByIdWithConsent', privacyContext);
+    // Mock consent verification - in real implementation would check consent
+    return this.findById(id);
+  }
+
+  async getAnonymizedAnalytics(criteria: AnalyticsCriteria, privacyContext: PrivacyContext): Promise<AnonymizedData<any>> {
+    await this.logPrivacyOperation('getAnonymizedAnalytics', privacyContext);
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return {
+      data: { totalRecords: this.alerts.size },
+      cohortSize: Math.max(10, this.alerts.size),
+      dateRange: {
+        start: weekAgo,
+        end: now
+      },
+      anonymizedFields: ['studentId', 'educatorId'],
+      aggregationMethod: 'count'
+    };
+  }
+
   // Test utilities
   getPrivacyLogs() {
     return this.privacyLogs;
@@ -799,10 +827,10 @@ export class MockEducatorAlertsRepository implements EducatorAlertsRepository {
       recommendedActions: [
         {
           id: 'action_1',
-          type: 'contact_student',
+          type: 'contact_student' as const,
           title: 'Contact Student',
           description: 'Reach out to discuss current challenges',
-          priority: 'high',
+          priority: 'high' as const,
           estimatedTime: '15 minutes',
           completed: false
         }

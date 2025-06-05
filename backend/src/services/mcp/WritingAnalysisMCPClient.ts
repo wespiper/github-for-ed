@@ -68,7 +68,7 @@ export class WritingAnalysisMCPClient {
     }
 
     try {
-      const result = await this.client.request({
+      const result = await (this.client.request as any)({
         method: 'tools/call',
         params: {
           name: toolName,

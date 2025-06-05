@@ -170,8 +170,8 @@ export class EducatorAlertsMCPClient {
         arguments: args
       });
 
-      if (result.content && result.content[0] && result.content[0].type === 'text') {
-        const response = JSON.parse(result.content[0].text);
+      if ((result as any).content && (result as any).content[0] && (result as any).content[0].type === 'text') {
+        const response = JSON.parse((result as any).content[0].text);
         
         if (response.success) {
           this.logger.log(`✅ MCP tool ${toolName} completed successfully`);

@@ -90,8 +90,7 @@ export default async function academicIntegrityRoutes(
     '/ai-assistance/detect',
     {
       schema: {
-        tags: ['Academic Integrity'],
-        body: {
+          body: {
           type: 'object',
           required: ['studentId', 'assignmentId', 'content', 'privacyContext'],
           properties: {
@@ -164,8 +163,7 @@ export default async function academicIntegrityRoutes(
     '/integrity/analyze',
     {
       schema: {
-        tags: ['Academic Integrity'],
-        body: {
+          body: {
           type: 'object',
           required: ['studentId', 'assignmentId', 'submissionData', 'privacyContext'],
           properties: {
@@ -246,8 +244,7 @@ export default async function academicIntegrityRoutes(
     '/ai-validation/validate',
     {
       schema: {
-        tags: ['Academic Integrity'],
-        body: {
+          body: {
           type: 'object',
           required: ['studentId', 'assignmentId', 'aiInteraction', 'privacyContext'],
           properties: {
@@ -330,8 +327,7 @@ export default async function academicIntegrityRoutes(
     '/reports/generate',
     {
       schema: {
-        tags: ['Academic Integrity'],
-        body: {
+          body: {
           type: 'object',
           required: ['criteria', 'privacyContext'],
           properties: {
@@ -388,8 +384,17 @@ export default async function academicIntegrityRoutes(
     },
     async (request: FastifyRequest<{ Body: ReportGenerationRequest }>, reply: FastifyReply) => {
       try {
+        // Convert string dates to Date objects
+        const criteria = {
+          ...request.body.criteria,
+          timeframe: {
+            start: new Date(request.body.criteria.timeframe.start),
+            end: new Date(request.body.criteria.timeframe.end)
+          }
+        };
+        
         const result = await academicIntegrityService.generateIntegrityReports(
-          request.body.criteria,
+          criteria,
           {
             ...request.body.privacyContext,
             timestamp: new Date()

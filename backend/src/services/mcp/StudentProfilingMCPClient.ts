@@ -130,8 +130,8 @@ export class StudentProfilingMCPClient {
         arguments: params
       });
 
-      if (result.content?.[0]?.type === 'text') {
-        const data = JSON.parse(result.content[0].text);
+      if ((result as any).content?.[0]?.type === 'text') {
+        const data = JSON.parse((result as any).content[0].text);
         return {
           success: true,
           data
@@ -146,7 +146,7 @@ export class StudentProfilingMCPClient {
       console.error(`Error calling tool ${toolName}:`, error);
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }

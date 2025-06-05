@@ -125,7 +125,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
   constructor() {
     const serviceFactory = ServiceFactory.getInstance();
     this.repository = serviceFactory.getAcademicIntegrityRepository();
-    this.logger = new Logger('AcademicIntegrityService');
+    this.logger = Logger.getInstance('AcademicIntegrityService');
     this.circuitBreaker = new CircuitBreakerService();
     this.featureFlags = new FeatureFlagService();
     this.mcpClient = new AcademicIntegrityMCPClient();
@@ -138,7 +138,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
     try {
       await this.mcpClient.connect();
     } catch (error) {
-      this.logger.warn('MCP client initialization failed, will use fallbacks:', error);
+      this.logger.error('MCP client initialization failed, will use fallbacks', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -178,7 +178,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
       return await this.detectAIAssistanceLevelsRepository(studentId, assignmentId, content, privacyContext);
 
     } catch (error) {
-      this.logger.error(`${operation} failed:`, error);
+      this.logger.error(`${operation} failed`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -220,7 +220,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
       return await this.analyzeAcademicIntegrityRepository(studentId, assignmentId, submissionData, privacyContext);
 
     } catch (error) {
-      this.logger.error(`${operation} failed:`, error);
+      this.logger.error(`${operation} failed`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -262,7 +262,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
       return await this.validateEducationalAIUseRepository(studentId, assignmentId, aiInteraction, privacyContext);
 
     } catch (error) {
-      this.logger.error(`${operation} failed:`, error);
+      this.logger.error(`${operation} failed`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -303,7 +303,7 @@ export class AcademicIntegrityService implements AcademicIntegrityServiceInterfa
       return await this.generateIntegrityReportsRepository(criteria, privacyContext);
 
     } catch (error) {
-      this.logger.error(`${operation} failed:`, error);
+      this.logger.error(`${operation} failed`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }

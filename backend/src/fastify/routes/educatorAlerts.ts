@@ -327,8 +327,14 @@ const educatorAlertsRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const privacyContext = createPrivacyContext(request);
 
+      // Temporarily simplified for testing - add required fields
+      const alertsWithStatus = request.body.alerts.map((alert: any) => ({
+        ...alert,
+        status: 'pending' // Add required status field
+      }));
+      
       const result = await educatorAlertsService.sendEducatorAlerts(
-        request.body.alerts,
+        alertsWithStatus,
         request.body.deliveryOptions,
         privacyContext
       );
@@ -362,10 +368,14 @@ const educatorAlertsRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const privacyContext = createPrivacyContext(request);
 
-      // Convert string dates to Date objects
+      // Convert string dates to Date objects and add required fields
       const scheduleData = {
         ...request.body.scheduleData,
-        scheduledFor: new Date(request.body.scheduleData.scheduledFor)
+        scheduledFor: new Date(request.body.scheduleData.scheduledFor),
+        status: 'scheduled' as const, // Add required status field
+        interventionId: request.body.interventionId, // Add required interventionId
+        remindersSent: [], // Add required remindersSent field (Date array)
+        followUpRequired: request.body.scheduleData.followUpRequired ?? false // Ensure boolean type
       };
 
       const schedule = await educatorAlertsService.scheduleInterventionActions(
@@ -416,9 +426,16 @@ const educatorAlertsRoutes: FastifyPluginAsync = async (fastify) => {
         }
       };
 
+      // Add required fields to measurement data
+      const measurementDataWithRequired = {
+        ...request.body.measurementData,
+        interventionId: request.body.interventionId, // Add required interventionId
+        improvementScore: (request.body.measurementData as any).improvementScore || 0 // Add required improvementScore
+      };
+
       const effectiveness = await educatorAlertsService.trackInterventionEffectiveness(
         request.body.interventionId,
-        request.body.measurementData,
+        measurementDataWithRequired,
         comparisonPeriod,
         privacyContext
       );

@@ -77,3 +77,7 @@ mongodb.log
 # Claude Code reflections and insights
 .claude/reflections/
 .claude/insights/
+
+# Scribe Tree MCP Servers
+mcp-servers/scribe-tree-strategic-cto
+mcp-servers/scribe-tree-docs

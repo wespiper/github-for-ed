@@ -23,7 +23,12 @@ import { EventBus } from '../events/EventBus';
 import { Logger } from '../monitoring/Logger';
 
 export interface EducatorAlertsMCPClient {
-  generateInterventionRecommendations(params: any): Promise<any>;
+  generateInterventionRecommendations(
+    studentId: string,
+    analysisData: Record<string, any>,
+    educationalContext: Record<string, any>,
+    privacyContext: Record<string, any>
+  ): Promise<any>;
   sendEducatorAlerts(params: any): Promise<any>;
   scheduleInterventionActions(params: any): Promise<any>;
   trackInterventionEffectiveness(params: any): Promise<any>;
@@ -155,14 +160,14 @@ export class EducatorAlertsService {
     this.httpClient = httpClient;
     
     const serviceFactory = ServiceFactory.getInstance();
-    this.repository = serviceFactory.getEducatorAlertsRepository();
+    this.repository = serviceFactory.getEducatorAlertsRepository() as any; // Temporary fix for development
     this.eventBus = serviceFactory.getEventBus();
-    this.logger = new Logger('EducatorAlertsService');
+    this.logger = Logger.getInstance('EducatorAlertsService');
     
     // Use MCP client from ServiceFactory if not provided
     if (!this.mcpClient) {
       try {
-        this.mcpClient = serviceFactory.getEducatorAlertsMCPClient();
+        this.mcpClient = serviceFactory.getEducatorAlertsMCPClient() as any; // Temporary fix for development
       } catch (error) {
         this.logger.warn('MCP client not available from ServiceFactory, falling back to HTTP/Repository');
       }
@@ -198,12 +203,12 @@ export class EducatorAlertsService {
       if (this.shouldUseMCP() && this.mcpClient) {
         try {
           const result = await this.executeWithTimeout(
-            () => this.mcpClient!.generateInterventionRecommendations({
+            () => this.mcpClient!.generateInterventionRecommendations(
               studentId,
               analysisData,
               educationalContext,
               privacyContext
-            }),
+            ),
             this.config.timeouts.mcp
           );
           
@@ -211,7 +216,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, studentId, 'success', 'mcp', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via MCP:`, error);
+          this.logger.error(`${operation} failed via MCP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, studentId, 'failed', 'mcp', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -237,7 +242,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, studentId, 'success', 'http', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via HTTP:`, error);
+          this.logger.error(`${operation} failed via HTTP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, studentId, 'failed', 'http', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -262,7 +267,7 @@ export class EducatorAlertsService {
       return result;
 
     } catch (error) {
-      this.logger.error(`${operation} failed on all tiers:`, error);
+      this.logger.error(`${operation} failed on all tiers`, error instanceof Error ? error : new Error(String(error)));
       await this.logEvent(operation, studentId, 'failed', 'all_tiers', privacyContext);
       throw new Error(`Failed to generate intervention recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -304,7 +309,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, 'bulk_alerts', 'success', 'mcp', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via MCP:`, error);
+          this.logger.error(`${operation} failed via MCP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, 'bulk_alerts', 'failed', 'mcp', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -329,7 +334,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, 'bulk_alerts', 'success', 'http', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via HTTP:`, error);
+          this.logger.error(`${operation} failed via HTTP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, 'bulk_alerts', 'failed', 'http', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -349,7 +354,7 @@ export class EducatorAlertsService {
       return result;
 
     } catch (error) {
-      this.logger.error(`${operation} failed on all tiers:`, error);
+      this.logger.error(`${operation} failed on all tiers`, error instanceof Error ? error : new Error(String(error)));
       await this.logEvent(operation, 'bulk_alerts', 'failed', 'all_tiers', privacyContext);
       throw new Error(`Failed to send educator alerts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -389,7 +394,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, interventionId, 'success', 'mcp', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via MCP:`, error);
+          this.logger.error(`${operation} failed via MCP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, interventionId, 'failed', 'mcp', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -415,7 +420,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, interventionId, 'success', 'http', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via HTTP:`, error);
+          this.logger.error(`${operation} failed via HTTP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, interventionId, 'failed', 'http', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -440,7 +445,7 @@ export class EducatorAlertsService {
       return result;
 
     } catch (error) {
-      this.logger.error(`${operation} failed on all tiers:`, error);
+      this.logger.error(`${operation} failed on all tiers`, error instanceof Error ? error : new Error(String(error)));
       await this.logEvent(operation, interventionId, 'failed', 'all_tiers', privacyContext);
       throw new Error(`Failed to schedule intervention actions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -479,7 +484,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, interventionId, 'success', 'mcp', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via MCP:`, error);
+          this.logger.error(`${operation} failed via MCP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, interventionId, 'failed', 'mcp', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -505,7 +510,7 @@ export class EducatorAlertsService {
           await this.logEvent(operation, interventionId, 'success', 'http', privacyContext);
           return result;
         } catch (error) {
-          this.logger.warn(`${operation} failed via HTTP:`, error);
+          this.logger.error(`${operation} failed via HTTP`, error instanceof Error ? error : new Error(String(error)));
           await this.logEvent(operation, interventionId, 'failed', 'http', privacyContext);
           
           if (!this.config.enableFallback) {
@@ -530,7 +535,7 @@ export class EducatorAlertsService {
       return result;
 
     } catch (error) {
-      this.logger.error(`${operation} failed on all tiers:`, error);
+      this.logger.error(`${operation} failed on all tiers`, error instanceof Error ? error : new Error(String(error)));
       await this.logEvent(operation, interventionId, 'failed', 'all_tiers', privacyContext);
       throw new Error(`Failed to track intervention effectiveness: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -651,12 +656,12 @@ export class EducatorAlertsService {
           userId: privacyContext.requesterId
         },
         metadata: {
-          service: 'EducatorAlertsService',
-          privacyContext
+          source: 'EducatorAlertsService',
+          userId: privacyContext.requesterId
         }
       });
     } catch (error) {
-      this.logger.warn('Failed to log event:', error);
+      this.logger.error('Failed to log event', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -702,7 +707,7 @@ export class EducatorAlertsService {
       try {
         await this.mcpClient.disconnect();
       } catch (error) {
-        this.logger.warn('Error disconnecting MCP client:', error);
+        this.logger.error('Error disconnecting MCP client', error instanceof Error ? error : new Error(String(error)));
       }
     }
   }

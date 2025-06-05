@@ -115,7 +115,8 @@ export class CircuitBreakerService {
     } catch (error) {
       this.recordFailure(serviceName, circuit, error);
       
-      if (circuit.state === CircuitState.OPEN) {
+      // Check if circuit is now open after recording failure
+      if ((circuit as any).state === CircuitState.OPEN) {
         this.logger.warn(`Circuit breaker ${serviceName} opened - using fallback`);
         return await this.executeFallback(serviceName, fallback);
       }

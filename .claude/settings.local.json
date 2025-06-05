@@ -87,7 +87,11 @@
       "Bash(MCP_EDUCATOR_ALERTS_PATH=\"/Users/wnp/Desktop/scribe-tree/mcp-servers/educator-alerts/dist/index.js\" node test-educator-alerts-integration.js)",
       "Bash(MCP_EDUCATOR_ALERTS_PATH=\"/Users/wnp/Desktop/scribe-tree/mcp-servers/educator-alerts/dist/index.js\" node debug-path.js)",
       "Bash(MCP_EDUCATIONAL_AI_VALIDATOR_PATH=\"/Users/wnp/Desktop/scribe-tree/mcp-servers/educational-ai-validator/dist/index.js\" node test-educational-ai-validator-integration.js)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 npm run dev)",
+      "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 timeout 20s npm run dev)",
+      "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 FASTIFY_DEBUG_MODE=true npm run dev)",
+      "Bash(pg_isready:*)"
     ],
     "deny": []
   },
