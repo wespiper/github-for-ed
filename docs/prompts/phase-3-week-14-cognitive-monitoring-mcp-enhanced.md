@@ -1,56 +1,58 @@
-# Phase 3 - Week 14: Privacy-Enhanced Cognitive Monitoring MCP Server (Fastify)
+# Phase 3 - Week 14: Advanced Cognitive Monitoring MCP Server
 
 ## Objective
-Implement a privacy-first, high-performance MCP server using Fastify for real-time cognitive monitoring that respects student privacy while providing educational value. Process 100+ behavioral events per second with <50ms response times while maintaining comprehensive privacy protections.
+Build an advanced cognitive monitoring MCP server leveraging established architecture patterns from Phase 2, implementing sophisticated real-time learning analytics while maintaining the proven privacy-first design. Achieve 200+ behavioral events per second with <40ms response times using optimized infrastructure from Week 13.
 
 ## Context
-- **Current Phase**: Phase 3 - Infrastructure & Performance (Unified MCP + HTTP Microservices Migration)
+- **Current Phase**: Phase 3 - Infrastructure & Performance Optimization
 - **Week**: Week 14 of 20
 - **Branch**: `feat/mcp-microservices-migration`
-- **Privacy Focus**: Implement comprehensive privacy protections throughout the cognitive monitoring pipeline
-- **Dependencies**: Phase 2 NestJS patterns established, message queue infrastructure operational, Redis caching layer ready, privacy framework established, Unified Migration Plan (Phases 1-2 complete)
-- **Unified Approach**: High-performance Fastify service with dual interface architecture (MCP protocol + HTTP REST APIs)
+- **Established Foundation**: 4 operational MCP servers (Writing Analysis, Student Profiling, Educator Alerts, Academic Integrity), proven privacy patterns, 95%+ compliance scores
+- **Infrastructure**: Enhanced monitoring, optimized service communication, horizontal scaling, multi-layer caching from Week 13
+- **Privacy Patterns**: Proven privacy-by-design patterns from existing MCP servers, established consent management, comprehensive audit trails
+- **Performance Baseline**: Optimized infrastructure supporting 200+ concurrent users, <150ms average response times
 
 ## Scope
-### In Scope
-- Create privacy-first, high-performance Fastify MCP server
-- Extract CognitiveLoadService with built-in privacy protections
-- Implement privacy-preserving WebSocket connections for behavioral data
-- Build anonymized cognitive load detection algorithms
-- Real-time consent validation and privacy preference enforcement
-- Privacy-respecting intervention triggers
-- Strict data minimization for sensitive behavioral patterns
+### In Scope - Advanced Cognitive Monitoring
+- **Build on proven MCP patterns**: Leverage established NestJS architecture from existing servers
+- **Advanced behavioral analytics**: Real-time cognitive load detection with sophisticated algorithms
+- **Enhanced privacy features**: Build on proven 95%+ compliance patterns from Phase 2
+- **High-performance monitoring**: Utilize optimized infrastructure for 200+ events/second processing
+- **Intelligent intervention engine**: Advanced pattern recognition with educational context awareness
+- **Seamless integration**: Connect with existing Writing Analysis and Student Profiling services
+- **Production-ready features**: Enterprise-grade monitoring, alerting, and analytics
 
 ### Out of Scope
-- Machine learning model training on personal data
-- Long-term behavioral data storage
-- Cross-student behavioral comparisons
-- Personally identifiable pattern storage
-- Behavioral data sharing without explicit consent
+- Basic MCP server setup (patterns already established)
+- Initial privacy implementation (proven patterns to be reused)
+- Basic infrastructure setup (optimized in Week 13)
+- Simple cognitive monitoring (focus on advanced features)
 
 ## Technical Requirements
-1. **Framework**: Fastify 4.x with privacy-by-design architecture
-2. **Performance**: <50ms cognitive assessment with privacy filters, <10ms event processing
-3. **Privacy**: Real-time consent validation, anonymized pattern detection, data minimization
-4. **Memory**: <256MB per instance with privacy overhead
-5. **Compliance**: FERPA, COPPA, and GDPR-compatible design
+1. **Architecture**: Build on established NestJS patterns from existing MCP servers for consistency
+2. **Performance**: <40ms cognitive assessment leveraging Week 13 optimizations, 200+ events/second throughput
+3. **Privacy**: Reuse proven 95%+ compliance patterns, integrate with existing consent management
+4. **Integration**: Seamless communication with Writing Analysis and Student Profiling services
+5. **Scalability**: Leverage horizontal scaling infrastructure for production-grade capacity
+6. **Monitoring**: Integrate with enhanced Prometheus/Grafana setup from Week 13
+7. **Caching**: Utilize multi-layer caching for optimal performance
 
 ## Implementation Steps
 
-### Step 1: Privacy-First Fastify Setup
-- [ ] Create `mcp-servers/cognitive-monitoring/` directory structure
-- [ ] Initialize Fastify project with privacy middleware
-- [ ] Install dependencies: `fastify`, `@fastify/websocket`, `@fastify/compress`, `@fastify/secure-session`
-- [ ] Configure Fastify with privacy-first defaults
-- [ ] Set up Docker container with privacy isolation
-- [ ] Implement privacy audit logging
+### Step 1: MCP Server Foundation (Building on Established Patterns)
+- [ ] Create `mcp-servers/cognitive-monitoring/` using proven architecture from existing servers
+- [ ] Copy and adapt NestJS patterns from Writing Analysis and Student Profiling servers
+- [ ] Implement established privacy middleware and consent validation patterns
+- [ ] Set up Docker configuration matching existing MCP servers
+- [ ] Integrate with optimized monitoring infrastructure from Week 13
+- [ ] Connect to enhanced service discovery and load balancing
 
-### Step 2: Privacy-Enhanced MCP Protocol
-- [ ] Create `src/mcp/privacy-aware-mcp-server.ts`
-- [ ] Implement privacy-filtered MCP tools with consent validation
-- [ ] Set up tool registry: `detect_cognitive_overload_anonymous`, `analyze_behavioral_patterns_private`, `trigger_privacy_safe_interventions`, `monitor_anonymized_metrics`
-- [ ] Add privacy metadata to all tool responses
-- [ ] Implement educational purpose validation for each tool
+### Step 2: Advanced MCP Tools Implementation
+- [ ] Create `src/mcp/cognitive-monitoring-tools.ts` with sophisticated algorithms
+- [ ] Implement tools: `detect_cognitive_overload_advanced`, `analyze_learning_patterns_ai`, `predict_intervention_needs`, `generate_personalized_insights`, `monitor_engagement_metrics`
+- [ ] Integrate with existing Writing Analysis service for writing behavior correlation
+- [ ] Connect with Student Profiling service for comprehensive learning analytics
+- [ ] Implement educational context awareness using established AI boundary patterns
 
 ### Step 3: Secure WebSocket Infrastructure
 - [ ] Set up `src/websocket/secure-websocket-handler.ts`
