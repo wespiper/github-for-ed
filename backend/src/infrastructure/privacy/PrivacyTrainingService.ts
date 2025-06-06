@@ -1,1183 +1,1076 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from '../../monitoring/Logger';
+/**
+ * Privacy Training Service
+ * Comprehensive privacy training materials and tracking system
+ */
 
-export enum TrainingRole {
+import { Injectable } from '@nestjs/common';
+import { EventEmitter } from 'events';
+
+export interface TrainingProgram {
+  id: string;
+  name: string;
+  type: TrainingType;
+  targetRoles: UserRole[];
+  regulations: string[];
+  modules: TrainingModule[];
+  requirements: TrainingRequirement;
+  certification: CertificationConfig;
+  status: 'draft' | 'active' | 'deprecated';
+  version: string;
+  createdAt: Date;
+  updatedAt: Date;
+  effectiveDate: Date;
+  expiryDate?: Date;
+}
+
+export enum TrainingType {
+  ONBOARDING = 'onboarding',
+  ANNUAL_REFRESH = 'annual_refresh',
+  ROLE_SPECIFIC = 'role_specific',
+  INCIDENT_RESPONSE = 'incident_response',
+  COMPLIANCE_UPDATE = 'compliance_update',
+  SPECIALIZED = 'specialized'
+}
+
+export enum UserRole {
   DEVELOPER = 'developer',
-  SUPPORT_TEAM = 'support_team',
+  SUPPORT_STAFF = 'support_staff',
   ADMINISTRATOR = 'administrator',
   EDUCATOR = 'educator',
   PRIVACY_OFFICER = 'privacy_officer',
-  SECURITY_TEAM = 'security_team',
-  EXECUTIVE = 'executive'
-}
-
-export enum TrainingStatus {
-  NOT_STARTED = 'not_started',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  EXPIRED = 'expired',
-  FAILED = 'failed'
+  SECURITY_ANALYST = 'security_analyst',
+  LEGAL_COUNSEL = 'legal_counsel',
+  EXECUTIVE = 'executive',
+  ALL_STAFF = 'all_staff'
 }
 
 export interface TrainingModule {
   id: string;
   title: string;
   description: string;
-  roles: TrainingRole[];
-  duration: number; // in minutes
-  content: TrainingContent[];
-  assessments: TrainingAssessment[];
+  content: ModuleContent;
+  duration: number; // minutes
   prerequisites: string[];
-  validityPeriod: number; // in days
+  learningObjectives: string[];
+  assessments: Assessment[];
+  resources: Resource[];
+  interactive: boolean;
   mandatory: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  order: number;
 }
 
-export interface TrainingContent {
+export interface ModuleContent {
+  type: 'video' | 'text' | 'interactive' | 'presentation' | 'simulation';
+  url?: string;
+  text?: string;
+  slides?: Slide[];
+  scenarios?: Scenario[];
+  checkpoints: Checkpoint[];
+}
+
+export interface Slide {
   id: string;
-  type: 'video' | 'document' | 'interactive' | 'presentation' | 'quiz';
   title: string;
   content: string;
-  order: number;
-  estimatedTime: number; // in minutes
+  media?: {
+    type: 'image' | 'video' | 'animation';
+    url: string;
+    alt?: string;
+  };
+  notes?: string;
 }
 
-export interface TrainingAssessment {
+export interface Scenario {
   id: string;
   title: string;
-  questions: TrainingQuestion[];
-  passingScore: number;
-  maxAttempts: number;
-  timeLimit?: number; // in minutes
+  description: string;
+  context: string;
+  challenge: string;
+  options: ScenarioOption[];
+  correctAnswer: string;
+  explanation: string;
+  consequences: string[];
 }
 
-export interface TrainingQuestion {
+export interface ScenarioOption {
   id: string;
-  type: 'multiple_choice' | 'true_false' | 'scenario' | 'essay';
+  text: string;
+  isCorrect: boolean;
+  feedback: string;
+}
+
+export interface Checkpoint {
+  id: string;
+  title: string;
   question: string;
+  type: 'multiple_choice' | 'true_false' | 'text_input' | 'scenario';
   options?: string[];
   correctAnswer: string | string[];
   explanation: string;
   points: number;
 }
 
-export interface UserTrainingRecord {
+export interface Assessment {
+  id: string;
+  title: string;
+  type: 'quiz' | 'practical' | 'scenario_based' | 'certification_exam';
+  questions: Question[];
+  passingScore: number; // percentage
+  timeLimit?: number; // minutes
+  attempts: number;
+  randomizeQuestions: boolean;
+  randomizeOptions: boolean;
+}
+
+export interface Question {
+  id: string;
+  text: string;
+  type: 'multiple_choice' | 'multiple_select' | 'true_false' | 'fill_blank' | 'essay';
+  options?: string[];
+  correctAnswers: string[];
+  explanation: string;
+  points: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  tags: string[];
+}
+
+export interface Resource {
+  id: string;
+  title: string;
+  type: 'document' | 'link' | 'video' | 'policy' | 'regulation' | 'case_study';
+  url: string;
+  description: string;
+  mandatory: boolean;
+}
+
+export interface TrainingRequirement {
+  frequency: 'once' | 'annual' | 'biannual' | 'quarterly' | 'on_update';
+  expirationMonths: number;
+  renewalRequired: boolean;
+  managementApproval: boolean;
+  certificateRequired: boolean;
+  minimumScore: number; // percentage
+}
+
+export interface CertificationConfig {
+  enabled: boolean;
+  certificateName: string;
+  validityPeriod: number; // months
+  renewalProcess: 'retake' | 'refresher' | 'attestation';
+  digitalBadge: boolean;
+  publicVerification: boolean;
+}
+
+export interface TrainingRecord {
+  id: string;
   userId: string;
-  moduleId: string;
-  role: TrainingRole;
+  programId: string;
+  moduleId?: string;
   status: TrainingStatus;
-  startedAt?: Date;
+  startedAt: Date;
   completedAt?: Date;
-  expiresAt?: Date;
-  score?: number;
+  lastActivityAt: Date;
+  progress: TrainingProgress;
   attempts: TrainingAttempt[];
-  certificateId?: string;
+  certification?: CertificationRecord;
+  notes?: string;
+  assignedBy?: string;
+  deadline?: Date;
+}
+
+export enum TrainingStatus {
+  ASSIGNED = 'assigned',
+  STARTED = 'started',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  OVERDUE = 'overdue',
+  EXPIRED = 'expired',
+  EXEMPTED = 'exempted'
+}
+
+export interface TrainingProgress {
+  modulesCompleted: number;
+  totalModules: number;
+  completionPercentage: number;
+  timeSpent: number; // minutes
+  currentModule?: string;
+  assessmentsPassed: number;
+  totalAssessments: number;
+  overallScore?: number;
 }
 
 export interface TrainingAttempt {
   id: string;
+  moduleId: string;
+  assessmentId: string;
   startedAt: Date;
   completedAt?: Date;
-  score?: number;
+  score: number;
   passed: boolean;
-  answers: TrainingAnswer[];
+  timeSpent: number;
+  answers: AttemptAnswer[];
 }
 
-export interface TrainingAnswer {
+export interface AttemptAnswer {
   questionId: string;
   answer: string | string[];
   correct: boolean;
   points: number;
+  timeSpent: number;
 }
 
-export interface TrainingCertificate {
+export interface CertificationRecord {
   id: string;
+  programId: string;
   userId: string;
-  moduleId: string;
+  certificateName: string;
   issuedAt: Date;
   expiresAt: Date;
   score: number;
-  digitalSignature: string;
+  badgeUrl?: string;
+  verificationCode: string;
+  status: 'active' | 'expired' | 'revoked';
 }
 
-/**
- * Privacy Training Service
- * 
- * Manages comprehensive privacy training program including:
- * - Role-specific training modules
- * - Interactive training content delivery
- * - Assessment and certification tracking
- * - Training compliance monitoring
- * - Automated recertification reminders
- * - Training effectiveness analytics
- */
+export interface TrainingAnalytics {
+  programId: string;
+  period: {
+    start: Date;
+    end: Date;
+  };
+  participants: number;
+  completionRate: number;
+  averageScore: number;
+  averageTimeToComplete: number;
+  passRate: number;
+  moduleAnalytics: ModuleAnalytics[];
+  riskIndicators: RiskIndicator[];
+  recommendations: string[];
+}
+
+export interface ModuleAnalytics {
+  moduleId: string;
+  moduleName: string;
+  completionRate: number;
+  averageScore: number;
+  averageTimeSpent: number;
+  commonMistakes: CommonMistake[];
+  difficulty: number; // 1-5 scale
+}
+
+export interface CommonMistake {
+  questionId: string;
+  questionText: string;
+  incorrectAnswers: string[];
+  frequency: number;
+  impact: 'low' | 'medium' | 'high';
+}
+
+export interface RiskIndicator {
+  type: 'low_completion' | 'low_scores' | 'high_failure_rate' | 'overdue_training';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affectedUsers: number;
+  department?: string;
+  recommendation: string;
+}
+
 @Injectable()
-export class PrivacyTrainingService {
-  private readonly logger = new Logger('PrivacyTrainingService');
-  private readonly trainingModules = new Map<string, TrainingModule>();
-  private readonly userTrainingRecords = new Map<string, UserTrainingRecord[]>();
-  private readonly certificates = new Map<string, TrainingCertificate>();
-
+export class PrivacyTrainingService extends EventEmitter {
+  private programs = new Map<string, TrainingProgram>();
+  private records = new Map<string, TrainingRecord>();
+  private certifications = new Map<string, CertificationRecord>();
+  
   constructor() {
-    this.initializeTrainingModules();
+    super();
+    this.initializeTrainingPrograms();
   }
 
   /**
-   * Initialize comprehensive privacy training modules
+   * Create new training program
    */
-  private initializeTrainingModules(): void {
-    this.logger.info('Initializing privacy training modules');
+  public async createTrainingProgram(program: Omit<TrainingProgram, 'id' | 'createdAt' | 'updatedAt'>): Promise<TrainingProgram> {
+    const newProgram: TrainingProgram = {
+      ...program,
+      id: this.generateProgramId(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    // Core privacy fundamentals module
-    this.createPrivacyFundamentalsModule();
+    this.programs.set(newProgram.id, newProgram);
     
-    // FERPA/COPPA/GDPR specific modules
-    this.createFERPATrainingModule();
-    this.createCOPPATrainingModule();
-    this.createGDPRTrainingModule();
+    this.emit('training_program_created', newProgram);
     
-    // Role-specific modules
-    this.createDeveloperPrivacyModule();
-    this.createSupportTeamPrivacyModule();
-    this.createAdministratorPrivacyModule();
-    this.createEducatorPrivacyModule();
-    
-    // Incident response training
-    this.createIncidentResponseModule();
-    
-    // Advanced privacy topics
-    this.createAdvancedPrivacyModule();
-
-    this.logger.info('Privacy training modules initialized', {
-      totalModules: this.trainingModules.size
-    });
+    return newProgram;
   }
 
   /**
-   * Create Privacy Fundamentals module
+   * Assign training to users
    */
-  private createPrivacyFundamentalsModule(): void {
-    const module: TrainingModule = {
-      id: 'privacy-fundamentals',
-      title: 'Privacy Fundamentals for Educational Technology',
-      description: 'Core privacy concepts and principles for educational data protection',
-      roles: [TrainingRole.DEVELOPER, TrainingRole.SUPPORT_TEAM, TrainingRole.ADMINISTRATOR, TrainingRole.EDUCATOR],
-      duration: 45,
-      content: [
-        {
-          id: 'pf-intro',
-          type: 'presentation',
-          title: 'Introduction to Educational Privacy',
-          content: 'Privacy in educational technology: why it matters and key principles',
-          order: 1,
-          estimatedTime: 10
-        },
-        {
-          id: 'pf-data-types',
-          type: 'interactive',
-          title: 'Types of Educational Data',
-          content: 'Understanding PII, directory information, and sensitive educational data',
-          order: 2,
-          estimatedTime: 15
-        },
-        {
-          id: 'pf-consent',
-          type: 'video',
-          title: 'Consent and Student Privacy Rights',
-          content: 'Managing consent for educational technology use',
-          order: 3,
-          estimatedTime: 12
-        },
-        {
-          id: 'pf-best-practices',
-          type: 'document',
-          title: 'Privacy Best Practices',
-          content: 'Practical guidelines for protecting student privacy',
-          order: 4,
-          estimatedTime: 8
-        }
-      ],
-      assessments: [
-        {
-          id: 'pf-assessment',
-          title: 'Privacy Fundamentals Assessment',
-          questions: [
-            {
-              id: 'pf-q1',
-              type: 'multiple_choice',
-              question: 'Which of the following is considered PII under FERPA?',
-              options: ['Student name', 'Student ID number', 'Student email address', 'All of the above'],
-              correctAnswer: 'All of the above',
-              explanation: 'FERPA protects all personally identifiable information that can be used to identify a student.',
-              points: 10
-            },
-            {
-              id: 'pf-q2',
-              type: 'true_false',
-              question: 'Directory information can be disclosed without consent if the school has provided proper notice.',
-              correctAnswer: 'true',
-              explanation: 'Directory information may be disclosed without consent if parents/students have been properly notified and given the opportunity to opt out.',
-              points: 10
-            },
-            {
-              id: 'pf-q3',
-              type: 'scenario',
-              question: 'A teacher wants to use a new educational app that requires student names and email addresses. What steps should be taken?',
-              correctAnswer: 'Verify the app complies with FERPA, review data use policies, obtain necessary approvals, and ensure proper consent is obtained.',
-              explanation: 'Educational technology must be properly vetted for privacy compliance before use with student data.',
-              points: 15
-            }
-          ],
-          passingScore: 80,
-          maxAttempts: 3,
-          timeLimit: 30
-        }
-      ],
-      prerequisites: [],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+  public async assignTraining(
+    programId: string,
+    userIds: string[],
+    deadline?: Date,
+    assignedBy?: string
+  ): Promise<TrainingRecord[]> {
+    const program = this.programs.get(programId);
+    if (!program) {
+      throw new Error(`Training program ${programId} not found`);
+    }
 
-    this.trainingModules.set(module.id, module);
-  }
+    const records: TrainingRecord[] = [];
 
-  /**
-   * Create FERPA training module
-   */
-  private createFERPATrainingModule(): void {
-    const module: TrainingModule = {
-      id: 'ferpa-compliance',
-      title: 'FERPA Compliance for Educational Technology',
-      description: 'Comprehensive training on Family Educational Rights and Privacy Act requirements',
-      roles: [TrainingRole.ADMINISTRATOR, TrainingRole.EDUCATOR, TrainingRole.PRIVACY_OFFICER],
-      duration: 60,
-      content: [
-        {
-          id: 'ferpa-overview',
-          type: 'presentation',
-          title: 'FERPA Overview and Requirements',
-          content: 'Understanding FERPA scope, requirements, and exceptions',
-          order: 1,
-          estimatedTime: 20
-        },
-        {
-          id: 'ferpa-directory',
-          type: 'interactive',
-          title: 'Directory Information Management',
-          content: 'Managing directory information disclosures and opt-outs',
-          order: 2,
-          estimatedTime: 15
-        },
-        {
-          id: 'ferpa-consent',
-          type: 'video',
-          title: 'FERPA Consent Requirements',
-          content: 'When and how to obtain FERPA consent',
-          order: 3,
-          estimatedTime: 15
-        },
-        {
-          id: 'ferpa-violations',
-          type: 'document',
-          title: 'Avoiding FERPA Violations',
-          content: 'Common FERPA violations and how to prevent them',
-          order: 4,
-          estimatedTime: 10
-        }
-      ],
-      assessments: [
-        {
-          id: 'ferpa-assessment',
-          title: 'FERPA Compliance Assessment',
-          questions: [
-            {
-              id: 'ferpa-q1',
-              type: 'multiple_choice',
-              question: 'Under FERPA, when can educational records be disclosed without consent?',
-              options: ['To school officials with legitimate educational interest', 'In response to a court order', 'To other schools where the student seeks to enroll', 'All of the above'],
-              correctAnswer: 'All of the above',
-              explanation: 'FERPA allows disclosure without consent in specific circumstances outlined in the law.',
-              points: 15
-            }
-          ],
-          passingScore: 85,
-          maxAttempts: 3,
-          timeLimit: 45
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create COPPA training module
-   */
-  private createCOPPATrainingModule(): void {
-    const module: TrainingModule = {
-      id: 'coppa-compliance',
-      title: 'COPPA Compliance for Under-13 Users',
-      description: "Children's Online Privacy Protection Act requirements for educational platforms",
-      roles: [TrainingRole.DEVELOPER, TrainingRole.ADMINISTRATOR, TrainingRole.PRIVACY_OFFICER],
-      duration: 45,
-      content: [
-        {
-          id: 'coppa-overview',
-          type: 'presentation',
-          title: 'COPPA Requirements Overview',
-          content: 'Understanding COPPA scope and parental consent requirements',
-          order: 1,
-          estimatedTime: 15
-        },
-        {
-          id: 'coppa-consent',
-          type: 'interactive',
-          title: 'Verifiable Parental Consent',
-          content: 'Methods for obtaining and verifying parental consent',
-          order: 2,
-          estimatedTime: 20
-        },
-        {
-          id: 'coppa-school-exception',
-          type: 'video',
-          title: 'COPPA School Official Exception',
-          content: 'Understanding the school official exception and its limitations',
-          order: 3,
-          estimatedTime: 10
-        }
-      ],
-      assessments: [
-        {
-          id: 'coppa-assessment',
-          title: 'COPPA Compliance Assessment',
-          questions: [
-            {
-              id: 'coppa-q1',
-              type: 'true_false',
-              question: 'Under COPPA, schools can provide consent on behalf of parents for educational technology use.',
-              correctAnswer: 'true',
-              explanation: 'The school official exception allows schools to consent for educational use, but with limitations.',
-              points: 10
-            }
-          ],
-          passingScore: 80,
-          maxAttempts: 3,
-          timeLimit: 30
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create GDPR training module
-   */
-  private createGDPRTrainingModule(): void {
-    const module: TrainingModule = {
-      id: 'gdpr-compliance',
-      title: 'GDPR Compliance for Educational Data',
-      description: 'General Data Protection Regulation requirements for EU data subjects',
-      roles: [TrainingRole.DEVELOPER, TrainingRole.ADMINISTRATOR, TrainingRole.PRIVACY_OFFICER],
-      duration: 75,
-      content: [
-        {
-          id: 'gdpr-overview',
-          type: 'presentation',
-          title: 'GDPR Principles and Rights',
-          content: 'Understanding GDPR data protection principles and individual rights',
-          order: 1,
-          estimatedTime: 25
-        },
-        {
-          id: 'gdpr-lawful-basis',
-          type: 'interactive',
-          title: 'Lawful Basis for Processing',
-          content: 'Determining appropriate lawful basis for educational data processing',
-          order: 2,
-          estimatedTime: 20
-        },
-        {
-          id: 'gdpr-rights',
-          type: 'video',
-          title: 'Data Subject Rights Management',
-          content: 'Handling access, rectification, erasure, and other rights requests',
-          order: 3,
-          estimatedTime: 20
-        },
-        {
-          id: 'gdpr-breach',
-          type: 'document',
-          title: 'GDPR Breach Notification',
-          content: 'Understanding 72-hour breach notification requirements',
-          order: 4,
-          estimatedTime: 10
-        }
-      ],
-      assessments: [
-        {
-          id: 'gdpr-assessment',
-          title: 'GDPR Compliance Assessment',
-          questions: [
-            {
-              id: 'gdpr-q1',
-              type: 'multiple_choice',
-              question: 'Under GDPR, personal data breaches must be reported to supervisory authorities within:',
-              options: ['24 hours', '48 hours', '72 hours', '30 days'],
-              correctAnswer: '72 hours',
-              explanation: 'GDPR requires breach notification to supervisory authorities within 72 hours of becoming aware of the breach.',
-              points: 15
-            }
-          ],
-          passingScore: 85,
-          maxAttempts: 3,
-          timeLimit: 60
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Developer Privacy module
-   */
-  private createDeveloperPrivacyModule(): void {
-    const module: TrainingModule = {
-      id: 'developer-privacy',
-      title: 'Privacy-by-Design for Developers',
-      description: 'Technical privacy implementation for software developers',
-      roles: [TrainingRole.DEVELOPER],
-      duration: 90,
-      content: [
-        {
-          id: 'dev-privacy-design',
-          type: 'presentation',
-          title: 'Privacy-by-Design Principles',
-          content: 'Implementing privacy controls in software architecture',
-          order: 1,
-          estimatedTime: 30
-        },
-        {
-          id: 'dev-data-minimization',
-          type: 'interactive',
-          title: 'Data Minimization Implementation',
-          content: 'Coding practices for collecting only necessary data',
-          order: 2,
-          estimatedTime: 25
-        },
-        {
-          id: 'dev-encryption',
-          type: 'video',
-          title: 'Encryption and Secure Storage',
-          content: 'Implementing encryption for data at rest and in transit',
-          order: 3,
-          estimatedTime: 20
-        },
-        {
-          id: 'dev-access-controls',
-          type: 'document',
-          title: 'Access Controls and Audit Logging',
-          content: 'Implementing role-based access and privacy audit trails',
-          order: 4,
-          estimatedTime: 15
-        }
-      ],
-      assessments: [
-        {
-          id: 'dev-assessment',
-          title: 'Developer Privacy Assessment',
-          questions: [
-            {
-              id: 'dev-q1',
-              type: 'scenario',
-              question: 'You need to store student passwords. What is the appropriate approach?',
-              correctAnswer: 'Hash passwords using a strong algorithm like bcrypt with salt, never store plain text passwords',
-              explanation: 'Passwords should always be hashed using strong, salted algorithms. Plain text storage is a critical security violation.',
-              points: 20
-            }
-          ],
-          passingScore: 90,
-          maxAttempts: 2,
-          timeLimit: 75
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Support Team Privacy module
-   */
-  private createSupportTeamPrivacyModule(): void {
-    const module: TrainingModule = {
-      id: 'support-privacy',
-      title: 'Privacy Guidelines for Support Teams',
-      description: 'Privacy protection during customer support interactions',
-      roles: [TrainingRole.SUPPORT_TEAM],
-      duration: 40,
-      content: [
-        {
-          id: 'support-verification',
-          type: 'interactive',
-          title: 'Identity Verification Procedures',
-          content: 'Safely verifying user identity before accessing account information',
-          order: 1,
-          estimatedTime: 15
-        },
-        {
-          id: 'support-data-access',
-          type: 'video',
-          title: 'Appropriate Data Access',
-          content: 'Accessing only the minimum data necessary to resolve issues',
-          order: 2,
-          estimatedTime: 15
-        },
-        {
-          id: 'support-communication',
-          type: 'document',
-          title: 'Privacy-Safe Communication',
-          content: 'Guidelines for discussing account information with users',
-          order: 3,
-          estimatedTime: 10
-        }
-      ],
-      assessments: [
-        {
-          id: 'support-assessment',
-          title: 'Support Team Privacy Assessment',
-          questions: [
-            {
-              id: 'support-q1',
-              type: 'scenario',
-              question: 'A caller claims to be a student\'s parent requesting account information. What should you do?',
-              correctAnswer: 'Follow identity verification procedures before providing any information, and only provide information you are authorized to share',
-              explanation: 'Always verify identity and follow established procedures for information disclosure.',
-              points: 15
-            }
-          ],
-          passingScore: 85,
-          maxAttempts: 3,
-          timeLimit: 30
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Administrator Privacy module
-   */
-  private createAdministratorPrivacyModule(): void {
-    const module: TrainingModule = {
-      id: 'admin-privacy',
-      title: 'Privacy Administration and Compliance',
-      description: 'Privacy governance and compliance management for administrators',
-      roles: [TrainingRole.ADMINISTRATOR],
-      duration: 60,
-      content: [
-        {
-          id: 'admin-governance',
-          type: 'presentation',
-          title: 'Privacy Governance Framework',
-          content: 'Establishing privacy policies and procedures',
-          order: 1,
-          estimatedTime: 20
-        },
-        {
-          id: 'admin-vendor-management',
-          type: 'interactive',
-          title: 'Third-Party Vendor Management',
-          content: 'Evaluating and managing third-party privacy risks',
-          order: 2,
-          estimatedTime: 20
-        },
-        {
-          id: 'admin-incident-response',
-          type: 'video',
-          title: 'Privacy Incident Management',
-          content: 'Leading privacy incident response and notification',
-          order: 3,
-          estimatedTime: 20
-        }
-      ],
-      assessments: [
-        {
-          id: 'admin-assessment',
-          title: 'Administrator Privacy Assessment',
-          questions: [
-            {
-              id: 'admin-q1',
-              type: 'multiple_choice',
-              question: 'When evaluating a new educational technology vendor, what should be prioritized?',
-              options: ['Cost savings', 'Privacy and security controls', 'Feature completeness', 'Implementation timeline'],
-              correctAnswer: 'Privacy and security controls',
-              explanation: 'Privacy and security should be the primary consideration when evaluating educational technology vendors.',
-              points: 15
-            }
-          ],
-          passingScore: 85,
-          maxAttempts: 3,
-          timeLimit: 45
-        }
-      ],
-      prerequisites: ['privacy-fundamentals', 'ferpa-compliance'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Educator Privacy module
-   */
-  private createEducatorPrivacyModule(): void {
-    const module: TrainingModule = {
-      id: 'educator-privacy',
-      title: 'Privacy Awareness for Educators',
-      description: 'Student privacy protection in educational practice',
-      roles: [TrainingRole.EDUCATOR],
-      duration: 35,
-      content: [
-        {
-          id: 'educator-classroom',
-          type: 'interactive',
-          title: 'Classroom Privacy Best Practices',
-          content: 'Protecting student privacy in digital and physical classrooms',
-          order: 1,
-          estimatedTime: 15
-        },
-        {
-          id: 'educator-technology',
-          type: 'video',
-          title: 'Educational Technology Selection',
-          content: 'Choosing privacy-appropriate tools for educational use',
-          order: 2,
-          estimatedTime: 12
-        },
-        {
-          id: 'educator-communication',
-          type: 'document',
-          title: 'Privacy-Safe Parent Communication',
-          content: 'Guidelines for communicating about students while protecting privacy',
-          order: 3,
-          estimatedTime: 8
-        }
-      ],
-      assessments: [
-        {
-          id: 'educator-assessment',
-          title: 'Educator Privacy Assessment',
-          questions: [
-            {
-              id: 'educator-q1',
-              type: 'true_false',
-              question: 'It is acceptable to use personal cloud storage for student assignments.',
-              correctAnswer: 'false',
-              explanation: 'Student work should only be stored in approved, secure systems that comply with privacy requirements.',
-              points: 10
-            }
-          ],
-          passingScore: 80,
-          maxAttempts: 3,
-          timeLimit: 25
-        }
-      ],
-      prerequisites: ['privacy-fundamentals'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Incident Response training module
-   */
-  private createIncidentResponseModule(): void {
-    const module: TrainingModule = {
-      id: 'incident-response',
-      title: 'Privacy Incident Response Procedures',
-      description: 'Responding to privacy incidents and data breaches',
-      roles: [TrainingRole.PRIVACY_OFFICER, TrainingRole.SECURITY_TEAM, TrainingRole.ADMINISTRATOR],
-      duration: 50,
-      content: [
-        {
-          id: 'incident-detection',
-          type: 'presentation',
-          title: 'Incident Detection and Classification',
-          content: 'Identifying and classifying privacy incidents',
-          order: 1,
-          estimatedTime: 15
-        },
-        {
-          id: 'incident-response',
-          type: 'interactive',
-          title: 'Incident Response Procedures',
-          content: 'Step-by-step incident response workflows',
-          order: 2,
-          estimatedTime: 20
-        },
-        {
-          id: 'incident-notification',
-          type: 'video',
-          title: 'Breach Notification Requirements',
-          content: 'Managing regulatory and stakeholder notifications',
-          order: 3,
-          estimatedTime: 15
-        }
-      ],
-      assessments: [
-        {
-          id: 'incident-assessment',
-          title: 'Incident Response Assessment',
-          questions: [
-            {
-              id: 'incident-q1',
-              type: 'scenario',
-              question: 'A data breach potentially affecting 500 EU students is discovered. What are the immediate actions required?',
-              correctAnswer: 'Contain the breach, assess impact, notify PIRT within 1 hour, prepare for 72-hour regulatory notification',
-              explanation: 'GDPR requires swift action and 72-hour notification for significant breaches.',
-              points: 20
-            }
-          ],
-          passingScore: 90,
-          maxAttempts: 2,
-          timeLimit: 40
-        }
-      ],
-      prerequisites: ['privacy-fundamentals', 'gdpr-compliance'],
-      validityPeriod: 365,
-      mandatory: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Create Advanced Privacy module
-   */
-  private createAdvancedPrivacyModule(): void {
-    const module: TrainingModule = {
-      id: 'advanced-privacy',
-      title: 'Advanced Privacy Technologies and Techniques',
-      description: 'Cutting-edge privacy technologies and implementation strategies',
-      roles: [TrainingRole.PRIVACY_OFFICER, TrainingRole.DEVELOPER, TrainingRole.SECURITY_TEAM],
-      duration: 120,
-      content: [
-        {
-          id: 'advanced-differential-privacy',
-          type: 'presentation',
-          title: 'Differential Privacy Implementation',
-          content: 'Mathematical privacy guarantees and practical implementation',
-          order: 1,
-          estimatedTime: 30
-        },
-        {
-          id: 'advanced-homomorphic',
-          type: 'interactive',
-          title: 'Homomorphic Encryption Applications',
-          content: 'Computing on encrypted educational data',
-          order: 2,
-          estimatedTime: 30
-        },
-        {
-          id: 'advanced-federated',
-          type: 'video',
-          title: 'Federated Learning for Education',
-          content: 'Privacy-preserving machine learning across institutions',
-          order: 3,
-          estimatedTime: 30
-        },
-        {
-          id: 'advanced-zkp',
-          type: 'document',
-          title: 'Zero-Knowledge Proofs',
-          content: 'Proving knowledge without revealing information',
-          order: 4,
-          estimatedTime: 30
-        }
-      ],
-      assessments: [
-        {
-          id: 'advanced-assessment',
-          title: 'Advanced Privacy Assessment',
-          questions: [
-            {
-              id: 'advanced-q1',
-              type: 'essay',
-              question: 'Explain how differential privacy could be applied to educational analytics while preserving student privacy.',
-              correctAnswer: 'Differential privacy adds calibrated noise to query results, providing mathematical guarantees that individual student data cannot be inferred while preserving statistical utility for educational insights.',
-              explanation: 'Differential privacy provides formal privacy guarantees by adding noise proportional to query sensitivity.',
-              points: 25
-            }
-          ],
-          passingScore: 85,
-          maxAttempts: 2,
-          timeLimit: 90
-        }
-      ],
-      prerequisites: ['privacy-fundamentals', 'developer-privacy'],
-      validityPeriod: 730, // 2 years for advanced topics
-      mandatory: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.trainingModules.set(module.id, module);
-  }
-
-  /**
-   * Assign training to user based on role
-   */
-  async assignTrainingToUser(userId: string, role: TrainingRole): Promise<UserTrainingRecord[]> {
-    this.logger.info('Assigning training to user', { userId, role });
-
-    const assignedModules: UserTrainingRecord[] = [];
-    
-    // Get all modules applicable to the role
-    const applicableModules = Array.from(this.trainingModules.values())
-      .filter(module => module.roles.includes(role));
-
-    for (const module of applicableModules) {
-      const record: UserTrainingRecord = {
+    for (const userId of userIds) {
+      const record: TrainingRecord = {
+        id: this.generateRecordId(),
         userId,
-        moduleId: module.id,
-        role,
-        status: TrainingStatus.NOT_STARTED,
-        attempts: []
+        programId,
+        status: TrainingStatus.ASSIGNED,
+        startedAt: new Date(),
+        lastActivityAt: new Date(),
+        progress: {
+          modulesCompleted: 0,
+          totalModules: program.modules.length,
+          completionPercentage: 0,
+          timeSpent: 0,
+          assessmentsPassed: 0,
+          totalAssessments: program.modules.reduce((sum, m) => sum + m.assessments.length, 0)
+        },
+        attempts: [],
+        assignedBy,
+        deadline
       };
 
-      assignedModules.push(record);
+      this.records.set(record.id, record);
+      records.push(record);
     }
 
-    // Store user training records
-    this.userTrainingRecords.set(userId, assignedModules);
+    this.emit('training_assigned', { programId, userIds, records });
 
-    this.logger.info('Training assigned to user', {
-      userId,
-      role,
-      modulesAssigned: assignedModules.length
-    });
-
-    return assignedModules;
+    return records;
   }
 
   /**
-   * Start training module for user
+   * Start training module
    */
-  async startTraining(userId: string, moduleId: string): Promise<UserTrainingRecord> {
-    const userRecords = this.userTrainingRecords.get(userId) || [];
-    const record = userRecords.find(r => r.moduleId === moduleId);
-
+  public async startModule(recordId: string, moduleId: string): Promise<void> {
+    const record = this.records.get(recordId);
     if (!record) {
-      throw new Error(`Training module ${moduleId} not assigned to user ${userId}`);
+      throw new Error(`Training record ${recordId} not found`);
     }
 
-    const module = this.trainingModules.get(moduleId);
-    if (!module) {
-      throw new Error(`Training module ${moduleId} not found`);
+    const program = this.programs.get(record.programId);
+    if (!program) {
+      throw new Error(`Training program ${record.programId} not found`);
     }
 
-    // Check prerequisites
-    const prerequisites = module.prerequisites;
-    for (const prereqId of prerequisites) {
-      const prereqRecord = userRecords.find(r => r.moduleId === prereqId);
-      if (!prereqRecord || prereqRecord.status !== TrainingStatus.COMPLETED) {
-        throw new Error(`Prerequisite module ${prereqId} must be completed first`);
-      }
-    }
-
-    record.status = TrainingStatus.IN_PROGRESS;
-    record.startedAt = new Date();
-
-    this.logger.info('Training started', { userId, moduleId });
-
-    return record;
-  }
-
-  /**
-   * Complete training assessment
-   */
-  async completeAssessment(
-    userId: string,
-    moduleId: string,
-    assessmentId: string,
-    answers: TrainingAnswer[]
-  ): Promise<{
-    passed: boolean;
-    score: number;
-    certificate?: TrainingCertificate;
-  }> {
-    const userRecords = this.userTrainingRecords.get(userId) || [];
-    const record = userRecords.find(r => r.moduleId === moduleId);
-
-    if (!record) {
-      throw new Error(`Training module ${moduleId} not assigned to user ${userId}`);
-    }
-
-    const module = this.trainingModules.get(moduleId);
-    if (!module) {
-      throw new Error(`Training module ${moduleId} not found`);
-    }
-
-    const assessment = module.assessments.find(a => a.id === assessmentId);
-    if (!assessment) {
-      throw new Error(`Assessment ${assessmentId} not found in module ${moduleId}`);
-    }
-
-    // Calculate score
-    const totalPoints = assessment.questions.reduce((sum, q) => sum + q.points, 0);
-    const earnedPoints = answers.reduce((sum, answer) => sum + answer.points, 0);
-    const score = (earnedPoints / totalPoints) * 100;
-    const passed = score >= assessment.passingScore;
-
-    // Create attempt record
-    const attempt: TrainingAttempt = {
-      id: `attempt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      startedAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      completedAt: new Date(),
-      score,
-      passed,
-      answers
-    };
-
-    record.attempts.push(attempt);
-
-    if (passed) {
-      record.status = TrainingStatus.COMPLETED;
-      record.completedAt = new Date();
-      record.expiresAt = new Date(Date.now() + module.validityPeriod * 24 * 60 * 60 * 1000);
-      record.score = score;
-
-      // Generate certificate
-      const certificate = await this.generateCertificate(userId, moduleId, score);
-      record.certificateId = certificate.id;
-
-      this.logger.info('Training completed successfully', {
-        userId,
-        moduleId,
-        score: score.toFixed(1),
-        certificateId: certificate.id
-      });
-
-      return { passed, score, certificate };
-    } else {
-      if (record.attempts.length >= assessment.maxAttempts) {
-        record.status = TrainingStatus.FAILED;
-      }
-
-      this.logger.info('Training assessment failed', {
-        userId,
-        moduleId,
-        score: score.toFixed(1),
-        attemptsUsed: record.attempts.length,
-        maxAttempts: assessment.maxAttempts
-      });
-
-      return { passed, score };
-    }
-  }
-
-  /**
-   * Generate training certificate
-   */
-  private async generateCertificate(
-    userId: string,
-    moduleId: string,
-    score: number
-  ): Promise<TrainingCertificate> {
-    const module = this.trainingModules.get(moduleId);
+    const module = program.modules.find(m => m.id === moduleId);
     if (!module) {
       throw new Error(`Module ${moduleId} not found`);
     }
 
-    const certificate: TrainingCertificate = {
-      id: `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      userId,
+    record.status = TrainingStatus.IN_PROGRESS;
+    record.progress.currentModule = moduleId;
+    record.lastActivityAt = new Date();
+
+    this.emit('module_started', { record, module });
+  }
+
+  /**
+   * Complete training module
+   */
+  public async completeModule(recordId: string, moduleId: string, timeSpent: number): Promise<void> {
+    const record = this.records.get(recordId);
+    if (!record) {
+      throw new Error(`Training record ${recordId} not found`);
+    }
+
+    const program = this.programs.get(record.programId);
+    if (!program) {
+      throw new Error(`Training program ${record.programId} not found`);
+    }
+
+    const module = program.modules.find(m => m.id === moduleId);
+    if (!module) {
+      throw new Error(`Module ${moduleId} not found`);
+    }
+
+    record.progress.modulesCompleted++;
+    record.progress.timeSpent += timeSpent;
+    record.progress.completionPercentage = (record.progress.modulesCompleted / record.progress.totalModules) * 100;
+    record.lastActivityAt = new Date();
+
+    // Check if program is complete
+    if (record.progress.modulesCompleted === record.progress.totalModules) {
+      record.status = TrainingStatus.COMPLETED;
+      record.completedAt = new Date();
+
+      // Generate certification if required
+      if (program.certification.enabled) {
+        await this.generateCertification(record);
+      }
+    }
+
+    this.emit('module_completed', { record, module });
+  }
+
+  /**
+   * Submit assessment attempt
+   */
+  public async submitAssessment(
+    recordId: string,
+    moduleId: string,
+    assessmentId: string,
+    answers: AttemptAnswer[],
+    timeSpent: number
+  ): Promise<TrainingAttempt> {
+    const record = this.records.get(recordId);
+    if (!record) {
+      throw new Error(`Training record ${recordId} not found`);
+    }
+
+    const program = this.programs.get(record.programId);
+    if (!program) {
+      throw new Error(`Training program ${record.programId} not found`);
+    }
+
+    const module = program.modules.find(m => m.id === moduleId);
+    if (!module) {
+      throw new Error(`Module ${moduleId} not found`);
+    }
+
+    const assessment = module.assessments.find(a => a.id === assessmentId);
+    if (!assessment) {
+      throw new Error(`Assessment ${assessmentId} not found`);
+    }
+
+    // Calculate score
+    const totalPoints = assessment.questions.reduce((sum, q) => sum + q.points, 0);
+    const earnedPoints = answers.reduce((sum, a) => sum + a.points, 0);
+    const score = (earnedPoints / totalPoints) * 100;
+    const passed = score >= assessment.passingScore;
+
+    const attempt: TrainingAttempt = {
+      id: this.generateAttemptId(),
       moduleId,
-      issuedAt: new Date(),
-      expiresAt: new Date(Date.now() + module.validityPeriod * 24 * 60 * 60 * 1000),
+      assessmentId,
+      startedAt: new Date(Date.now() - timeSpent * 60000),
+      completedAt: new Date(),
       score,
-      digitalSignature: this.generateDigitalSignature(userId, moduleId, score)
+      passed,
+      timeSpent,
+      answers
     };
 
-    this.certificates.set(certificate.id, certificate);
+    record.attempts.push(attempt);
+    record.lastActivityAt = new Date();
 
-    return certificate;
+    if (passed) {
+      record.progress.assessmentsPassed++;
+    }
+
+    this.emit('assessment_submitted', { record, attempt, passed });
+
+    return attempt;
   }
 
   /**
-   * Generate digital signature for certificate
+   * Generate training analytics
    */
-  private generateDigitalSignature(userId: string, moduleId: string, score: number): string {
-    // Simple signature generation - in production would use proper cryptographic signing
-    const data = `${userId}:${moduleId}:${score}:${Date.now()}`;
-    return Buffer.from(data).toString('base64');
-  }
+  public async generateAnalytics(
+    programId: string,
+    period: { start: Date; end: Date }
+  ): Promise<TrainingAnalytics> {
+    const program = this.programs.get(programId);
+    if (!program) {
+      throw new Error(`Training program ${programId} not found`);
+    }
 
-  /**
-   * Get training progress for user
-   */
-  async getTrainingProgress(userId: string): Promise<{
-    overallProgress: number;
-    completedModules: number;
-    totalModules: number;
-    records: UserTrainingRecord[];
-    expiringCertificates: TrainingCertificate[];
-  }> {
-    const userRecords = this.userTrainingRecords.get(userId) || [];
-    const completedModules = userRecords.filter(r => r.status === TrainingStatus.COMPLETED).length;
-    const overallProgress = userRecords.length > 0 ? (completedModules / userRecords.length) * 100 : 0;
+    const programRecords = Array.from(this.records.values())
+      .filter(r => r.programId === programId && r.startedAt >= period.start && r.startedAt <= period.end);
 
-    // Find expiring certificates (within 30 days)
-    const userCertificates = Array.from(this.certificates.values())
-      .filter(c => c.userId === userId);
-    const expiringCertificates = userCertificates.filter(c => {
-      const daysUntilExpiry = (c.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-      return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-    });
+    const participants = programRecords.length;
+    const completed = programRecords.filter(r => r.status === TrainingStatus.COMPLETED).length;
+    const completionRate = participants > 0 ? (completed / participants) * 100 : 0;
+
+    const scores = programRecords
+      .filter(r => r.progress.overallScore !== undefined)
+      .map(r => r.progress.overallScore!);
+    const averageScore = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+
+    const completedRecords = programRecords.filter(r => r.completedAt);
+    const averageTimeToComplete = completedRecords.length > 0 
+      ? completedRecords.reduce((sum, r) => sum + r.progress.timeSpent, 0) / completedRecords.length 
+      : 0;
+
+    const passedAttempts = programRecords.reduce((sum, r) => sum + r.attempts.filter(a => a.passed).length, 0);
+    const totalAttempts = programRecords.reduce((sum, r) => sum + r.attempts.length, 0);
+    const passRate = totalAttempts > 0 ? (passedAttempts / totalAttempts) * 100 : 0;
+
+    const moduleAnalytics = await this.calculateModuleAnalytics(program, programRecords);
+    const riskIndicators = this.identifyRiskIndicators(programRecords);
 
     return {
-      overallProgress,
-      completedModules,
-      totalModules: userRecords.length,
-      records: userRecords,
-      expiringCertificates
+      programId,
+      period,
+      participants,
+      completionRate,
+      averageScore,
+      averageTimeToComplete,
+      passRate,
+      moduleAnalytics,
+      riskIndicators,
+      recommendations: this.generateRecommendations(completionRate, averageScore, passRate, riskIndicators)
     };
   }
 
   /**
-   * Get training compliance report
+   * Get training compliance status
    */
-  async getComplianceReport(): Promise<{
-    totalUsers: number;
-    compliantUsers: number;
-    complianceRate: number;
-    moduleCompletionRates: { moduleId: string; title: string; completionRate: number }[];
-    expiringCertificates: number;
-    overdueCertificates: number;
-  }> {
-    const allUserRecords = Array.from(this.userTrainingRecords.values()).flat();
-    const totalUsers = new Set(allUserRecords.map(r => r.userId)).size;
+  public getComplianceStatus(userId?: string, department?: string): any {
+    let relevantRecords = Array.from(this.records.values());
 
-    // Calculate compliance (users with all mandatory modules completed and not expired)
-    const userCompliance = new Map<string, boolean>();
-    const mandatoryModules = Array.from(this.trainingModules.values())
-      .filter(m => m.mandatory)
-      .map(m => m.id);
+    if (userId) {
+      relevantRecords = relevantRecords.filter(r => r.userId === userId);
+    }
 
-    Array.from(this.userTrainingRecords.entries()).forEach(([userId, records]) => {
-      const mandatoryRecords = records.filter(r => mandatoryModules.includes(r.moduleId));
-      const allCompleted = mandatoryRecords.every(r => 
-        r.status === TrainingStatus.COMPLETED && 
-        r.expiresAt && 
-        r.expiresAt > new Date()
+    const now = new Date();
+    const overdue = relevantRecords.filter(r => 
+      r.deadline && r.deadline < now && r.status !== TrainingStatus.COMPLETED
+    ).length;
+
+    const expiringSoon = relevantRecords.filter(r => {
+      if (!r.deadline) return false;
+      const daysUntilExpiry = (r.deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      return daysUntilExpiry <= 30 && daysUntilExpiry > 0 && r.status !== TrainingStatus.COMPLETED;
+    }).length;
+
+    const completed = relevantRecords.filter(r => r.status === TrainingStatus.COMPLETED).length;
+    const total = relevantRecords.length;
+    const complianceRate = total > 0 ? (completed / total) * 100 : 100;
+
+    return {
+      complianceRate,
+      total,
+      completed,
+      overdue,
+      expiringSoon,
+      status: complianceRate >= 95 ? 'excellent' : complianceRate >= 85 ? 'good' : complianceRate >= 70 ? 'warning' : 'critical'
+    };
+  }
+
+  /**
+   * Initialize default training programs
+   */
+  private initializeTrainingPrograms(): void {
+    // Privacy Fundamentals for All Staff
+    const privacyFundamentals: TrainingProgram = {
+      id: 'privacy-fundamentals',
+      name: 'Privacy Fundamentals for Educational Technology',
+      type: TrainingType.ONBOARDING,
+      targetRoles: [UserRole.ALL_STAFF],
+      regulations: ['FERPA', 'GDPR', 'COPPA'],
+      modules: [
+        {
+          id: 'privacy-basics',
+          title: 'Privacy Basics in Educational Settings',
+          description: 'Understanding privacy principles and their importance in education',
+          content: {
+            type: 'presentation',
+            slides: [
+              {
+                id: 'slide-1',
+                title: 'What is Educational Privacy?',
+                content: 'Privacy in education means protecting student and educator data while enabling effective learning and teaching.',
+                media: {
+                  type: 'image',
+                  url: '/training/images/privacy-overview.png',
+                  alt: 'Privacy concept illustration'
+                }
+              },
+              {
+                id: 'slide-2',
+                title: 'Why Privacy Matters',
+                content: 'Privacy protection builds trust, ensures compliance, and protects individuals from harm.',
+                notes: 'Emphasize real-world examples of privacy violations and their consequences'
+              }
+            ],
+            checkpoints: [
+              {
+                id: 'checkpoint-1',
+                title: 'Privacy Definition Check',
+                question: 'What is the primary goal of educational privacy?',
+                type: 'multiple_choice',
+                options: [
+                  'To hide information from everyone',
+                  'To protect student and educator data while enabling effective education',
+                  'To make data collection impossible',
+                  'To slow down educational processes'
+                ],
+                correctAnswer: 'To protect student and educator data while enabling effective education',
+                explanation: 'Educational privacy balances protection with functionality.',
+                points: 10
+              }
+            ]
+          },
+          duration: 30,
+          prerequisites: [],
+          learningObjectives: [
+            'Understand basic privacy principles',
+            'Recognize privacy risks in educational settings',
+            'Identify when to apply privacy protections'
+          ],
+          assessments: [
+            {
+              id: 'privacy-basics-quiz',
+              title: 'Privacy Basics Quiz',
+              type: 'quiz',
+              questions: [
+                {
+                  id: 'q1',
+                  text: 'Which law primarily governs educational records privacy in the US?',
+                  type: 'multiple_choice',
+                  options: ['HIPAA', 'FERPA', 'CCPA', 'GDPR'],
+                  correctAnswers: ['FERPA'],
+                  explanation: 'FERPA (Family Educational Rights and Privacy Act) governs educational records privacy in the US.',
+                  points: 10,
+                  difficulty: 'easy',
+                  tags: ['regulations', 'US', 'FERPA']
+                },
+                {
+                  id: 'q2',
+                  text: 'What constitutes personally identifiable information (PII) in educational settings?',
+                  type: 'multiple_select',
+                  options: [
+                    'Student name',
+                    'Student ID number',
+                    'Anonymous usage statistics',
+                    'Grades and performance data',
+                    'Aggregated class averages'
+                  ],
+                  correctAnswers: ['Student name', 'Student ID number', 'Grades and performance data'],
+                  explanation: 'PII includes any information that can identify a specific student.',
+                  points: 15,
+                  difficulty: 'medium',
+                  tags: ['PII', 'data-classification']
+                }
+              ],
+              passingScore: 80,
+              timeLimit: 15,
+              attempts: 3,
+              randomizeQuestions: true,
+              randomizeOptions: true
+            }
+          ],
+          resources: [
+            {
+              id: 'ferpa-guide',
+              title: 'FERPA Quick Reference Guide',
+              type: 'document',
+              url: '/training/resources/ferpa-guide.pdf',
+              description: 'Comprehensive guide to FERPA requirements',
+              mandatory: true
+            },
+            {
+              id: 'privacy-policy',
+              title: 'Scribe Tree Privacy Policy',
+              type: 'policy',
+              url: '/privacy-policy',
+              description: 'Our organization privacy policy and procedures',
+              mandatory: true
+            }
+          ],
+          interactive: true,
+          mandatory: true,
+          order: 1
+        },
+        {
+          id: 'data-handling',
+          title: 'Safe Data Handling Practices',
+          description: 'Best practices for collecting, storing, and processing educational data',
+          content: {
+            type: 'interactive',
+            scenarios: [
+              {
+                id: 'scenario-1',
+                title: 'Student Data Request',
+                description: 'A researcher requests access to student performance data for a study.',
+                context: 'University research department wants to analyze learning patterns',
+                challenge: 'How should you respond to this request?',
+                options: [
+                  {
+                    id: 'option-1',
+                    text: 'Provide the raw data immediately',
+                    isCorrect: false,
+                    feedback: 'Raw data contains PII and requires proper authorization and anonymization.'
+                  },
+                  {
+                    id: 'option-2',
+                    text: 'Deny the request completely',
+                    isCorrect: false,
+                    feedback: 'Legitimate research can be supported with proper privacy protections.'
+                  },
+                  {
+                    id: 'option-3',
+                    text: 'Consult privacy officer and provide anonymized data if approved',
+                    isCorrect: true,
+                    feedback: 'Correct! Always follow proper approval processes and provide anonymized data when possible.'
+                  }
+                ],
+                correctAnswer: 'option-3',
+                explanation: 'Research requests must go through proper privacy review and use anonymized data.',
+                consequences: [
+                  'Proper process protects student privacy',
+                  'Enables legitimate research to continue',
+                  'Maintains compliance with regulations'
+                ]
+              }
+            ],
+            checkpoints: [
+              {
+                id: 'checkpoint-2',
+                title: 'Data Minimization Check',
+                question: 'What is data minimization?',
+                type: 'text_input',
+                correctAnswer: ['Collecting only the minimum data necessary for the intended purpose'],
+                explanation: 'Data minimization reduces privacy risks by limiting data collection.',
+                points: 15
+              }
+            ]
+          },
+          duration: 45,
+          prerequisites: ['privacy-basics'],
+          learningObjectives: [
+            'Apply data minimization principles',
+            'Recognize proper data sharing procedures',
+            'Implement secure data handling practices'
+          ],
+          assessments: [
+            {
+              id: 'data-handling-practical',
+              title: 'Data Handling Practical Assessment',
+              type: 'scenario_based',
+              questions: [
+                {
+                  id: 'scenario-q1',
+                  text: 'You receive an email requesting student grades for scholarship evaluation. What steps should you take?',
+                  type: 'essay',
+                  correctAnswers: ['Verify requestor identity', 'Check authorization', 'Anonymize data if possible', 'Document the request'],
+                  explanation: 'Proper verification and documentation procedures must be followed.',
+                  points: 25,
+                  difficulty: 'hard',
+                  tags: ['data-sharing', 'verification', 'procedures']
+                }
+              ],
+              passingScore: 75,
+              attempts: 2,
+              randomizeQuestions: false,
+              randomizeOptions: false
+            }
+          ],
+          resources: [
+            {
+              id: 'data-handling-checklist',
+              title: 'Data Handling Checklist',
+              type: 'document',
+              url: '/training/resources/data-handling-checklist.pdf',
+              description: 'Step-by-step checklist for safe data handling',
+              mandatory: true
+            }
+          ],
+          interactive: true,
+          mandatory: true,
+          order: 2
+        }
+      ],
+      requirements: {
+        frequency: 'annual',
+        expirationMonths: 12,
+        renewalRequired: true,
+        managementApproval: false,
+        certificateRequired: true,
+        minimumScore: 80
+      },
+      certification: {
+        enabled: true,
+        certificateName: 'Privacy Fundamentals Certification',
+        validityPeriod: 12,
+        renewalProcess: 'refresher',
+        digitalBadge: true,
+        publicVerification: false
+      },
+      status: 'active',
+      version: '1.0',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      effectiveDate: new Date()
+    };
+
+    this.programs.set(privacyFundamentals.id, privacyFundamentals);
+
+    // Developer-specific privacy training
+    const developerTraining: TrainingProgram = {
+      id: 'developer-privacy',
+      name: 'Privacy-by-Design for Developers',
+      type: TrainingType.ROLE_SPECIFIC,
+      targetRoles: [UserRole.DEVELOPER],
+      regulations: ['GDPR', 'FERPA', 'COPPA'],
+      modules: [
+        {
+          id: 'privacy-design',
+          title: 'Privacy-by-Design Principles',
+          description: 'Implementing privacy controls in software development',
+          content: {
+            type: 'presentation',
+            slides: [
+              {
+                id: 'dev-slide-1',
+                title: 'Privacy-by-Design Fundamentals',
+                content: 'Privacy must be built into systems from the ground up, not added as an afterthought.'
+              }
+            ],
+            checkpoints: [
+              {
+                id: 'dev-checkpoint-1',
+                title: 'Design Principles',
+                question: 'What are the 7 foundational principles of Privacy-by-Design?',
+                type: 'multiple_choice',
+                options: [
+                  'Proactive not Reactive, Privacy as the Default, Full Functionality',
+                  'Security, Compliance, Efficiency',
+                  'Speed, Scale, Simplicity',
+                  'Cost, Quality, Time'
+                ],
+                correctAnswer: 'Proactive not Reactive, Privacy as the Default, Full Functionality',
+                explanation: 'Privacy-by-Design has 7 foundational principles including being proactive, privacy as default, and maintaining full functionality.',
+                points: 15
+              }
+            ]
+          },
+          duration: 60,
+          prerequisites: [],
+          learningObjectives: [
+            'Understand privacy-by-design principles',
+            'Implement privacy controls in code',
+            'Design privacy-preserving systems'
+          ],
+          assessments: [
+            {
+              id: 'dev-practical',
+              title: 'Privacy Implementation Assessment',
+              type: 'practical',
+              questions: [
+                {
+                  id: 'code-q1',
+                  text: 'Write a code snippet that demonstrates proper PII handling in a database query.',
+                  type: 'essay',
+                  correctAnswers: ['Use encryption', 'Implement access controls', 'Add audit logging'],
+                  explanation: 'Proper PII handling requires encryption, access controls, and audit trails.',
+                  points: 30,
+                  difficulty: 'hard',
+                  tags: ['coding', 'PII', 'database']
+                }
+              ],
+              passingScore: 85,
+              attempts: 2,
+              randomizeQuestions: false,
+              randomizeOptions: false
+            }
+          ],
+          resources: [
+            {
+              id: 'privacy-code-examples',
+              title: 'Privacy Code Examples',
+              type: 'document',
+              url: '/training/resources/privacy-code-examples.md',
+              description: 'Code examples demonstrating privacy best practices',
+              mandatory: true
+            }
+          ],
+          interactive: true,
+          mandatory: true,
+          order: 1
+        }
+      ],
+      requirements: {
+        frequency: 'annual',
+        expirationMonths: 12,
+        renewalRequired: true,
+        managementApproval: false,
+        certificateRequired: true,
+        minimumScore: 85
+      },
+      certification: {
+        enabled: true,
+        certificateName: 'Privacy-by-Design Developer Certification',
+        validityPeriod: 12,
+        renewalProcess: 'retake',
+        digitalBadge: true,
+        publicVerification: true
+      },
+      status: 'active',
+      version: '1.0',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      effectiveDate: new Date()
+    };
+
+    this.programs.set(developerTraining.id, developerTraining);
+  }
+
+  /**
+   * Generate certification for completed training
+   */
+  private async generateCertification(record: TrainingRecord): Promise<CertificationRecord> {
+    const program = this.programs.get(record.programId)!;
+    
+    const certification: CertificationRecord = {
+      id: this.generateCertificationId(),
+      programId: record.programId,
+      userId: record.userId,
+      certificateName: program.certification.certificateName,
+      issuedAt: new Date(),
+      expiresAt: new Date(Date.now() + program.certification.validityPeriod * 30 * 24 * 60 * 60 * 1000),
+      score: record.progress.overallScore || 0,
+      verificationCode: this.generateVerificationCode(),
+      status: 'active'
+    };
+
+    if (program.certification.digitalBadge) {
+      certification.badgeUrl = `/certificates/${certification.id}/badge.png`;
+    }
+
+    this.certifications.set(certification.id, certification);
+    record.certification = certification;
+
+    this.emit('certification_generated', certification);
+
+    return certification;
+  }
+
+  /**
+   * Calculate module analytics
+   */
+  private async calculateModuleAnalytics(program: TrainingProgram, records: TrainingRecord[]): Promise<ModuleAnalytics[]> {
+    return program.modules.map(module => {
+      const moduleRecords = records.filter(r => 
+        r.progress.currentModule === module.id || r.progress.modulesCompleted > module.order - 1
       );
-      userCompliance.set(userId, allCompleted);
-    });
 
-    const compliantUsers = Array.from(userCompliance.values()).filter(Boolean).length;
-    const complianceRate = totalUsers > 0 ? (compliantUsers / totalUsers) * 100 : 0;
+      const completed = moduleRecords.filter(r => r.progress.modulesCompleted >= module.order).length;
+      const completionRate = moduleRecords.length > 0 ? (completed / moduleRecords.length) * 100 : 0;
 
-    // Calculate module completion rates
-    const moduleCompletionRates = Array.from(this.trainingModules.values()).map(module => {
-      const moduleRecords = allUserRecords.filter(r => r.moduleId === module.id);
-      const completedRecords = moduleRecords.filter(r => r.status === TrainingStatus.COMPLETED);
-      const completionRate = moduleRecords.length > 0 ? (completedRecords.length / moduleRecords.length) * 100 : 0;
+      const scores = records.flatMap(r => r.attempts)
+        .filter(a => a.moduleId === module.id)
+        .map(a => a.score);
+      const averageScore = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+
+      const times = records.flatMap(r => r.attempts)
+        .filter(a => a.moduleId === module.id)
+        .map(a => a.timeSpent);
+      const averageTimeSpent = times.length > 0 ? times.reduce((sum, t) => sum + t, 0) / times.length : 0;
 
       return {
         moduleId: module.id,
-        title: module.title,
-        completionRate
+        moduleName: module.title,
+        completionRate,
+        averageScore,
+        averageTimeSpent,
+        commonMistakes: [], // Would analyze actual wrong answers
+        difficulty: averageScore >= 90 ? 1 : averageScore >= 80 ? 2 : averageScore >= 70 ? 3 : averageScore >= 60 ? 4 : 5
       };
     });
+  }
 
-    // Count expiring and overdue certificates
-    const allCertificates = Array.from(this.certificates.values());
+  /**
+   * Identify risk indicators
+   */
+  private identifyRiskIndicators(records: TrainingRecord[]): RiskIndicator[] {
+    const indicators: RiskIndicator[] = [];
     const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    const expiringCertificates = allCertificates.filter(c => 
-      c.expiresAt > now && c.expiresAt <= thirtyDaysFromNow
-    ).length;
+    // Low completion rate
+    const total = records.length;
+    const completed = records.filter(r => r.status === TrainingStatus.COMPLETED).length;
+    const completionRate = total > 0 ? (completed / total) * 100 : 0;
 
-    const overdueCertificates = allCertificates.filter(c => 
-      c.expiresAt <= now
-    ).length;
-
-    return {
-      totalUsers,
-      compliantUsers,
-      complianceRate,
-      moduleCompletionRates,
-      expiringCertificates,
-      overdueCertificates
-    };
-  }
-
-  /**
-   * Get available training modules for role
-   */
-  getModulesForRole(role: TrainingRole): TrainingModule[] {
-    return Array.from(this.trainingModules.values())
-      .filter(module => module.roles.includes(role))
-      .sort((a, b) => {
-        // Sort mandatory modules first, then by title
-        if (a.mandatory && !b.mandatory) return -1;
-        if (!a.mandatory && b.mandatory) return 1;
-        return a.title.localeCompare(b.title);
+    if (completionRate < 70) {
+      indicators.push({
+        type: 'low_completion',
+        severity: completionRate < 50 ? 'critical' : 'high',
+        description: `Training completion rate is ${completionRate.toFixed(1)}%`,
+        affectedUsers: total - completed,
+        recommendation: 'Implement mandatory training deadlines and manager follow-up'
       });
+    }
+
+    // Overdue training
+    const overdue = records.filter(r => 
+      r.deadline && r.deadline < now && r.status !== TrainingStatus.COMPLETED
+    ).length;
+
+    if (overdue > 0) {
+      indicators.push({
+        type: 'overdue_training',
+        severity: overdue > total * 0.2 ? 'critical' : 'medium',
+        description: `${overdue} users have overdue training`,
+        affectedUsers: overdue,
+        recommendation: 'Send escalation notices and implement consequences for non-compliance'
+      });
+    }
+
+    return indicators;
   }
 
   /**
-   * Get training module by ID
+   * Generate recommendations based on analytics
    */
-  getModule(moduleId: string): TrainingModule | undefined {
-    return this.trainingModules.get(moduleId);
+  private generateRecommendations(
+    completionRate: number,
+    averageScore: number,
+    passRate: number,
+    riskIndicators: RiskIndicator[]
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (completionRate < 85) {
+      recommendations.push('Implement automated reminders and manager escalations for incomplete training');
+    }
+
+    if (averageScore < 80) {
+      recommendations.push('Review training content difficulty and provide additional learning resources');
+    }
+
+    if (passRate < 75) {
+      recommendations.push('Consider extending time limits or providing practice assessments');
+    }
+
+    if (riskIndicators.some(r => r.severity === 'critical')) {
+      recommendations.push('Immediate intervention required for critical privacy training gaps');
+    }
+
+    return recommendations;
   }
 
-  /**
-   * Get user certificate
-   */
-  getCertificate(certificateId: string): TrainingCertificate | undefined {
-    return this.certificates.get(certificateId);
+  // Helper methods
+  private generateProgramId(): string {
+    return `PROG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateRecordId(): string {
+    return `REC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateAttemptId(): string {
+    return `ATT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateCertificationId(): string {
+    return `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateVerificationCode(): string {
+    return `ST-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
   }
 }
