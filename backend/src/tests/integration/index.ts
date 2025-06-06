@@ -1,52 +1,248 @@
+// Export all integration test classes
 export { ServiceIntegrationTest, TestResult, ServiceTestSuite, TestCase } from './ServiceIntegrationTest';
+export { EducationalWorkflowIntegrationTest } from './EducationalWorkflowIntegrationTest';
+export { PerformanceBaselineTest, PerformanceBaselineReport } from './PerformanceBaselineTest';
+export { ServiceCommunicationTest } from './ServiceCommunicationTest';
+export { PrivacyComplianceIntegrationTest } from './PrivacyComplianceIntegrationTest';
+export { ResilienceAndLoadTest } from './ResilienceAndLoadTest';
 
 // Integration test runner script
 import { ServiceIntegrationTest } from './ServiceIntegrationTest';
+import { EducationalWorkflowIntegrationTest } from './EducationalWorkflowIntegrationTest';
+import { PerformanceBaselineTest } from './PerformanceBaselineTest';
+import { ServiceCommunicationTest } from './ServiceCommunicationTest';
+import { PrivacyComplianceIntegrationTest } from './PrivacyComplianceIntegrationTest';
+import { ResilienceAndLoadTest } from './ResilienceAndLoadTest';
 
 /**
- * Run all integration tests
+ * Run all integration tests - Comprehensive Phase 2 Week 12 Test Suite
  */
 export async function runAllIntegrationTests(): Promise<void> {
-  const tester = new ServiceIntegrationTest();
+  console.log('🚀 Starting Scribe Tree Phase 2 Week 12 Comprehensive Integration Tests...\n');
+  console.log('📋 Test Suite: Educational Workflows + Performance + Privacy + Resilience\n');
   
+  const overallStartTime = Date.now();
+  const testResults: any[] = [];
+  let allTestsPassed = true;
+
+  // Initialize all test classes
+  const serviceTest = new ServiceIntegrationTest();
+  const educationalTest = new EducationalWorkflowIntegrationTest();
+  const performanceTest = new PerformanceBaselineTest();
+  const communicationTest = new ServiceCommunicationTest();
+  const privacyTest = new PrivacyComplianceIntegrationTest();
+  const resilienceTest = new ResilienceAndLoadTest();
+
   try {
-    console.log('🚀 Starting Scribe Tree Integration Tests...\n');
+    // Initialize all test environments
+    console.log('🔧 Initializing test environments...');
+    await Promise.all([
+      serviceTest.setupTestServices(),
+      educationalTest.initialize(),
+      performanceTest.initialize(),
+      communicationTest.initialize(),
+      privacyTest.initialize(),
+      resilienceTest.initialize()
+    ]);
+    console.log('✅ All test environments initialized\n');
+
+    // 1. Basic Service Integration Tests
+    console.log('1️⃣ Running Basic Service Integration Tests...');
+    try {
+      const basicResults = await serviceTest.runIntegrationTests();
+      testResults.push({
+        testSuite: 'Basic Service Integration',
+        results: basicResults,
+        success: basicResults.summary.failed === 0
+      });
+      
+      if (basicResults.summary.failed > 0) {
+        allTestsPassed = false;
+        console.log(`❌ Basic Service Tests: ${basicResults.summary.failed} failures\n`);
+      } else {
+        console.log(`✅ Basic Service Tests: All ${basicResults.summary.total} tests passed\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Basic Service Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // 2. Educational Workflow Integration Tests
+    console.log('2️⃣ Running Educational Workflow Integration Tests...');
+    try {
+      const workflowResults = await Promise.all([
+        educationalTest.testCompleteWritingWorkflow(),
+        educationalTest.testCollaborativeWritingScenario(),
+        educationalTest.testEducatorInterventionWorkflow(),
+        educationalTest.testPrivacyAwareLearningAnalytics()
+      ]);
+      
+      const workflowSuccess = workflowResults.every(r => r.success);
+      testResults.push({
+        testSuite: 'Educational Workflows',
+        results: workflowResults,
+        success: workflowSuccess
+      });
+      
+      if (!workflowSuccess) {
+        allTestsPassed = false;
+        console.log(`❌ Educational Workflow Tests: ${workflowResults.filter(r => !r.success).length} failures\n`);
+      } else {
+        console.log(`✅ Educational Workflow Tests: All ${workflowResults.length} workflows passed\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Educational Workflow Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // 3. Performance Baseline Tests
+    console.log('3️⃣ Running Performance Baseline Tests...');
+    try {
+      const performanceReport = await performanceTest.runPerformanceBaseline();
+      const performanceSuccess = performanceReport.complianceStatus.phase3Ready;
+      
+      testResults.push({
+        testSuite: 'Performance Baseline',
+        results: performanceReport,
+        success: performanceSuccess
+      });
+      
+      if (!performanceSuccess) {
+        allTestsPassed = false;
+        console.log(`⚠️ Performance Tests: Phase 3 optimization needed\n`);
+      } else {
+        console.log(`✅ Performance Tests: All targets met, Phase 3 ready\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Performance Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // 4. Service Communication Tests
+    console.log('4️⃣ Running Service Communication Tests...');
+    try {
+      const communicationResults = await Promise.all([
+        communicationTest.testCircuitBreakerResilience(),
+        communicationTest.testServiceDiscoveryAndRouting(),
+        communicationTest.testInterServiceEventCommunication(),
+        communicationTest.testServiceAuthenticationAndAuthorization()
+      ]);
+      
+      const communicationSuccess = communicationResults.every(r => r.overallSuccess);
+      testResults.push({
+        testSuite: 'Service Communication',
+        results: communicationResults,
+        success: communicationSuccess
+      });
+      
+      if (!communicationSuccess) {
+        allTestsPassed = false;
+        console.log(`❌ Service Communication Tests: Some tests failed\n`);
+      } else {
+        console.log(`✅ Service Communication Tests: All communication patterns working\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Service Communication Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // 5. Privacy Compliance Tests
+    console.log('5️⃣ Running Comprehensive Privacy Compliance Tests...');
+    try {
+      const privacyReport = await privacyTest.runPrivacyComplianceTests();
+      const privacySuccess = privacyReport.testSummary.complianceScore >= 90;
+      
+      testResults.push({
+        testSuite: 'Privacy Compliance',
+        results: privacyReport,
+        success: privacySuccess
+      });
+      
+      if (!privacySuccess) {
+        allTestsPassed = false;
+        console.log(`❌ Privacy Compliance Tests: ${privacyReport.testSummary.complianceScore.toFixed(1)}% compliance\n`);
+      } else {
+        console.log(`✅ Privacy Compliance Tests: ${privacyReport.testSummary.complianceScore.toFixed(1)}% compliance achieved\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Privacy Compliance Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // 6. Resilience and Load Tests
+    console.log('6️⃣ Running Resilience and Load Tests...');
+    try {
+      const resilienceReport = await resilienceTest.runResilienceAndLoadTests();
+      const resilienceSuccess = 
+        resilienceReport.resilienceTests.systemResilience !== 'poor' &&
+        resilienceReport.loadTests.systemCapacity !== 'insufficient';
+      
+      testResults.push({
+        testSuite: 'Resilience and Load',
+        results: resilienceReport,
+        success: resilienceSuccess
+      });
+      
+      if (!resilienceSuccess) {
+        allTestsPassed = false;
+        console.log(`❌ Resilience and Load Tests: System needs optimization\n`);
+      } else {
+        console.log(`✅ Resilience and Load Tests: System resilience ${resilienceReport.resilienceTests.systemResilience}, capacity ${resilienceReport.loadTests.systemCapacity}\n`);
+      }
+    } catch (error) {
+      console.log(`❌ Resilience and Load Tests failed: ${error}\n`);
+      allTestsPassed = false;
+    }
+
+    // Generate comprehensive test report
+    const overallDuration = Date.now() - overallStartTime;
+    const successfulSuites = testResults.filter(r => r.success).length;
+    const totalSuites = testResults.length;
     
-    // Setup test environment
-    await tester.setupTestServices();
+    console.log('\n' + '═'.repeat(80));
+    console.log('📊 PHASE 2 WEEK 12 INTEGRATION TEST RESULTS SUMMARY');
+    console.log('═'.repeat(80));
+    console.log(`🕐 Total Duration: ${(overallDuration / 1000).toFixed(1)} seconds`);
+    console.log(`📋 Test Suites: ${successfulSuites}/${totalSuites} passed`);
+    console.log(`🎯 Overall Success: ${allTestsPassed ? '✅ PASSED' : '❌ FAILED'}`);
+    console.log('');
     
-    // Run tests
-    const testResults = await tester.runIntegrationTests();
+    // Detailed results per test suite
+    testResults.forEach(suite => {
+      const status = suite.success ? '✅' : '❌';
+      console.log(`${status} ${suite.testSuite}`);
+    });
     
-    // Display results
-    console.log('\n📊 Test Results Summary:');
-    console.log('═'.repeat(50));
-    console.log(`Total Tests: ${testResults.summary.total}`);
-    console.log(`Passed: ${testResults.summary.passed} ✅`);
-    console.log(`Failed: ${testResults.summary.failed} ❌`);
-    console.log(`Duration: ${testResults.summary.duration}ms`);
-    console.log(`Success Rate: ${((testResults.summary.passed / testResults.summary.total) * 100).toFixed(1)}%`);
+    console.log('');
     
-    if (testResults.summary.failed > 0) {
-      console.log('\n❌ Failed Tests:');
-      console.log('─'.repeat(50));
-      testResults.results
-        .filter(r => !r.success)
-        .forEach(r => {
-          console.log(`  • ${r.testName}: ${r.error}`);
-        });
+    if (allTestsPassed) {
+      console.log('🎉 PHASE 2 WEEK 12 INTEGRATION TESTING: SUCCESSFUL COMPLETION');
+      console.log('🚀 System ready for Phase 3 performance optimization');
+    } else {
+      console.log('⚠️ PHASE 2 WEEK 12 INTEGRATION TESTING: ISSUES DETECTED');
+      console.log('🔧 Review failed test suites before proceeding to Phase 3');
     }
     
-    console.log('\n✨ Integration tests completed!\n');
+    console.log('\n✨ Comprehensive integration testing completed!\n');
     
     // Exit with appropriate code
-    process.exit(testResults.summary.failed > 0 ? 1 : 0);
+    process.exit(allTestsPassed ? 0 : 1);
     
   } catch (error) {
-    console.error('💥 Integration test setup failed:', error);
+    console.error('💥 Integration test execution failed:', error);
     process.exit(1);
   } finally {
-    await tester.cleanup();
+    // Cleanup all test environments
+    console.log('🧹 Cleaning up test environments...');
+    await Promise.all([
+      serviceTest.cleanup(),
+      educationalTest.cleanup(),
+      performanceTest.cleanup(),
+      communicationTest.cleanup(),
+      privacyTest.cleanup(),
+      resilienceTest.cleanup()
+    ]);
+    console.log('✅ All test environments cleaned up');
   }
 }
 

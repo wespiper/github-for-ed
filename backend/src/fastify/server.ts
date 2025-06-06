@@ -3,8 +3,11 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
 import rateLimit from '@fastify/rate-limit';
+import { DistributedServicesManager } from '../services/integration/DistributedServicesManager';
 
-export async function buildFastifyServer(): Promise<FastifyInstance> {
+let distributedServicesManager: DistributedServicesManager | null = null;
+
+export async function buildFastifyServer(enableDistributedServices: boolean = true): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
     trustProxy: true,
@@ -36,16 +39,47 @@ export async function buildFastifyServer(): Promise<FastifyInstance> {
     timeWindow: '1 minute',
   });
 
-  // Health check endpoint
-  fastify.get('/health', async (request, reply) => {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      server: 'fastify',
-    };
-  });
+  // Initialize distributed services if enabled
+  if (enableDistributedServices) {
+    distributedServicesManager = new DistributedServicesManager(fastify, {
+      gateway: { enabled: true },
+      monitoring: { enabled: true },
+      orchestration: { enabled: true }
+    });
+    
+    await distributedServicesManager.initialize();
+    
+    // Add distributed services health to main health check
+    fastify.get('/health', async (request, reply) => {
+      const systemHealth = distributedServicesManager?.getSystemHealth();
+      
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        server: 'fastify',
+        distributedServices: systemHealth ? {
+          status: systemHealth.status,
+          services: systemHealth.services,
+          healthyServices: systemHealth.healthyServices,
+          components: systemHealth.components
+        } : 'disabled'
+      };
+    });
+  } else {
+    // Standard health check endpoint
+    fastify.get('/health', async (request, reply) => {
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        server: 'fastify',
+        distributedServices: 'disabled'
+      };
+    });
+  }
 
   // Error handling
   fastify.setErrorHandler((error, request, reply) => {
@@ -76,15 +110,32 @@ export async function buildFastifyServer(): Promise<FastifyInstance> {
   // Graceful shutdown
   process.on('SIGINT', async () => {
     fastify.log.info('SIGINT received, shutting down gracefully...');
+    
+    // Shutdown distributed services first
+    if (distributedServicesManager) {
+      await distributedServicesManager.shutdown();
+    }
+    
     await fastify.close();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
     fastify.log.info('SIGTERM received, shutting down gracefully...');
+    
+    // Shutdown distributed services first
+    if (distributedServicesManager) {
+      await distributedServicesManager.shutdown();
+    }
+    
     await fastify.close();
     process.exit(0);
   });
 
   return fastify;
+}
+
+// Export distributed services manager for external access
+export function getDistributedServicesManager(): DistributedServicesManager | null {
+  return distributedServicesManager;
 }

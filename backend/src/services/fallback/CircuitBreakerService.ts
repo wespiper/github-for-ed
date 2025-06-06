@@ -277,4 +277,31 @@ export class CircuitBreakerService {
     this.logger.log(`Circuit breaker ${serviceName} manually opened`);
     return true;
   }
+
+  /**
+   * Get circuit breaker statistics
+   */
+  getStats(): {
+    totalCircuits: number;
+    openCircuits: number;
+    closedCircuits: number;
+    halfOpenCircuits: number;
+    totalRequests: number;
+    totalFailures: number;
+    overallFailureRate: number;
+  } {
+    const circuits = Array.from(this.circuits.values());
+    const totalRequests = circuits.reduce((sum, c) => sum + c.metrics.totalRequests, 0);
+    const totalFailures = circuits.reduce((sum, c) => sum + c.metrics.totalFailures, 0);
+
+    return {
+      totalCircuits: circuits.length,
+      openCircuits: circuits.filter(c => c.state === CircuitState.OPEN).length,
+      closedCircuits: circuits.filter(c => c.state === CircuitState.CLOSED).length,
+      halfOpenCircuits: circuits.filter(c => c.state === CircuitState.HALF_OPEN).length,
+      totalRequests,
+      totalFailures,
+      overallFailureRate: totalRequests > 0 ? (totalFailures / totalRequests) * 100 : 0
+    };
+  }
 }
