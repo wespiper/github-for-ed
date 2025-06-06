@@ -2,7 +2,6 @@ import React, { type ErrorInfo, type ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Copy } from 'lucide-react';
-import { DevErrorOverlay } from './DevErrorOverlay';
 
 interface Props {
   children: ReactNode;
@@ -123,18 +122,6 @@ ${JSON.stringify(this.props, null, 2)}
   render() {
     if (this.state.hasError) {
       // Show dev overlay in development
-      if (this.state.showDevOverlay && this.state.error) {
-        return (
-          <>
-            {this.props.children}
-            <DevErrorOverlay
-              error={this.state.error}
-              errorInfo={this.state.errorInfo || undefined}
-              onDismiss={this.handleDismissDevOverlay}
-            />
-          </>
-        );
-      }
 
       if (this.props.fallback) {
         return this.props.fallback;

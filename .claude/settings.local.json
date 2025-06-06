@@ -91,7 +91,8 @@
       "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 npm run dev)",
       "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 timeout 20s npm run dev)",
       "Bash(FASTIFY_TRAFFIC_PERCENTAGE=0 FASTIFY_DEBUG_MODE=true npm run dev)",
-      "Bash(pg_isready:*)"
+      "Bash(pg_isready:*)",
+      "Bash(./cleanup-experimental-files.sh:*)"
     ],
     "deny": []
   },

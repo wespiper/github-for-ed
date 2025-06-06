@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { WritingEditor } from "@/components/editor/WritingEditor";
-import { VersionTimeline } from "@/components/editor/VersionTimeline";
-import { WritingAnalytics } from "@/components/analytics/WritingAnalytics";
+// Temporarily disabled - will be replaced in Phase 5
+// import { WritingEditor } from "@/components/editor/WritingEditor";
+// import { VersionTimeline } from "@/components/editor/VersionTimeline";
+// import { WritingAnalytics } from "@/components/analytics/WritingAnalytics";
 import { EducationalAICoach } from "@/components/ai/EducationalAICoach";
 import { useAssignment } from "@/hooks/useAssignments";
 import {
@@ -32,8 +33,7 @@ export const AssignmentWorkspace = () => {
     const { data: submission, isLoading: submissionLoading } = useSubmission(
         submissionId!
     );
-    const { data: versions, isLoading: versionsLoading } =
-        useSubmissionVersions(submissionId!);
+    const { data: versions } = useSubmissionVersions(submissionId!);
     const updateSubmission = useUpdateSubmission();
 
     // Real-time collaboration simulation (would integrate with WebSocket in production)
@@ -377,30 +377,17 @@ export const AssignmentWorkspace = () => {
                                 </details>
                             </div>
 
-                            {/* Writing Editor */}
+                            {/* Writing Editor - Phase 5 Implementation */}
                             <div className="p-6">
-                                <WritingEditor
-                                    content={submission.content || ''}
-                                    onUpdate={handleContentUpdate}
-                                    onSave={handleManualSave}
-                                    placeholder="Start writing your assignment..."
-                                    autoSave={
-                                        assignment.versionControl &&
-                                        assignment.versionControl.autoSaveInterval > 0
-                                    }
-                                    autoSaveInterval={
-                                        assignment.versionControl
-                                            ? assignment.versionControl.autoSaveInterval * 1000
-                                            : 30000
-                                    }
-                                    editable={canEdit && !isSubmitted}
-                                    maxCharacters={
-                                        assignment.requirements?.maxWords
-                                            ? assignment.requirements.maxWords *
-                                              6
-                                            : undefined
-                                    }
-                                />
+                                <div className="min-h-[400px] border rounded-lg p-4 bg-gray-50">
+                                    <textarea
+                                        className="w-full h-full min-h-[350px] p-4 border-0 bg-transparent resize-none focus:outline-none"
+                                        value={submission.content || ''}
+                                        onChange={(e) => handleContentUpdate(e.target.value)}
+                                        placeholder="Start writing your assignment..."
+                                        disabled={!canEdit || isSubmitted}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -475,38 +462,23 @@ export const AssignmentWorkspace = () => {
                     {(showVersions || showAnalytics || showAICoach) && (
                         <div className="lg:col-span-4">
                             <div className="sticky top-24 space-y-6">
+                                {/* Version Timeline - Phase 5 Implementation */}
                                 {showVersions && (
                                     <div className="bg-white rounded-lg shadow-sm p-6">
-                                        <VersionTimeline
-                                            versions={versions || []}
-                                            currentVersion={
-                                                submission.currentVersion ?? 1
-                                            }
-                                            onVersionSelect={(version) =>
-                                                console.log(
-                                                    "Version selected:",
-                                                    version
-                                                )
-                                            }
-                                            onCompareVersions={(v1, v2) =>
-                                                console.log("Compare:", v1, v2)
-                                            }
-                                            loading={versionsLoading}
-                                        />
+                                        <div className="text-center text-gray-500">
+                                            <p>Version Timeline</p>
+                                            <p className="text-sm">Coming in Phase 5</p>
+                                        </div>
                                     </div>
                                 )}
 
+                                {/* Writing Analytics - Phase 5 Implementation */}
                                 {showAnalytics && (
                                     <div className="bg-white rounded-lg shadow-sm p-6">
-                                        <WritingAnalytics
-                                            documentId={submissionId!}
-                                            currentWordCount={
-                                                submission.wordCount
-                                            }
-                                            totalVersions={
-                                                submission.currentVersion ?? 1
-                                            }
-                                        />
+                                        <div className="text-center text-gray-500">
+                                            <p>Writing Analytics</p>
+                                            <p className="text-sm">Coming in Phase 5</p>
+                                        </div>
                                     </div>
                                 )}
 

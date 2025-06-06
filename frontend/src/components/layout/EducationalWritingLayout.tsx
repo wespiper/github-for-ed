@@ -2,7 +2,7 @@ import { useState } from "react";
 import { EducationalSidebar } from "./EducationalSidebar";
 import { SplitPanelContainer } from "./SplitPanelContainer";
 import { AssignmentContextPanel, mockAssignmentData } from "@/components/assignment/AssignmentContextPanel";
-import { VersionTimelinePanel } from "@/components/editor/VersionTimelinePanel";
+// import { VersionTimelinePanel } from "@/components/editor/VersionTimelinePanel"; // Phase 5
 import { FileText, Clock, MessageCircle, Brain } from "lucide-react";
 
 type SplitMode = 'single' | 'editor-versions' | 'editor-feedback' | 'editor-context' | 'editor-comparison';
@@ -70,7 +70,7 @@ export const EducationalWritingLayout = ({
             id: 'journey',
             title: 'Writing Journey',
             icon: Clock,
-            component: VersionTimelinePanel
+            component: () => <div className="p-4 text-center text-gray-500">Version Timeline - Coming in Phase 5</div>
         },
         {
             id: 'collaboration',
