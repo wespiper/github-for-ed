@@ -4,10 +4,43 @@
  * Authentication and user management using Prisma ORM
  */
 
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 import { generateToken } from '../utils/jwt';
-import { RegisterInput, LoginInput, AuthResponse, UpdateProfileInput } from '@shared/types';
+// Note: Shared types temporarily inlined to resolve import issues
+interface RegisterInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: 'student' | 'educator' | 'admin';
+}
+
+interface LoginInput {
+  email: string;
+  password: string;
+}
+
+interface UpdateProfileInput {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  bio?: string;
+  profilePicture?: string;
+}
+
+interface AuthResponse {
+  success: boolean;
+  message: string;
+  token?: string;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+}
 import { Prisma, User } from '@prisma/client';
 
 export class AuthService {
@@ -48,6 +81,7 @@ export class AuthService {
     const userResponse = this.formatUserResponse(user);
     
     return {
+      success: true,
       message: 'User registered successfully',
       user: userResponse,
       token
@@ -83,6 +117,7 @@ export class AuthService {
     const userResponse = this.formatUserResponse(user);
     
     return {
+      success: true,
       message: 'Login successful',
       user: userResponse,
       token

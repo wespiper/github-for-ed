@@ -4,9 +4,13 @@ import { StudentLearningProfile } from './StudentLearningProfileService';
 import { CognitiveLoadDetector, CognitiveLoadIndicators } from './CognitiveLoadDetector';
 import { ServiceFactory } from '../../container/ServiceFactory';
 import { CacheKeyBuilder, CacheTTL } from '../../cache/CacheService';
+import { PrivacyCacheService, PrivacyCacheKeyBuilder } from '../../cache/PrivacyCacheService';
+import { PrivacyEventUtils } from '../../events/EventBus';
 import { 
   StudentProgressUpdatedEvent, 
   AIInteractionLoggedEvent,
+  DataAccessAuditedEvent,
+  ConsentVerificationEvent,
   EventTypes 
 } from '../../events/events';
 
@@ -80,24 +84,104 @@ export class WritingProcessAnalyzer {
   private static serviceFactory = ServiceFactory.getInstance();
 
   /**
-   * Analyze a student's writing process for an assignment
+   * Analyze a student's writing process for an assignment with privacy controls
    */
   static async analyzeWritingProcess(
     studentId: string,
     assignmentId: string,
-    profile?: StudentLearningProfile
+    profile?: StudentLearningProfile,
+    accessorId: string = 'system'
   ): Promise<WritingProcessInsights> {
     const correlationId = uuidv4();
     const cache = this.serviceFactory.getCache();
     const eventBus = this.serviceFactory.getEventBus();
     const sessionRepo = this.serviceFactory.getWritingSessionRepository();
+    
+    // Hash student ID for privacy
+    const studentIdHash = PrivacyEventUtils.hashStudentId(studentId);
 
-    // Check cache first
-    const cacheKey = CacheKeyBuilder.aiAnalysisResult('writing_process', `${studentId}:${assignmentId}`);
-    const cachedInsights = await cache.get<WritingProcessInsights>(cacheKey);
+    // Verify consent before proceeding
+    const consentVerified = await this.verifyStudentConsent(studentIdHash, 'ai-analysis');
+    
+    // Log consent verification event
+    await eventBus.publish<ConsentVerificationEvent>({
+      type: EventTypes.CONSENT_VERIFIED,
+      correlationId,
+      timestamp: new Date(),
+      category: 'consent',
+      privacyLevel: 'restricted',
+      studentIdHash,
+      payload: {
+        verificationResult: consentVerified ? 'valid' : 'insufficient',
+        requestedOperation: 'writing-process-analysis',
+        consentTypes: ['ai-analysis', 'progress-tracking'],
+        lastConsentUpdate: new Date(),
+        gracePeriodApplied: false,
+        fallbackAction: consentVerified ? 'proceed-anonymized' : 'minimal-processing'
+      },
+      privacyContext: {
+        dataMinimized: true,
+        consentVerified,
+        educationalPurpose: 'Writing skill development and process analysis'
+      },
+      metadata: { userId: studentId, source: 'writing-process-analyzer' }
+    });
+
+    if (!consentVerified) {
+      console.warn(`Writing process analysis denied for ${studentIdHash}: No consent for AI analysis`);
+      return this.createEmptyInsights(studentId, assignmentId);
+    }
+
+    // Check privacy-aware cache first
+    const privacyCacheService = new PrivacyCacheService(cache);
+    const cacheKey = PrivacyCacheKeyBuilder.aiInteractionsPrivacy(studentIdHash, assignmentId);
+    const cachedInsights = await privacyCacheService.get<WritingProcessInsights>(
+      cacheKey, 
+      {
+        privacyLevel: 'sensitive',
+        studentConsent: true,
+        anonymize: false,
+        auditAccess: true,
+        studentIdHash,
+        educationalPurpose: 'Writing process analysis'
+      },
+      accessorId
+    );
+    
     if (cachedInsights) {
       return cachedInsights;
     }
+
+    // Log data access audit event
+    await eventBus.publish<DataAccessAuditedEvent>({
+      type: EventTypes.DATA_ACCESS_AUDITED,
+      correlationId,
+      timestamp: new Date(),
+      category: 'audit',
+      privacyLevel: 'confidential',
+      studentIdHash,
+      payload: {
+        accessorId: accessorId,
+        dataType: 'student-writing',
+        purpose: 'educational-analysis',
+        educationalJustification: 'Writing skill assessment and process analysis for educational improvement',
+        accessTimestamp: new Date(),
+        dataScope: {
+          studentCount: 1,
+          recordCount: 0, // Will be updated after analysis
+          timeRange: {
+            start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
+            end: new Date()
+          }
+        }
+      },
+      privacyContext: {
+        dataMinimized: true,
+        consentVerified: true,
+        educationalPurpose: 'Writing process analysis and skill development'
+      },
+      metadata: { userId: studentId, source: 'writing-process-analyzer' }
+    });
 
     // Log AI interaction
     await eventBus.publish<AIInteractionLoggedEvent>({
@@ -194,16 +278,28 @@ export class WritingProcessAnalyzer {
       interventionSuggestions
     };
 
-    // Cache the insights
-    await cache.set(cacheKey, insights, { ttl: CacheTTL.WRITING_PATTERN });
+    // Cache the insights with privacy controls
+    await privacyCacheService.set(
+      cacheKey, 
+      insights, 
+      {
+        privacyLevel: 'sensitive',
+        studentConsent: true,
+        anonymize: false,
+        auditAccess: true,
+        studentIdHash,
+        educationalPurpose: 'Writing process analysis and improvement'
+      },
+      accessorId
+    );
 
-    // Publish progress update event
+    // Publish progress update event with privacy context
     await eventBus.publish<StudentProgressUpdatedEvent>({
       type: EventTypes.STUDENT_PROGRESS_UPDATED,
       correlationId,
       timestamp: new Date(),
       payload: {
-        studentId,
+        studentIdHash,
         courseId: '', // Would need to fetch from assignment
         assignmentId,
         progressType: 'writing',
@@ -223,7 +319,13 @@ export class WritingProcessAnalyzer {
           revisionQuality
         }
       },
-      metadata: { userId: studentId }
+      privacyContext: {
+        dataMinimized: true,
+        consentVerified: true,
+        educationalPurpose: 'Track student writing progress and provide educational insights',
+        retentionPeriod: 365 // 1 year
+      },
+      metadata: { userId: studentId, source: 'writing-process-analyzer' }
     });
 
     // Update AI interaction duration
@@ -991,5 +1093,56 @@ export class WritingProcessAnalyzer {
       processRecommendations: ['Encourage student to begin writing'],
       interventionSuggestions: ['Provide initial writing support']
     };
+  }
+
+  /**
+   * Verify student consent for AI analysis
+   * In a real implementation, this would check the consent database
+   */
+  private static async verifyStudentConsent(
+    studentIdHash: string, 
+    consentType: 'ai-analysis' | 'progress-tracking' | 'data-sharing'
+  ): Promise<boolean> {
+    const cache = this.serviceFactory.getCache();
+    const privacyCacheService = new PrivacyCacheService(cache);
+    
+    // Check consent status from cache
+    const consentKey = PrivacyCacheKeyBuilder.consentStatus(studentIdHash);
+    const consentStatus = await privacyCacheService.get<{
+      aiAnalysis: boolean;
+      progressTracking: boolean;
+      dataSharing: boolean;
+      lastUpdated: Date;
+    }>(
+      consentKey,
+      {
+        privacyLevel: 'user-specific',
+        studentConsent: true,
+        anonymize: false,
+        auditAccess: false,
+        studentIdHash,
+        educationalPurpose: 'Consent verification'
+      },
+      'consent-verifier'
+    );
+
+    // For development purposes, assume consent if not found
+    if (!consentStatus) {
+      // In production, this would default to false and require explicit consent
+      console.warn(`No consent status found for ${studentIdHash}, defaulting to true for development`);
+      return true;
+    }
+
+    // Check specific consent type
+    switch (consentType) {
+      case 'ai-analysis':
+        return consentStatus.aiAnalysis;
+      case 'progress-tracking':
+        return consentStatus.progressTracking;
+      case 'data-sharing':
+        return consentStatus.dataSharing;
+      default:
+        return false;
+    }
   }
 }

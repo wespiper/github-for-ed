@@ -124,7 +124,7 @@ export class HealthCheck {
       await cache.delete(testKey);
       
       const responseTime = Date.now() - start;
-      const isHealthy = retrieved?.timestamp === testValue.timestamp;
+      const isHealthy = (retrieved as any)?.timestamp === testValue.timestamp;
       
       return {
         status: isHealthy ? (responseTime > 500 ? 'degraded' : 'up') : 'down',

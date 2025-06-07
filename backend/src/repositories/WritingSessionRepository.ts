@@ -1,6 +1,7 @@
 import { WritingSession, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { WritingSessionRepository as IWritingSessionRepository } from './interfaces';
+import { PrivacyContext } from '../types/privacy';
 
 /**
  * Prisma implementation of WritingSessionRepository
@@ -40,7 +41,7 @@ export class PrismaWritingSessionRepository implements IWritingSessionRepository
     });
   }
 
-  async findByAssignment(assignmentId: string, userId?: string): Promise<WritingSession[]> {
+  async findByAssignment(assignmentId: string, context: PrivacyContext, userId?: string): Promise<WritingSession[]> {
     const where: any = {
       document: { assignmentId }
     };
@@ -53,7 +54,7 @@ export class PrismaWritingSessionRepository implements IWritingSessionRepository
     });
   }
 
-  async findByCourse(courseId: string, userId?: string, timeframeDays?: number): Promise<WritingSession[]> {
+  async findByCourse(courseId: string, context: PrivacyContext, userId?: string, timeframeDays?: number): Promise<WritingSession[]> {
     const where: any = {
       document: {
         assignment: { courseId }

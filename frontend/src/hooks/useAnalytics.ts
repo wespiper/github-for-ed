@@ -1,7 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { ReflectionAssessment } from '@/components/ai/ReflectionQualityInterface';
-import type { AIContribution } from '@/components/ai/AIContributionTracker';
+// import type { AIContribution } from '@/components/ai/AIContributionTracker'; // Phase 5
+
+// Temporary type definition until Phase 5
+interface AIContribution {
+  id: string;
+  timestamp: Date;
+  type: 'suggestion' | 'completion' | 'revision';
+  content: string;
+  accepted: boolean;
+  impact: 'high' | 'medium' | 'low';
+  isIncorporated?: boolean;
+  reflectionQuality?: number;
+}
 
 // Types for analytics data
 export interface WritingProgress {
@@ -563,7 +575,9 @@ export const useAnalyticsHelpers = () => {
 
     const incorporationRate = (contributions.filter(c => c.isIncorporated).length / contributions.length) * 100;
     
-    const reflectionQualityScores = contributions.map(c => getReflectionQualityScore(c.reflectionQuality));
+    const reflectionQualityScores = contributions
+      .filter(c => c.reflectionQuality !== undefined)
+      .map(c => getReflectionQualityScore(c.reflectionQuality as any));
     const averageReflectionQuality = reflectionQualityScores.reduce((sum, score) => sum + score, 0) / reflectionQualityScores.length;
 
     let educationalValue: 'high' | 'medium' | 'low';

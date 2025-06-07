@@ -1,6 +1,24 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { AuthService } from '../../services';
-import { RegisterInput, LoginInput, UpdateProfileInput } from '@shared/types';
+// Note: Shared types temporarily inlined to resolve import issues
+interface RegisterInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: 'student' | 'educator' | 'admin';
+}
+
+interface LoginInput {
+  email: string;
+  password: string;
+}
+
+interface UpdateProfileInput {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
 import { verifyToken, extractTokenFromHeader, JWTPayload } from '../../utils/jwt';
 import { User } from '@prisma/client';
 import prisma from '../../lib/prisma';

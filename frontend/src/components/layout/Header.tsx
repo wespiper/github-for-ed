@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { RoleToggle } from "@/components/admin/RoleToggle";
+// import { RoleToggle } from "@/components/admin/RoleToggle"; // Removed in cleanup
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export const Header = () => {
@@ -65,8 +65,7 @@ export const Header = () => {
                             {/* Notifications */}
                             <NotificationBell />
 
-                            {/* Admin Role Toggle */}
-                            <RoleToggle />
+                            {/* Admin Role Toggle - Removed */}
 
                             <div className="relative">
                                 <button
