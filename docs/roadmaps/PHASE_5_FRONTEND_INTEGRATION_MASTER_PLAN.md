@@ -42,9 +42,17 @@ Transform from a privacy-focused platform to an **AI Learning Partner** that:
 
 ## 🌟 NEW PRIORITY: AI Learning Partner Core Experience
 
-### The Revolutionary Writing Editor (Priority #1)
+### The Revolutionary Writing Editor - @scribe-tree/editor (Priority #1)
 
-**Vision**: A writing environment that implements "productive friction" - making students stronger through strategic challenges while maintaining engagement.
+**Vision**: A standalone, extensible writing environment module that implements "productive friction" - making students stronger through strategic challenges while maintaining engagement.
+
+#### Architecture Decision: Standalone NPM Package
+We will build ScribeEditor as **@scribe-tree/editor** - a standalone npm package that:
+- Can be developed and versioned independently
+- Enables rapid iteration without affecting core platform
+- Allows external adoption and community contributions
+- Provides plugin architecture for institutional customization
+- Maintains clean separation of concerns
 
 #### Core Design Principles
 1. **Visible Complexity**: Show the writing process, don't hide it
@@ -53,30 +61,52 @@ Transform from a privacy-focused platform to an **AI Learning Partner** that:
 4. **Transparent AI**: Show exactly how AI contributes to the work
 5. **Celebration of Growth**: Reward capability development, not task completion
 
-#### Essential Components
+#### Essential Components (Implemented as Plugins)
 
-##### 1. AI Learning Partner Interface
+##### 1. AI Learning Partner Interface (Core Feature)
 **Purpose**: Conversational AI that teaches through Socratic questioning
 - **Chat-Based Coaching**: Not answers, but better questions
 - **Thought Prompts**: "What if you considered..." instead of "Here's the answer"
 - **Capability Challenges**: Progressive tasks that build skills
 - **Reflection Triggers**: Automatic prompts for metacognition
 
-##### 2. Productive Friction Elements
+##### 2. Productive Friction Elements (Plugin System)
 **Purpose**: Strategic obstacles that develop capability
-- **Idea Maze**: Visualize multiple paths before choosing
-- **Argument Builder**: Construct logic step-by-step
-- **Evidence Challenger**: AI questions source quality
-- **Revision Layers**: Show thinking evolution visually
-- **Complexity Meters**: Make cognitive load visible
+- **IdeaMazePlugin**: Visualize multiple thesis paths before choosing
+- **ArgumentBuilderPlugin**: Construct logic step-by-step
+- **EvidenceChallengerPlugin**: AI questions source quality
+- **QuantumDocPlugin**: Show thinking evolution with timeline branches
+- **ThinkingEnginePlugin**: Make cognitive load visible
 
-##### 3. Learning Effectiveness Dashboard
+##### 3. Learning Effectiveness Dashboard (Analytics Module)
 **Purpose**: Measure what matters - capability development
 - **Thinking Depth Tracker**: Visualize analytical growth
 - **Independence Progress**: Track reduction in AI dependence
 - **Skill Mastery Map**: Show capability development
 - **Growth Celebrations**: Milestone achievements
 - **Peer Comparisons**: Anonymous capability benchmarks
+
+#### Integration with Scribe Tree Platform
+```typescript
+// Example integration in main app
+import { ScribeEditor } from '@scribe-tree/editor';
+import { useScribeTreeAPI } from '@/hooks/useAPI';
+
+function WritingWorkspace() {
+  const api = useScribeTreeAPI();
+  
+  return (
+    <ScribeEditor
+      config={{
+        plugins: ['ideaMaze', 'quantumDoc', 'thinkingEngine'],
+        api: api.endpoints,
+        theme: 'productive-friction'
+      }}
+      onAnalytics={handleLearningMetrics}
+    />
+  );
+}
+```
 
 ### Faculty Empowerment Portal (Priority #2)
 
@@ -511,39 +541,62 @@ Transform from a privacy-focused platform to an **AI Learning Partner** that:
 - **Performance**: Virtualization for large documents
 - **Accessibility**: Full keyboard navigation for all features
 
-## Revised Implementation Approach
+## Revised Implementation Approach - Dual Track Development
 
-### Phase 1: MVP Learning Partner (Months 1-2)
-**Goal**: Prove the AI Learning Partner concept with core features
-- Revolutionary writing editor with idea maze
-- Basic AI conversational interface (Socratic method)
-- Simple capability tracking and progression
-- Minimal viable productive friction elements
+### Track 1: @scribe-tree/editor Development (12 weeks)
+**Dedicated team building the standalone editor module**
 
-### Phase 2: Faculty Success Tools (Months 3-4)
+#### Weeks 1-4: Core Foundation
+- Set up @scribe-tree/editor package infrastructure
+- Implement three-panel layout with Lexical
+- Basic Root Explorer and AI Partner interface
+- Plugin architecture foundation
+
+#### Weeks 5-8: Productive Friction Features  
+- QuantumDocument with branching
+- Pattern Library system
+- ThinkingEngine analytics
+- Progressive AI access implementation
+
+#### Weeks 9-12: Polish & Extensibility
+- Complete plugin system
+- Performance optimization
+- Comprehensive documentation
+- npm package preparation
+
+### Track 2: Platform Integration (Parallel Development)
+
+#### Phase 1: MVP Learning Partner Integration (Months 1-2)
+**Goal**: Integrate ScribeEditor with core platform
+- Install and configure @scribe-tree/editor in main app
+- Connect to backend AI services and analytics
+- Implement assignment context integration
+- Create unified authentication flow
+
+#### Phase 2: Faculty Success Tools (Months 3-4)
 **Goal**: Enable educator adoption and prove learning outcomes
-- Faculty training portal with resources
-- Assignment design wizard
-- Basic learning analytics dashboard
-- ROI measurement tools
+- Faculty training portal with ScribeEditor guides
+- Assignment design wizard using editor features
+- Learning analytics dashboard with editor metrics
+- ROI measurement tools tracking capability development
 
-### Phase 3: Full Experience (Months 5-6)
-**Goal**: Complete the vision with engagement features
-- Advanced productive friction elements
-- Comprehensive analytics and insights
-- Breakthrough celebrations and gamification
-- Community and sharing features
+#### Phase 3: Full Experience (Months 5-6)
+**Goal**: Complete the platform vision
+- Advanced ScribeEditor plugin integration
+- Comprehensive analytics across all touchpoints
+- Breakthrough celebrations using editor events
+- Community features for sharing editor workflows
 
-### Phase 4: Scale & Polish (Months 7-8)
+#### Phase 4: Scale & Polish (Months 7-8)
 **Goal**: Prepare for institutional adoption
-- Performance optimization
-- White-label capabilities
-- Advanced integrations
-- Mobile optimization
-- Unified design system
-- Cross-component communication
-- Performance optimization
-- Comprehensive testing
+- Performance optimization of integrated system
+- White-label ScribeEditor customization
+- LMS integrations with editor embedding
+- Mobile optimization for editor experience
+- Unified design system across platform and editor
+- Cross-component communication finalization
+- End-to-end testing of all workflows
+- Production deployment preparation
 
 ## Remaining Phase 4 Enterprise Tasks
 
@@ -591,17 +644,29 @@ Transform from a privacy-focused platform to an **AI Learning Partner** that:
 
 ## Next Steps
 
-1. **Complete Phase 4 Production Deployment** (Weeks 18-20)
+1. **Launch ScribeEditor Development Track** (Immediate)
+   - Initialize @scribe-tree/editor package structure
+   - Assign dedicated team for 12-week development
+   - Begin Week 1: Foundation Setup
+   - Reference: [ScribeEditor Development Overview](../prompts/scribeeditor-development-overview.md)
+
+2. **Complete Phase 4 Production Deployment** (Weeks 18-20)
    - CI/CD pipelines and production configurations
    - Data migration validation with privacy protection
    - Privacy compliance certification preparation
    - Comprehensive UAT scenarios
 
-2. **Audit Existing Components**: Identify which planned components have partial implementations
-3. **Create Component Library**: Set up Storybook for isolated component development
-4. **Design System Update**: Ensure new components follow existing patterns
-5. **API Mock Server**: Create mock server for frontend development
-6. **Sprint Planning**: Use this document to plan frontend-focused sprints
+3. **Platform Integration Preparation** (Parallel to ScribeEditor)
+   - Audit existing components for editor integration points
+   - Create component library with Storybook
+   - Design system alignment with ScribeEditor
+   - API mock server for editor backend needs
+   - Update authentication flow for editor
+
+4. **Sprint Planning**: 
+   - Track 1: ScribeEditor development (12 weeks)
+   - Track 2: Platform integration and other frontend features
+   - Weekly sync between tracks for alignment
 
 ## Notes
 
