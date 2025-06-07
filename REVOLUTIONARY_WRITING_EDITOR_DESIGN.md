@@ -36,7 +36,7 @@ Our writing editor isn't just a text input tool - it's a **cognitive gymnasium**
 │   Thinking     │      Writing Canvas        │   AI Partner     │
 │   Tools        │                            │   Sidebar        │
 │                │   • Revision layers        │                  │
-│ • Idea Maze    │   • Color-coded text      │ • Chat interface │
+│ • Root Explorer│   • Color-coded text      │ • Chat interface │
 │ • Arg Builder  │   • Inline annotations    │ • Questions      │
 │ • Evidence Hub │   • Version timeline       │ • Challenges     │
 │ • Outline Tree │                            │ • Reflections    │
@@ -48,7 +48,7 @@ Our writing editor isn't just a text input tool - it's a **cognitive gymnasium**
 
 ## 🎨 Key Components
 
-### 1. The Idea Maze (Pre-Writing)
+### 1. The Root Explorer (Pre-Writing)
 
 **Purpose**: Force exploration of multiple approaches before committing
 
@@ -77,7 +77,7 @@ Our writing editor isn't just a text input tool - it's a **cognitive gymnasium**
 - **AI challenges**: Red highlights on weak connections
 
 #### Interaction Pattern
-1. Drag claim cards from idea maze
+1. Drag claim cards from root explorer
 2. Attach evidence cards from research
 3. Connect with reasoning cards
 4. AI questions weak connections
